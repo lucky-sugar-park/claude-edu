@@ -126,8 +126,10 @@
 - 🛠 실습 2: 웹에서 클라우드 작업을 시작해 두고, 모바일로 진행 상황을 확인한 뒤 결과 브랜치를 로컬에서 리뷰하기
 - 🛠 실습 3: 팀의 업무 5가지를 골라 "어떤 환경이 적절한지" 표로 정리하고 이유 발표하기
 - 🛠 실습 4: Windows Terminal 또는 tmux로 화면을 나눠 `claude`, 백엔드 서버, 프론트 서버를 함께 띄우기
+- **IDE 연결**: VS Code(확장, Cursor 등 계열 포함), IntelliJ 등 JetBrains(플러그인 + CLI, `/ide`), Eclipse(공식 플러그인 없음 → 내장 터미널에서 CLI). 선택 영역 공유, IDE diff, 진단 공유, WSL·원격 개발 설정
 - 🛠 실습 5: 같은 두 작업을 터미널 멀티 세션과 데스크톱 멀티 세션으로 각각 진행해 비교
-- 📎 예제: [주요 명령어](./examples/16-commands.md), [병렬 작업 방식 비교](./examples/17-parallel-work-terminal-vs-desktop.md), [환경별 장단점과 터미널 도구·단축키](./examples/14-environments-and-terminals.md), [환경별 실습 과제](./examples/01-basics-and-workflow.md#모듈-3-환경별-실습-과제)
+- 🛠 실습 6: IntelliJ 또는 VS Code에 연결해 선택 영역 참조, IDE diff 검토, 진단 기반 오류 수정
+- 📎 예제: [IDE 연결](./examples/25-ide-integration.md), [주요 명령어](./examples/16-commands.md), [병렬 작업 방식 비교](./examples/17-parallel-work-terminal-vs-desktop.md), [환경별 장단점과 터미널 도구·단축키](./examples/14-environments-and-terminals.md), [환경별 실습 과제](./examples/01-basics-and-workflow.md#모듈-3-환경별-실습-과제)
 
 #### 모듈 4. 코드베이스 탐색과 이해
 - 낯선 코드를 질문하는 방법 (구조, 데이터 흐름, 특정 버그의 원인)
@@ -395,6 +397,17 @@
 - 승인된 커넥터와 플러그인 목록 관리
 - AI가 생성한 코드의 품질 관리와 리뷰 문화
 
+### 선택 심화 모듈
+
+#### 심화 A. 오픈소스 LLM(Ollama)으로 RAG 구축
+- RAG 개념(검색 → 증강 → 생성), 구성 요소(분할, 임베딩, 벡터 저장소, 생성 모델, 오케스트레이션)
+- 왜 오픈소스 LLM + RAG인가: 데이터 비유출, 사내 지식 반영, 근거 제시, 폐쇄망. 한계와 대응
+- EduHub "교육 도우미": Docker Compose(pgvector + Ollama), Spring AI(Ollama, pgvector, QuestionAnswerAdvisor), 문서 적재와 질의, React MUI 채팅 화면
+- 품질 평가와 튜닝(평가 세트, 분할·임베딩·topK·프롬프트), 운영·보안
+- Claude Code로 RAG 개발하기, 그리고 사내 RAG를 MCP 서버로 감싸 Claude Code의 사내 문서 검색 도구로 활용
+- 🛠 실습: 교육 도우미 구축과 평가, 설정 변경에 따른 정확도 비교
+- 📎 예제: [Ollama로 RAG 구축](./examples/26-rag-with-ollama.md)
+
 ---
 
 ## 🏁 캡스톤 프로젝트
@@ -422,7 +435,7 @@
 | 5주 | 확장 | 12, 13 (개념 비교 토론 재진행) |
 | 6주 | 확장 | 14, 15 |
 | 7주 | 확장 · 조직 적용 | 16, 19 |
-| 8주 | 조직 적용 | 17, 18, 20 |
+| 8주 | 조직 적용 | 17, 18, 20 (+ 선택: 심화 A RAG) |
 | 9주 | 캡스톤 | 발표 및 피드백 |
 
 ---
@@ -456,6 +469,8 @@
 | [22-claude-code-vs-codex-vs-google.md](./examples/22-claude-code-vs-codex-vs-google.md) | Claude Code, OpenAI Codex, Google 코딩 에이전트 비교 | 1, 2 |
 | [23-permissions.md](./examples/23-permissions.md) | 권한의 종류, 규칙 문법, 설정 방법, 상황별 권장 설정 | 9 |
 | [24-codex-with-claude-code.md](./examples/24-codex-with-claude-code.md) | Codex와 Claude Code를 함께 쓰는 이유와 방법 | 14, 17 |
+| [25-ide-integration.md](./examples/25-ide-integration.md) | VS Code, IntelliJ(JetBrains), Eclipse 연결 방법 | 3 |
+| [26-rag-with-ollama.md](./examples/26-rag-with-ollama.md) | Ollama(오픈소스 LLM) + Spring AI + pgvector로 RAG 구축 | 심화 A |
 
 ---
 

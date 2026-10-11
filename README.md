@@ -30,3 +30,5 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [22 Claude Code vs Codex vs Google](./examples/22-claude-code-vs-codex-vs-google.md)
   - [23 권한 가이드](./examples/23-permissions.md)
   - [24 Codex와 Claude Code 함께 쓰기](./examples/24-codex-with-claude-code.md)
+  - [25 IDE 연결](./examples/25-ide-integration.md)
+  - [26 Ollama로 RAG 구축](./examples/26-rag-with-ollama.md)
