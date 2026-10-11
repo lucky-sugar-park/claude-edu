@@ -171,7 +171,8 @@
   - 프로젝트: 작업 디렉터리 기준으로 묶이는 CLAUDE.md, `.claude/` 설정·스킬·에이전트, `.mcp.json`, 세션 기록. 사용자 / 프로젝트 공유 / 프로젝트 개인 / 조직 범위의 차이 (Claude 앱의 "프로젝트" 기능과는 다른 개념)
   - 세션: 하나의 대화이자 컨텍스트. `--continue`, `--resume`, `/clear`, `/compact`로 관리
   - 활용: 세션 하나에 작업 하나, 장기 작업은 진행 상황 파일로 이어가기, 병렬 작업은 "브랜치 + 워크트리 + 세션" 하나씩, 모노레포와 멀티 저장소 구성
-  - 📎 예제: [프로젝트, 디렉터리, 세션](./examples/15-project-directory-session.md)
+  - **저장소 구조 모범 사례**: 루트 CLAUDE.md는 "지도", `.claude/`(settings, skills, agents, hooks, launch.json, worktrees), `.mcp.json`, `docs/`(architecture, adr, design, progress = Claude의 장기 기억), `reference/`(골든 예제), `scripts/verify.sh`(단일 검증 명령), 생성 코드 분리, 커밋할 것과 제외할 것
+  - 📎 예제: [프로젝트, 디렉터리, 세션](./examples/15-project-directory-session.md), [저장소 구조 모범 사례](./examples/20-repository-structure.md)
 - **무엇인가**
   - 세션을 시작할 때마다 **자동으로 컨텍스트에 들어가는** 마크다운 지침 파일
   - 매번 설명해야 하는 프로젝트 정보와 규칙을 Claude에게 알려 주는 "온보딩 문서"
@@ -303,7 +304,8 @@
   - 보안: 최소 권한, 신뢰할 수 있는 서버만 사용, 외부 데이터의 프롬프트 인젝션 주의
 - 🛠 실습 1: GitHub 또는 DB MCP를 연결해 자연어로 데이터 조회하기
 - 🛠 실습 2: 사내 API를 감싸는 간단한 MCP 서버 직접 만들기
-- 📎 예제: [MCP와 훅 개념 정리 (구성 요소, 연결 범위, 동작 시퀀스)](./examples/12-mcp-and-hooks-concepts.md), [MCP 실전 예제](./examples/04-mcp-plugins-artifacts.md)
+- **MCP 서버 심화**: 서버 유형(공식 원격, 공개 로컬, 커넥터, 플러그인, 직접 개발), `claude mcp add` 옵션과 범위(local/project/user), `.mcp.json`과 환경 변수 치환, OAuth 인증(`/mcp`), 리소스(`@서버:...`)와 프롬프트(`/mcp__서버__...`), 도구 검색과 출력 제한, 운영체제별 환경 구성, 권한 규칙, 조직 관리, 직접 만들기(TypeScript·Python, MCP Inspector), 보안과 문제 해결
+- 📎 예제: [MCP 서버 완전 가이드](./examples/19-mcp-server-guide.md), [MCP와 훅 개념 정리](./examples/12-mcp-and-hooks-concepts.md), [MCP 실전 예제](./examples/04-mcp-plugins-artifacts.md)
 
 #### 모듈 14. 플러그인(Plugins)
 - **무엇인가**
@@ -372,7 +374,7 @@
 - **측정**: `/context`, `/usage`(별칭 `/cost`), 헤드리스 JSON 출력, 관리 콘솔
 - **최적화 방법**
   - 세션 관리: 작업마다 `/clear`, 지시를 담아 `/compact`, 긴 작업은 나누고 진행 상황은 파일로
-  - 고정 비용: CLAUDE.md 다이어트, 하위 디렉터리 CLAUDE.md, 스킬 활용, 안 쓰는 MCP 서버 끄기
+  - 고정 비용: CLAUDE.md 다이어트, 하위 디렉터리 CLAUDE.md, 스킬 활용, 안 쓰는 MCP 서버 끄기(도구 검색으로 부담은 줄었지만 결과 크기는 관리 필요)
   - 도구 결과: 정확한 위치 지시, 명령 출력 줄이기, 생성물·의존성 폴더 읽기 차단, 탐색은 서브에이전트에게
   - 재작업 방지: Plan 모드, 완료 기준 명시, 잘못 가면 빨리 멈추기
   - 모델 선택: 작업 난이도에 맞는 모델, 서브에이전트별 모델 지정
@@ -441,6 +443,8 @@
 | [16-commands.md](./examples/16-commands.md) | CLI 명령·옵션, 슬래시 명령, 입력 접두사와 상황별 시나리오 | 3 (전체) |
 | [17-parallel-work-terminal-vs-desktop.md](./examples/17-parallel-work-terminal-vs-desktop.md) | 터미널 멀티 세션 vs 데스크톱 멀티 세션 vs 멀티 에이전트 비교 | 3, 11 |
 | [18-java-react-agents.md](./examples/18-java-react-agents.md) | Java + React 프로젝트에서 자주 만드는 서브에이전트와 정의 예시 | 11 |
+| [19-mcp-server-guide.md](./examples/19-mcp-server-guide.md) | MCP 서버 완전 가이드: 개념, 필요성, 사용법, 환경 구성, 직접 개발, 보안 | 13 |
+| [20-repository-structure.md](./examples/20-repository-structure.md) | Claude Code가 일하기 좋은 저장소 구조 모범 사례 | 8 |
 
 ---
 

@@ -24,3 +24,5 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [16 주요 명령어](./examples/16-commands.md)
   - [17 병렬 작업: 터미널 vs 데스크톱 vs 멀티 에이전트](./examples/17-parallel-work-terminal-vs-desktop.md)
   - [18 Java + React 에이전트 모범 사례](./examples/18-java-react-agents.md)
+  - [19 MCP 서버 완전 가이드](./examples/19-mcp-server-guide.md)
+  - [20 저장소 구조 모범 사례](./examples/20-repository-structure.md)
