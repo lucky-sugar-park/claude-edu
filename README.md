@@ -21,3 +21,5 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [13 CLAUDE.md vs 스킬 vs 에이전트 비교와 토론](./examples/13-choosing-the-right-tool.md)
   - [14 사용 환경과 터미널 도구](./examples/14-environments-and-terminals.md)
   - [15 프로젝트, 디렉터리, 세션](./examples/15-project-directory-session.md)
+  - [16 주요 명령어](./examples/16-commands.md)
+  - [17 병렬 작업: 터미널 vs 데스크톱 vs 멀티 에이전트](./examples/17-parallel-work-terminal-vs-desktop.md)

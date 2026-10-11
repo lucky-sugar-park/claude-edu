@@ -89,7 +89,7 @@
 | 병렬 작업 | 터미널 창을 여러 개 띄워 관리 | 한 창에서 여러 세션, 워크트리 자동 관리 |
 | 자동화 | 스크립트, 파이프, CI, cron 연동에 강함 | 앱 안의 예약 작업 기능 위주 |
 | 부가 기능 | 원격 제어 등 CLI 전용 명령 | 앱 미리보기, 파일 첨부, 휴대폰에서 작업 지시 |
-| 실행 환경 | Linux 서버 등 어디서나 | Mac, Windows |
+| 실행 환경 | Linux 서버 등 어디서나 | Mac, Windows (Linux는 베타) |
 
 - **터미널 도구와 단축키**
   - 윈도우에서 실행하는 두 가지 방식: 네이티브(PowerShell + Git Bash) vs WSL2
@@ -97,6 +97,8 @@
   - **wmux**: 윈도우 네이티브 AI 에이전트 멀티플렉서 (커뮤니티 오픈소스, 보안 검토 후 사용)
   - **tmux**: Linux·WSL·Mac용 터미널 멀티플렉서. 세션 유지, SSH 끊김 대비, 화면 분할
   - 자주 쓰는 단축키 치트시트: Claude Code, bash/zsh, PowerShell, VS Code, Windows Terminal·wmux·tmux
+- **주요 명령어**: CLI 명령·옵션(`claude -c`, `-r`, `-p`, `-w`, `--add-dir` 등), 슬래시 명령(`/init`, `/clear`, `/compact`, `/context`, `/rewind`, `/model`, `/permissions`, `/usage` 등), 입력 접두사(`@`, `!`)를 "무엇·왜·어떻게"와 상황별 시나리오로 익히기
+- **병렬 작업 방식 비교**: 터미널 도구로 직접 여러 세션 운영 vs CLI 백그라운드 세션(에이전트 뷰) vs 데스크톱 앱 멀티 세션 vs 한 세션 안의 멀티 에이전트(서브에이전트, `/batch`) vs 클라우드. "멀티 세션"과 "멀티 에이전트"의 차이, 상황별로 유리한 방식, 병렬 수는 리뷰 가능한 양만큼
 - **클라우드 세션 이해하기**
   - 세션마다 저장소를 새로 클론한 격리 컨테이너에서 실행되며, 작업이 끝나면 컨테이너가 정리된다 → **결과는 반드시 커밋하고 푸시**해야 남는다
   - 환경 설정: 네트워크 허용 범위, 환경 변수, 설정 스크립트(의존성 설치)
@@ -121,7 +123,8 @@
 - 🛠 실습 2: 웹에서 클라우드 작업을 시작해 두고, 모바일로 진행 상황을 확인한 뒤 결과 브랜치를 로컬에서 리뷰하기
 - 🛠 실습 3: 팀의 업무 5가지를 골라 "어떤 환경이 적절한지" 표로 정리하고 이유 발표하기
 - 🛠 실습 4: Windows Terminal 또는 tmux로 화면을 나눠 `claude`, 백엔드 서버, 프론트 서버를 함께 띄우기
-- 📎 예제: [환경별 장단점과 터미널 도구·단축키](./examples/14-environments-and-terminals.md), [환경별 실습 과제](./examples/01-basics-and-workflow.md#모듈-3-환경별-실습-과제)
+- 🛠 실습 5: 같은 두 작업을 터미널 멀티 세션과 데스크톱 멀티 세션으로 각각 진행해 비교
+- 📎 예제: [주요 명령어](./examples/16-commands.md), [병렬 작업 방식 비교](./examples/17-parallel-work-terminal-vs-desktop.md), [환경별 장단점과 터미널 도구·단축키](./examples/14-environments-and-terminals.md), [환경별 실습 과제](./examples/01-basics-and-workflow.md#모듈-3-환경별-실습-과제)
 
 #### 모듈 4. 코드베이스 탐색과 이해
 - 낯선 코드를 질문하는 방법 (구조, 데이터 흐름, 특정 버그의 원인)
@@ -249,7 +252,7 @@
   - 만들면 좋은 경우: 넓은 탐색, 독립된 관점의 검토, 병렬 처리, 권한 제한, 다른 모델이 적합한 작업, 반복되는 역할
   - 만들지 않는 편이 나은 경우: 일회성 작업, 대화 맥락이 꼭 필요한 작업, 절차 안내(→ 스킬), 강제 검사(→ 훅)
 - **어떻게 만드는가**
-  - `/agents`로 대화형 생성, 또는 `.claude/agents/*.md` 직접 작성 (`name`, `description`, `tools`, `model`)
+  - Claude에게 대화로 요청해 생성, 또는 `.claude/agents/*.md` 직접 작성 (`name`, `description`, `tools`, `model`)
   - 잘 만드는 원칙: 단일 책임, description에 "언제" 명시, 최소 권한 도구, 결과 보고 형식 지정, 검증 수단 제공
   - 호출: 자동 위임, 이름으로 명시 호출, 병렬 호출
 - **동작 시퀀스**
@@ -365,7 +368,7 @@
 
 #### 모듈 19. 토큰 사용량 최적화
 - **토큰은 어디에 쓰이는가**: 시스템 지침·도구 정의, CLAUDE.md, 대화 기록, **도구 결과(가장 큰 비중)**. 대화가 길수록 매 턴이 비싸진다
-- **측정**: `/context`, `/cost`, 헤드리스 JSON 출력, 관리 콘솔
+- **측정**: `/context`, `/usage`(별칭 `/cost`), 헤드리스 JSON 출력, 관리 콘솔
 - **최적화 방법**
   - 세션 관리: 작업마다 `/clear`, 지시를 담아 `/compact`, 긴 작업은 나누고 진행 상황은 파일로
   - 고정 비용: CLAUDE.md 다이어트, 하위 디렉터리 CLAUDE.md, 스킬 활용, 안 쓰는 MCP 서버 끄기
@@ -434,6 +437,8 @@
 | [13-choosing-the-right-tool.md](./examples/13-choosing-the-right-tool.md) | CLAUDE.md·커맨드·스킬·에이전트·훅 비교와 토론 | 2, 12 |
 | [14-environments-and-terminals.md](./examples/14-environments-and-terminals.md) | 터미널·IDE·데스크톱·클라우드·모바일 장단점, Windows Terminal·wmux·tmux, 단축키 | 3 |
 | [15-project-directory-session.md](./examples/15-project-directory-session.md) | 프로젝트, 디렉터리, 세션의 개념과 활용 방법 | 8 |
+| [16-commands.md](./examples/16-commands.md) | CLI 명령·옵션, 슬래시 명령, 입력 접두사와 상황별 시나리오 | 3 (전체) |
+| [17-parallel-work-terminal-vs-desktop.md](./examples/17-parallel-work-terminal-vs-desktop.md) | 터미널 멀티 세션 vs 데스크톱 멀티 세션 vs 멀티 에이전트 비교 | 3, 11 |
 
 ---
 
