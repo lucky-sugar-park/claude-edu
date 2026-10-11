@@ -377,7 +377,9 @@
 - `claude -p` 비대화형 실행, JSON 출력
 - GitHub Actions 연동: PR 자동 리뷰, 이슈 자동 처리
 - 🛠 실습: PR이 열리면 자동으로 리뷰 코멘트가 달리는 워크플로우 구축
-- 📎 예제: [자동화 예제](./examples/05-automation-and-capstone.md)
+- **Claude Code로 빌드·배포 파이프라인 구축**: Claude의 세 역할(파이프라인 작성, 파이프라인 안의 보조 단계, 로컬 검증), CI(변경 영역 검사·캐시·API 계약 검사), 컨테이너 이미지(한 번 빌드·여러 번 배포), 환경별 배포와 운영 사람 승인(GitHub Environments), Flyway 하위 호환 마이그레이션, CI 실패 자동 분석, 파이프라인 보안(OIDC, 최소 권한, 외부 PR, 프롬프트 인젝션)
+- 🛠 실습: CI/CD 구축, 실패 분석 코멘트, 운영 승인 대기 확인, 롤백 훈련
+- 📎 예제: [빌드·배포 파이프라인 모범 사례](./examples/28-build-deploy-pipeline.md), [자동화 예제](./examples/05-automation-and-capstone.md)
 
 #### 모듈 18. Claude Agent SDK
 - Claude Code를 움직이는 에이전트 루프를 **내 애플리케이션에서 직접** 쓰기 (모듈 1의 원리를 코드로 구현)
@@ -492,6 +494,7 @@
 | [25-ide-integration.md](./examples/25-ide-integration.md) | VS Code, IntelliJ(JetBrains), Eclipse 연결 방법 | 3 |
 | [26-rag-with-ollama.md](./examples/26-rag-with-ollama.md) | Ollama(오픈소스 LLM) + Spring AI + pgvector로 RAG 구축 | 심화 A |
 | [27-developer-responsibility.md](./examples/27-developer-responsibility.md) | ⭐ 바이브 코딩 시대 개발자의 책임: 구조 통제, 긴급 직접 대응, 환경 분리 | 1, 20, 전체 |
+| [28-build-deploy-pipeline.md](./examples/28-build-deploy-pipeline.md) | Claude Code로 빌드·배포 파이프라인 구축 모범 사례 | 17 |
 
 ---
 
