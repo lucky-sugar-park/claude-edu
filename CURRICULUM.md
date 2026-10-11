@@ -162,7 +162,13 @@
 - 🛠 실습: 이슈 하나를 브랜치 → 구현 → PR → 리뷰 반영 → 머지까지 완주
 - 📎 예제: [GitHub 연결과 버전관리](./examples/06-github-version-control.md)
 
-#### 모듈 8. 컨텍스트 관리 & CLAUDE.md
+#### 모듈 8. 프로젝트·세션·컨텍스트 관리 & CLAUDE.md
+- **프로젝트, 디렉터리, 세션의 개념**
+  - 작업 디렉터리: `claude`를 실행한 폴더. 접근 범위와 불러올 설정이 정해진다. 저장소 루트에서 실행하고, 다른 저장소는 `--add-dir` / `/add-dir`로 추가
+  - 프로젝트: 작업 디렉터리 기준으로 묶이는 CLAUDE.md, `.claude/` 설정·스킬·에이전트, `.mcp.json`, 세션 기록. 사용자 / 프로젝트 공유 / 프로젝트 개인 / 조직 범위의 차이 (Claude 앱의 "프로젝트" 기능과는 다른 개념)
+  - 세션: 하나의 대화이자 컨텍스트. `--continue`, `--resume`, `/clear`, `/compact`로 관리
+  - 활용: 세션 하나에 작업 하나, 장기 작업은 진행 상황 파일로 이어가기, 병렬 작업은 "브랜치 + 워크트리 + 세션" 하나씩, 모노레포와 멀티 저장소 구성
+  - 📎 예제: [프로젝트, 디렉터리, 세션](./examples/15-project-directory-session.md)
 - **무엇인가**
   - 세션을 시작할 때마다 **자동으로 컨텍스트에 들어가는** 마크다운 지침 파일
   - 매번 설명해야 하는 프로젝트 정보와 규칙을 Claude에게 알려 주는 "온보딩 문서"
@@ -202,6 +208,7 @@
 - 🛠 실습 1: `/init`으로 초안을 만든 뒤, 위 기준에 따라 불필요한 내용을 걷어내고 팀 규칙 추가하기
 - 🛠 실습 2: CLAUDE.md가 **있을 때와 없을 때** 같은 과제를 수행해 결과 비교하기
 - 🛠 실습 3: 일부러 너무 길거나 서로 충돌하는 CLAUDE.md를 만들어 어떤 문제가 생기는지 관찰하기
+- 🛠 실습 4: 루트와 `backend/`에서 각각 실행해 범위 비교, `--continue`/`--resume`으로 세션 이어가기, 진행 상황 파일로 새 세션에서 작업 이어가기
 - 📎 예제: [EduHub의 CLAUDE.md (루트, backend, frontend)](./examples/02-claude-md.md)
 
 ### 4단계: 확장 — "에이전트의 능력 넓히기"
@@ -426,6 +433,7 @@
 | [12-mcp-and-hooks-concepts.md](./examples/12-mcp-and-hooks-concepts.md) | MCP와 훅의 개념, 필요성, 사용법 | 12, 13 |
 | [13-choosing-the-right-tool.md](./examples/13-choosing-the-right-tool.md) | CLAUDE.md·커맨드·스킬·에이전트·훅 비교와 토론 | 2, 12 |
 | [14-environments-and-terminals.md](./examples/14-environments-and-terminals.md) | 터미널·IDE·데스크톱·클라우드·모바일 장단점, Windows Terminal·wmux·tmux, 단축키 | 3 |
+| [15-project-directory-session.md](./examples/15-project-directory-session.md) | 프로젝트, 디렉터리, 세션의 개념과 활용 방법 | 8 |
 
 ---
 
