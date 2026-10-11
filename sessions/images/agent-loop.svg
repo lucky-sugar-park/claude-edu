@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif">
+  <rect width="900" height="520" fill="#ffffff"/>
+  <text x="450" y="38" text-anchor="middle" font-size="24" font-weight="700" fill="#1f2937">에이전트 루프: 목표를 이룰 때까지 반복한다</text>
+  <defs>
+    <marker id="a" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#d97706"/></marker>
+  </defs>
+  <!-- user -->
+  <rect x="30" y="215" width="150" height="90" rx="14" fill="#f3f4f6" stroke="#6b7280" stroke-width="2"/>
+  <text x="105" y="252" text-anchor="middle" font-size="18" font-weight="700" fill="#1f2937">👤 사용자</text>
+  <text x="105" y="280" text-anchor="middle" font-size="14" fill="#4b5563">목표를 지시</text>
+  <line x1="182" y1="260" x2="262" y2="260" stroke="#6b7280" stroke-width="2.5" marker-end="url(#a)"/>
+  <!-- loop circle nodes -->
+  <circle cx="520" cy="270" r="170" fill="none" stroke="#fcd34d" stroke-width="3" stroke-dasharray="8 6"/>
+  <g font-size="17" font-weight="700">
+    <rect x="440" y="70" width="160" height="64" rx="12" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+    <text x="520" y="98" text-anchor="middle" fill="#92400e">② 도구 호출</text>
+    <text x="520" y="121" text-anchor="middle" font-size="13" font-weight="400" fill="#4b5563">읽기 · 수정 · 실행</text>
+
+    <rect x="630" y="238" width="170" height="64" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="715" y="266" text-anchor="middle" fill="#1e40af">③ 결과 관찰</text>
+    <text x="715" y="289" text-anchor="middle" font-size="13" font-weight="400" fill="#4b5563">테스트 결과, 오류 확인</text>
+
+    <rect x="440" y="406" width="160" height="64" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="520" y="434" text-anchor="middle" fill="#166534">④ 다음 판단</text>
+    <text x="520" y="457" text-anchor="middle" font-size="13" font-weight="400" fill="#4b5563">계속? 완료?</text>
+
+    <rect x="262" y="238" width="160" height="64" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="342" y="266" text-anchor="middle" fill="#5b21b6">① 이해 · 계획</text>
+    <text x="342" y="289" text-anchor="middle" font-size="13" font-weight="400" fill="#4b5563">무엇을 할지 결정</text>
+  </g>
+  <g stroke="#d97706" stroke-width="2.5" fill="none" marker-end="url(#a)">
+    <path d="M600,110 Q690,140 710,232"/>
+    <path d="M710,306 Q690,400 604,432"/>
+    <path d="M438,432 Q350,400 336,308"/>
+    <path d="M342,236 Q350,140 436,106"/>
+  </g>
+  <text x="520" y="262" text-anchor="middle" font-size="16" font-weight="700" fill="#1f2937">Claude 모델</text>
+  <text x="520" y="285" text-anchor="middle" font-size="13" fill="#4b5563">(두뇌)</text>
+  <!-- done -->
+  <text x="190" y="440" font-size="14" fill="#374151">완료되면</text>
+  <text x="190" y="460" font-size="14" fill="#374151">결과 보고 ➜ 👤</text>
+  <text x="640" y="500" font-size="13" fill="#6b7280">도구 = 손과 발 · 하네스(Claude Code) = 실행과 권한 확인</text>
+</svg>

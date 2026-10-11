@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" font-family="'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif">
+  <rect width="960" height="380" fill="#ffffff"/>
+  <text x="480" y="38" text-anchor="middle" font-size="24" font-weight="700" fill="#1f2937">같은 에이전트, 여러 화면</text>
+  <rect x="40" y="70" width="560" height="200" rx="16" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="60" y="98" font-size="16" font-weight="700" fill="#166534">💻 내 컴퓨터에서 실행 (로컬)</text>
+  <rect x="640" y="70" width="280" height="200" rx="16" fill="#eff6ff" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="660" y="98" font-size="16" font-weight="700" fill="#1e40af">☁️ 클라우드에서 실행</text>
+  <g font-size="15">
+    <rect x="60" y="120" width="160" height="130" rx="12" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="140" y="160" text-anchor="middle" font-size="28">⌨️</text>
+    <text x="140" y="195" text-anchor="middle" font-weight="700" fill="#1f2937">터미널(CLI)</text>
+    <text x="140" y="220" text-anchor="middle" font-size="12" fill="#6b7280">모든 기능 · 자동화</text>
+
+    <rect x="240" y="120" width="160" height="130" rx="12" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="320" y="160" text-anchor="middle" font-size="28">🧩</text>
+    <text x="320" y="195" text-anchor="middle" font-weight="700" fill="#1f2937">IDE</text>
+    <text x="320" y="220" text-anchor="middle" font-size="12" fill="#6b7280">VS Code · IntelliJ</text>
+
+    <rect x="420" y="120" width="160" height="130" rx="12" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="500" y="160" text-anchor="middle" font-size="28">🖥️</text>
+    <text x="500" y="195" text-anchor="middle" font-weight="700" fill="#1f2937">데스크톱 앱</text>
+    <text x="500" y="220" text-anchor="middle" font-size="12" fill="#6b7280">시각적 diff · 멀티 세션</text>
+
+    <rect x="660" y="120" width="115" height="130" rx="12" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="717" y="160" text-anchor="middle" font-size="28">🌐</text>
+    <text x="717" y="195" text-anchor="middle" font-weight="700" fill="#1f2937">웹</text>
+    <text x="717" y="220" text-anchor="middle" font-size="12" fill="#6b7280">맡겨 두기</text>
+
+    <rect x="790" y="120" width="115" height="130" rx="12" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="847" y="160" text-anchor="middle" font-size="28">📱</text>
+    <text x="847" y="195" text-anchor="middle" font-weight="700" fill="#1f2937">모바일</text>
+    <text x="847" y="220" text-anchor="middle" font-size="12" fill="#6b7280">지시 · 확인</text>
+  </g>
+  <rect x="190" y="300" width="580" height="56" rx="28" fill="#1f2937"/>
+  <text x="480" y="334" text-anchor="middle" font-size="16" fill="#ffffff">CLAUDE.md · 스킬 · 설정은 어느 화면에서든 똑같이 적용</text>
+</svg>

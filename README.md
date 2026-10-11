@@ -4,6 +4,8 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
 
 ## 문서
 - [CURRICULUM.md](./CURRICULUM.md) — 전체 커리큘럼 (5단계, 20개 모듈 + 선택 심화, 캡스톤)
+- [sessions/](./sessions/) — 회차별 강의 자료
+  - [1회차: 오리엔테이션 & 핵심 개념 (1~2시간)](./sessions/session-01-introduction.md)
 - [examples/](./examples/) — 실습 예제 (EduHub: Java + Spring Boot + JPA + OpenAPI + React MFE + MUI + Axios)
   - [00 예제 프로젝트](./examples/00-sample-project.md)
   - [01 기본 사용과 워크플로우](./examples/01-basics-and-workflow.md)
