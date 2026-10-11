@@ -267,7 +267,8 @@
 - 🛠 실습 1: `code-explorer`로 탐색을 맡기고 메인 컨텍스트 사용량 비교하기
 - 🛠 실습 2: 코드 리뷰 전용 서브에이전트 만들고 description에 따른 자동 위임 실험하기
 - 🛠 실습 3: 서브에이전트 팀으로 "수강 후기" 기능을 설계부터 PR까지 진행하기
-- 📎 예제: [에이전트 만들기와 동작 시퀀스, 역할 분담](./examples/10-agents.md)
+- **Java + React 프로젝트의 에이전트 모범 사례**: 탐색(`code-explorer`), 설계(`architect`), 구현(`backend-dev`, `frontend-dev`), 테스트(`backend-test-writer`, `frontend-test-writer`), 리뷰(`jpa-reviewer`, `spring-api-reviewer`, `react-reviewer`, `security-reviewer`), 변경 관리, 빌드 수정 등. 시작 세트 3개부터, 리뷰어는 읽기 전용, 모델은 역할에 맞게
+- 📎 예제: [에이전트 만들기와 동작 시퀀스, 역할 분담](./examples/10-agents.md), [Java + React 에이전트 모범 사례](./examples/18-java-react-agents.md)
 
 #### 모듈 12. 훅(Hooks)
 - **무엇인가**
@@ -439,6 +440,7 @@
 | [15-project-directory-session.md](./examples/15-project-directory-session.md) | 프로젝트, 디렉터리, 세션의 개념과 활용 방법 | 8 |
 | [16-commands.md](./examples/16-commands.md) | CLI 명령·옵션, 슬래시 명령, 입력 접두사와 상황별 시나리오 | 3 (전체) |
 | [17-parallel-work-terminal-vs-desktop.md](./examples/17-parallel-work-terminal-vs-desktop.md) | 터미널 멀티 세션 vs 데스크톱 멀티 세션 vs 멀티 에이전트 비교 | 3, 11 |
+| [18-java-react-agents.md](./examples/18-java-react-agents.md) | Java + React 프로젝트에서 자주 만드는 서브에이전트와 정의 예시 | 11 |
 
 ---
 
