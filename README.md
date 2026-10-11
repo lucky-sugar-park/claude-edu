@@ -34,3 +34,4 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [24 Codex와 Claude Code 함께 쓰기](./examples/24-codex-with-claude-code.md)
   - [25 IDE 연결](./examples/25-ide-integration.md)
   - [26 Ollama로 RAG 구축](./examples/26-rag-with-ollama.md)
+  - [27 ⭐ 바이브 코딩 시대, 개발자가 놓치면 안 되는 것](./examples/27-developer-responsibility.md)
