@@ -38,7 +38,10 @@
 - **왜 중요한가**
   - 원리를 알면 좋은 지시, 적절한 컨텍스트 제공, 실패 원인 분석을 스스로 할 수 있다
   - Claude Code가 "코딩 에이전트"인 이유: 파일 읽기·수정, 명령 실행, 검색을 스스로 반복한다
+- **도구(Tools)의 개념**: 모델이 실행을 "요청"하고 하네스가 실행하는 기능. 이름·설명·입력 스키마, 내장 도구(Read, Edit, Bash, WebFetch, Agent 등)와 MCP·SDK 도구, 권한·훅으로 통제
+- **다른 코딩 에이전트와의 비교**: OpenAI Codex, Google(Antigravity, Gemini CLI, Jules)과 개념 대응표, 평가 기준, 도구 중립적인 자산 관리
 - 🛠 실습: 간단한 과제를 Claude Code에 맡긴 뒤 **도구 호출 기록을 단계별로 따라가며** 에이전트 루프를 직접 관찰하기
+- 📎 예제: [도구(Tools) 개념](./examples/21-tools-concept.md), [Claude Code vs Codex vs Google](./examples/22-claude-code-vs-codex-vs-google.md)
 
 #### 모듈 2. 확장 생태계 한눈에 보기
 - 에이전트의 능력을 넓히는 구성 요소들과 그 관계
@@ -218,10 +221,13 @@
 ### 4단계: 확장 — "에이전트의 능력 넓히기"
 
 #### 모듈 9. 설정과 권한 (settings.json)
-- 권한 모드, allow/deny 규칙, 환경 변수
+- **사용자가 Claude Code에게 주는 권한**: 도구 종류별 기본 승인 동작, allow/ask/deny 규칙(평가 순서 deny → ask → allow), 권한 모드(Manual, acceptEdits, plan, auto, dontAsk, bypassPermissions), 작업 디렉터리 범위
+- 설정 방법: 승인 화면, `/permissions`, 프로젝트·개인·사용자·관리 설정, CLI 옵션과 우선순위. 규칙 문법(Bash 와일드카드, Read/Edit 경로 패턴, WebFetch 도메인, MCP, Agent)
+- 안전장치: 작업 공간 신뢰, MCP 서버 승인, 훅, 샌드박스, 관리 설정
+- 환경 변수
 - 보안 관점: 비밀정보 보호, 위험한 명령 차단
 - 🛠 실습: 팀 공용 `.claude/settings.json` 구성
-- 📎 예제: [settings.json 예시](./examples/03-settings-skills-agents-hooks.md)
+- 📎 예제: [권한 가이드](./examples/23-permissions.md), [settings.json 예시](./examples/03-settings-skills-agents-hooks.md)
 
 #### 모듈 10. 스킬(Skills)과 슬래시 커맨드
 - **무엇인가**
@@ -320,7 +326,8 @@
   - 플러그인 구조: 매니페스트(`plugin.json`)와 `commands/`, `skills/`, `agents/`, `hooks/` 디렉터리
   - 사내 마켓플레이스 구성과 배포 전략
 - 🛠 실습: 모듈 10~13에서 만든 결과물을 팀용 플러그인 하나로 패키징해 설치하기
-- 📎 예제: [플러그인 예제](./examples/04-mcp-plugins-artifacts.md#모듈-14-플러그인-eduhub-dev-kit)
+- **Codex와 함께 쓰기**: 왜(교차 리뷰, 설계 반론, 막힌 작업 넘기기), 어떻게(AGENTS.md 공유, OpenAI 공식 플러그인 codex-plugin-cc의 `/codex:review`·`/codex:adversarial-review`·`/codex:rescue`, MCP 연결, PR 교차 리뷰, CI 파이프라인), 주의 사항
+- 📎 예제: [플러그인 예제](./examples/04-mcp-plugins-artifacts.md#모듈-14-플러그인-eduhub-dev-kit), [Codex와 Claude Code 함께 쓰기](./examples/24-codex-with-claude-code.md)
 
 #### 모듈 15. 아티팩트(Artifacts)
 - **무엇인가**
@@ -445,6 +452,10 @@
 | [18-java-react-agents.md](./examples/18-java-react-agents.md) | Java + React 프로젝트에서 자주 만드는 서브에이전트와 정의 예시 | 11 |
 | [19-mcp-server-guide.md](./examples/19-mcp-server-guide.md) | MCP 서버 완전 가이드: 개념, 필요성, 사용법, 환경 구성, 직접 개발, 보안 | 13 |
 | [20-repository-structure.md](./examples/20-repository-structure.md) | Claude Code가 일하기 좋은 저장소 구조 모범 사례 | 8 |
+| [21-tools-concept.md](./examples/21-tools-concept.md) | 도구(Tools)의 개념, 동작, 종류, 통제 방법 | 1 |
+| [22-claude-code-vs-codex-vs-google.md](./examples/22-claude-code-vs-codex-vs-google.md) | Claude Code, OpenAI Codex, Google 코딩 에이전트 비교 | 1, 2 |
+| [23-permissions.md](./examples/23-permissions.md) | 권한의 종류, 규칙 문법, 설정 방법, 상황별 권장 설정 | 9 |
+| [24-codex-with-claude-code.md](./examples/24-codex-with-claude-code.md) | Codex와 Claude Code를 함께 쓰는 이유와 방법 | 14, 17 |
 
 ---
 

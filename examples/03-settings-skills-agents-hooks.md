@@ -11,25 +11,27 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./gradlew test:*)",
+      "Bash(./gradlew test *)",
       "Bash(./gradlew spotlessApply)",
       "Bash(./gradlew build)",
-      "Bash(npm test:*)",
+      "Bash(npm test *)",
       "Bash(npm run lint)",
       "Bash(npm run generate:api)",
       "Bash(git status)",
-      "Bash(git diff:*)"
+      "Bash(git diff *)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./backend/src/main/resources/application-prod.yml)",
-      "Bash(git push --force:*)",
-      "Bash(./gradlew flywayClean:*)"
+      "Bash(git push --force*)",
+      "Bash(./gradlew flywayClean*)"
     ]
   }
 }
 ```
+
+> 규칙 문법과 우선순위의 자세한 설명은 [권한 가이드](./23-permissions.md)를 참고하세요.
 
 **설계 포인트**
 - 자주 쓰고 안전한 명령(테스트, 린트, 포맷)은 `allow`로 승인 없이 실행

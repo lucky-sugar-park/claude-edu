@@ -26,3 +26,7 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [18 Java + React 에이전트 모범 사례](./examples/18-java-react-agents.md)
   - [19 MCP 서버 완전 가이드](./examples/19-mcp-server-guide.md)
   - [20 저장소 구조 모범 사례](./examples/20-repository-structure.md)
+  - [21 도구(Tools) 개념](./examples/21-tools-concept.md)
+  - [22 Claude Code vs Codex vs Google](./examples/22-claude-code-vs-codex-vs-google.md)
+  - [23 권한 가이드](./examples/23-permissions.md)
+  - [24 Codex와 Claude Code 함께 쓰기](./examples/24-codex-with-claude-code.md)
