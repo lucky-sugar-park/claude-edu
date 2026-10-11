@@ -2,7 +2,7 @@
 
 > 대상: 실무 개발자
 > 기간: 9주(주 1회 3시간) 또는 5일 집중과정
-> 구성: 5단계, 20개 모듈과 캡스톤 프로젝트
+> 구성: 5단계, 20개 모듈 + 선택 심화 모듈(RAG)과 캡스톤 프로젝트
 > 실습 예제: Java + Spring Boot + JPA/Hibernate + OpenAPI/Swagger + React + Microfrontend + MUI + Axios 기반 [EduHub 프로젝트](./examples/00-sample-project.md)
 
 ---
