@@ -1,4 +1,4 @@
-# 사용 환경 비교: 터미널, 데스크톱 앱, 클라우드(웹), 모바일 + 터미널 도구 (Windows Terminal, wmux, tmux)
+# 사용 환경 비교: 터미널, 데스크톱 앱, 클라우드(웹), 모바일 + 터미널 도구 (Windows Terminal, wmux, tmux, 멀티 모델 오픈소스 에이전트)
 
 > 관련 모듈: 3
 > 예제 프로젝트: [EduHub](./00-sample-project.md)
@@ -378,6 +378,48 @@ tmux new -s eduhub -c ~/projects/eduhub     # 세션 시작
 | 줄바꿈 문자(CRLF/LF) 차이로 diff가 전부 바뀜 | `.gitattributes`로 줄바꿈 규칙 고정, `git config core.autocrlf` 확인 |
 | bash로 작성한 훅이 동작하지 않음 | Git Bash 설치 또는 WSL 사용, 혹은 훅을 PowerShell 스크립트로 작성 |
 | `gradlew` 실행 권한 문제 (WSL) | `chmod +x gradlew` |
+
+### 4-9. 참고: 여러 모델을 지원하는 오픈소스 에이전트 환경
+
+터미널에서 쓰는 AI 에이전트 중에는 **특정 회사 모델에 묶이지 않고 여러 모델을 골라 쓸 수 있는 오픈소스 환경**도 있습니다. 교육과정의 중심 도구는 아니지만, 이런 선택지가 있다는 정도로 알아 두면 좋습니다.
+
+> ⚠️ 2026년 10월 기준 각 프로젝트의 공식 GitHub 저장소 내용을 바탕으로 정리했습니다. 변화가 매우 빠른 분야이므로 사용 전에 공식 문서를 확인하세요.
+
+| 도구 | 성격 | 라이선스 | 모델 | 특징 |
+|---|---|---|---|---|
+| **Hermes Agent** (Nous Research) | 범용 개인 비서형 에이전트 (코딩 전용 아님) | MIT | Nous Portal, OpenRouter, OpenAI, 사용자 지정 엔드포인트 등 다수 (`hermes model`로 전환) | 경험에서 스킬을 스스로 만들고 개선, 장기 메모리, MCP, 서브에이전트, 메신저 연동(Telegram·Slack 등), 예약 실행, Docker·SSH 등 여러 실행 환경 |
+| **OpenClaw** | 내 컴퓨터에서 돌아가는 개인 AI 비서 (코딩 전용 아님) | MIT | Claude, Codex, 로컬 모델 등 (모델·에이전트 실행기를 플러그인으로 교체) | 게이트웨이 중심 구조, 20여 개 메신저 연동, 스킬·플러그인 공유 허브(ClawHub), 데스크톱·모바일 앱 |
+| **OpenCode** | **코딩 특화** 터미널 에이전트 | MIT | 여러 제공사 모델 선택 (공식 문서 확인) | 터미널 UI, 수정 가능한 build 에이전트와 읽기 전용 plan 에이전트를 Tab으로 전환, 탐색용 서브에이전트, 데스크톱 앱(베타) |
+
+**설치 예시** (공식 저장소 안내 기준, Linux·macOS·WSL2)
+
+```bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash   # Hermes Agent → 실행: hermes
+curl -fsSL https://openclaw.ai/install.sh | bash                     # OpenClaw → 실행: openclaw onboard
+curl -fsSL https://opencode.ai/install | bash                        # OpenCode → 실행: opencode
+```
+
+**Claude Code와 비교해 알아 둘 점**
+
+| 관점 | Claude Code | 멀티 모델 오픈소스 환경 |
+|---|---|---|
+| 모델 | Claude 모델 | 여러 회사 모델, 로컬 모델(Ollama 등)까지 선택 |
+| 소스 공개 | 비공개 | 공개 (직접 수정·자체 호스팅 가능) |
+| 지원 | 공식 문서와 기업 지원 | 커뮤니티 중심 |
+| 공통 개념 | 스킬, MCP, 서브에이전트, 훅 | 비슷한 개념을 대부분 지원 (Hermes는 Agent Skills 표준을 따름) |
+
+**이럴 때 검토해 볼 만합니다**
+- 사내 정책상 **로컬·사내 모델**만 써야 하는 환경 ([Ollama RAG](./26-rag-with-ollama.md)와 연결)
+- 여러 모델을 **비교·실험**해 보고 싶을 때
+- 메신저 연동, 예약 작업 같은 **개인 비서형 자동화**가 필요할 때 (Hermes, OpenClaw)
+
+**주의할 점**
+- 이 도구들은 내 컴퓨터에서 **내 권한으로 명령을 실행**합니다. 샌드박스 설정, 권한 범위를 먼저 확인하세요
+- 메신저로 외부 메시지를 받는 구성은 **프롬프트 인젝션**에 특히 취약합니다 (OpenClaw도 수신 메시지를 신뢰할 수 없는 입력으로 다루라고 안내)
+- 커뮤니티 스킬·플러그인은 설치 전에 내용을 직접 검토합니다
+- 회사 코드에 사용하기 전에 **보안 검토와 데이터 처리 정책**(어느 모델 제공사로 코드가 전송되는지)을 확인합니다
+
+> 💡 이 교육과정에서 배우는 원리(에이전트 루프, 컨텍스트 관리, 검증 수단 제공, 최소 권한, 스킬·MCP 설계)는 이런 도구에도 그대로 통합니다. 도구 비교는 [Claude Code vs Codex vs Google](./22-claude-code-vs-codex-vs-google.md)도 참고하세요.
 
 ---
 

@@ -109,6 +109,7 @@
   - **wmux**: 윈도우 네이티브 AI 에이전트 멀티플렉서 (커뮤니티 오픈소스, 보안 검토 후 사용)
   - **tmux**: Linux·WSL·Mac용 터미널 멀티플렉서. 세션 유지, SSH 끊김 대비, 화면 분할
   - 자주 쓰는 단축키 치트시트: Claude Code, bash/zsh, PowerShell, VS Code, Windows Terminal·wmux·tmux
+  - 참고: 여러 모델을 지원하는 오픈소스 에이전트 환경(Hermes Agent, OpenClaw, OpenCode)의 성격, 검토할 상황, 보안 주의점
 - **주요 명령어**: CLI 명령·옵션(`claude -c`, `-r`, `-p`, `-w`, `--add-dir` 등), 슬래시 명령(`/init`, `/clear`, `/compact`, `/context`, `/rewind`, `/model`, `/permissions`, `/usage` 등), 입력 접두사(`@`, `!`)를 "무엇·왜·어떻게"와 상황별 시나리오로 익히기
 - **병렬 작업 방식 비교**: 터미널 도구로 직접 여러 세션 운영 vs CLI 백그라운드 세션(에이전트 뷰) vs 데스크톱 앱 멀티 세션 vs 한 세션 안의 멀티 에이전트(서브에이전트, `/batch`) vs 클라우드. "멀티 세션"과 "멀티 에이전트"의 차이, 상황별로 유리한 방식, 병렬 수는 리뷰 가능한 양만큼
 - **클라우드 세션 이해하기**
@@ -480,7 +481,7 @@
 | [11-prompting-best-practices.md](./examples/11-prompting-best-practices.md) | 프롬프트 모범 사례 | 5 (전체) |
 | [12-mcp-and-hooks-concepts.md](./examples/12-mcp-and-hooks-concepts.md) | MCP와 훅의 개념, 필요성, 사용법 | 12, 13 |
 | [13-choosing-the-right-tool.md](./examples/13-choosing-the-right-tool.md) | CLAUDE.md·커맨드·스킬·에이전트·훅 비교와 토론 | 2, 12 |
-| [14-environments-and-terminals.md](./examples/14-environments-and-terminals.md) | 터미널·IDE·데스크톱·클라우드·모바일 장단점, Windows Terminal·wmux·tmux, 단축키 | 3 |
+| [14-environments-and-terminals.md](./examples/14-environments-and-terminals.md) | 터미널·IDE·데스크톱·클라우드·모바일 장단점, Windows Terminal·wmux·tmux, 단축키, 멀티 모델 오픈소스 에이전트 | 3 |
 | [15-project-directory-session.md](./examples/15-project-directory-session.md) | 프로젝트, 디렉터리, 세션의 개념과 활용 방법 | 8 |
 | [16-commands.md](./examples/16-commands.md) | CLI 명령·옵션, 슬래시 명령, 입력 접두사와 상황별 시나리오 | 3 (전체) |
 | [17-parallel-work-terminal-vs-desktop.md](./examples/17-parallel-work-terminal-vs-desktop.md) | 터미널 멀티 세션 vs 데스크톱 멀티 세션 vs 멀티 에이전트 비교 | 3, 11 |
