@@ -15,7 +15,7 @@
 | 0:00 – 0:10 | 1. 과정 소개 | ⏱ 5분 |
 | 0:10 – 0:30 | 2. AI 에이전트란 무엇인가 | ⏱ 13분 |
 | 0:30 – 0:45 | 3. 도구(Tools)와 권한 | ⏱ 8분 |
-| 0:45 – 0:55 | 4. Claude Code 사용 환경 | ⏱ 5분 |
+| 0:45 – 0:55 | 4. Claude Code 사용 환경, IDE·터미널 도구 | ⏱ 5분 |
 | 0:55 – 1:05 | ☕ 휴식 | — |
 | 1:05 – 1:30 | 5. 확장 생태계: CLAUDE.md, 스킬, 서브에이전트, 훅, MCP, 플러그인, 아티팩트 | ⏱ 14분 |
 | 1:30 – 1:38 | 6. 컨텍스트와 토큰, 잘 일을 시키는 법 | ⏱ 5분 |
@@ -231,6 +231,24 @@ sequenceDiagram
 
 ---
 
+## 4-3. IDE 연결과 터미널 도구
+
+| IDE | 연결 방법 |
+|---|---|
+| **VS Code** (Cursor 등 계열 포함) | 공식 확장 설치 → 채팅 패널, 선택 영역 공유, 인라인 diff |
+| **IntelliJ 등 JetBrains** | CLI + 공식 플러그인 → IDE 터미널에서 `claude`, 외부 터미널은 `/ide` |
+| **Eclipse** | 공식 플러그인 없음 → Eclipse 터미널에서 CLI 사용 |
+
+| 터미널 도구 | 한 줄 소개 |
+|---|---|
+| **Windows Terminal** | 윈도우 기본 추천. 탭, 화면 분할, WSL·PowerShell 통합 |
+| **tmux** | Linux·WSL·Mac. 세션 유지, 화면 분할, SSH 끊김 대비 |
+| **wmux** | 윈도우용 AI 에이전트 멀티플렉서 (커뮤니티 오픈소스, 보안 검토 후) |
+
+> 💡 **참고:** 여러 모델을 골라 쓰는 오픈소스 에이전트도 있습니다. 코딩 특화인 **OpenCode**, 범용 비서형인 **Hermes Agent**, **OpenClaw** 등이 있으며, 로컬 모델만 써야 하거나 모델을 비교할 때 검토해 볼 만합니다.
+
+---
+
 ## ☕ 휴식 (10분)
 
 ---
@@ -375,13 +393,15 @@ pie showData
 
 ## 6-3. Claude Code만의 이야기일까?
 
-| 개념 | Claude Code | OpenAI Codex | Google |
-|---|---|---|---|
-| 지침 파일 | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` 등 |
-| 스킬 | ○ | ○ | ○ |
-| MCP | ○ | ○ | ○ |
+| 개념 | Claude Code | OpenAI Codex | Google (Antigravity 등) | 오픈소스 (OpenCode 등) |
+|---|---|---|---|---|
+| 지침 파일 | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` 등 | 도구별 |
+| 스킬 | ○ | ○ | ○ | 대부분 ○ |
+| MCP | ○ | ○ | ○ | 대부분 ○ |
+| 모델 | Claude | OpenAI | Gemini 중심 | 여러 모델·로컬 모델 |
 
 - 코딩 에이전트들은 **구조가 비슷해지는 중**
+- 함께 쓰기도 한다: 예) Claude Code로 구현하고 **Codex로 교차 리뷰** (OpenAI 공식 플러그인)
 - 오늘 배우는 원리(에이전트 루프, 컨텍스트, 검증, 최소 권한)는 **도구가 바뀌어도 그대로 통한다**
 
 ---
@@ -439,6 +459,8 @@ flowchart LR
 ```
 
 **준비해 둘 것**: 런북(장애 대응·배포·롤백 절차) · 사람이 그대로 실행할 수 있는 빌드·배포 스크립트 · 기능 플래그 · 정기적인 "AI 없이 핫픽스" 훈련
+
+> 💡 빌드·배포 파이프라인도 Claude Code와 함께 만들 수 있습니다. 단, **운영 배포는 AI가 아니라 파이프라인과 사람의 승인으로만** 진행합니다 (모듈 17).
 
 ---
 
@@ -589,5 +611,6 @@ flowchart TD
 
 - 과정 전체 커리큘럼: [CURRICULUM.md](../CURRICULUM.md)
 - ⭐ [바이브 코딩 시대, 개발자가 놓치면 안 되는 것](../examples/27-developer-responsibility.md)
+- 환경·도구: [사용 환경과 터미널 도구](../examples/14-environments-and-terminals.md) · [IDE 연결](../examples/25-ide-integration.md) · [Codex와 함께 쓰기](../examples/24-codex-with-claude-code.md) · [빌드·배포 파이프라인](../examples/28-build-deploy-pipeline.md)
 - 개념 심화: [도구](../examples/21-tools-concept.md) · [권한](../examples/23-permissions.md) · [MCP와 훅](../examples/12-mcp-and-hooks-concepts.md) · [CLAUDE.md vs 스킬 vs 에이전트](../examples/13-choosing-the-right-tool.md) · [에이전트](../examples/10-agents.md) · [토큰 최적화](../examples/08-token-optimization.md) · [다른 도구와 비교](../examples/22-claude-code-vs-codex-vs-google.md)
 - Claude Code 공식 문서: https://code.claude.com/docs
