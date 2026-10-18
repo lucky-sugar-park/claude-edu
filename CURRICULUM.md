@@ -399,7 +399,7 @@
   - 고정 비용: CLAUDE.md 다이어트, 하위 디렉터리 CLAUDE.md, 스킬 활용, 안 쓰는 MCP 서버 끄기(도구 검색으로 부담은 줄었지만 결과 크기는 관리 필요)
   - 도구 결과: 정확한 위치 지시, 명령 출력 줄이기, 생성물·의존성 폴더 읽기 차단, 탐색은 서브에이전트에게
   - 재작업 방지: Plan 모드, 완료 기준 명시, 잘못 가면 빨리 멈추기
-  - 모델 선택: 작업 난이도에 맞는 모델, 서브에이전트별 모델 지정
+  - 모델 선택: 작업 난이도에 맞는 모델(설계 Opus, 구현 Sonnet, 탐색 Haiku, `opusplan`), 추론 수준부터 조절, 서브에이전트별 모델 지정, 세션 중 모델 전환 최소화 (📎 [모델 가이드](./examples/29-models-guide.md))
   - CI 비용 관리: 변경 파일 중심 리뷰, 턴 수 제한, 사용량 기록
 - 🛠 실습: 같은 과제를 세 가지 방식으로 수행해 사용량과 품질 비교 후 아티팩트 차트로 공유
 - 📎 예제: [토큰 최적화](./examples/08-token-optimization.md)
@@ -497,6 +497,7 @@
 | [26-rag-with-ollama.md](./examples/26-rag-with-ollama.md) | Ollama(오픈소스 LLM) + Spring AI + pgvector로 RAG 구축 | 심화 A |
 | [27-developer-responsibility.md](./examples/27-developer-responsibility.md) | ⭐ 바이브 코딩 시대 개발자의 책임: 구조 통제, 긴급 직접 대응, 환경 분리 | 1, 20, 전체 |
 | [28-build-deploy-pipeline.md](./examples/28-build-deploy-pipeline.md) | Claude Code로 빌드·배포 파이프라인 구축 모범 사례 | 17 |
+| [29-models-guide.md](./examples/29-models-guide.md) | Claude Code의 모델(Fable·Opus·Sonnet·Haiku, opusplan)과 GPT 모델 활용, 토큰 사용, 작업별 모델 선택 모범 사례 | 1, 11, 19 |
 
 ---
 
