@@ -3,6 +3,7 @@
 Claude Code 개발자 교육과정 자료 저장소입니다.
 
 ## 문서
+- [SUBAGENT_MODEL_SELECTION.md](./SUBAGENT_MODEL_SELECTION.md) — 하위 에이전트 모델 고르기 (superpowers subagent-driven-development 사례)
 - [CURRICULUM.md](./CURRICULUM.md) — 전체 커리큘럼 (5단계, 20개 모듈 + 선택 심화, 캡스톤)
 - [sessions/](./sessions/) — 회차별 강의 자료
   - [1회차: 오리엔테이션 & 핵심 개념 (1~2시간)](./sessions/session-01-introduction.md)
