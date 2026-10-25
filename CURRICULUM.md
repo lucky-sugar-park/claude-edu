@@ -461,6 +461,7 @@
 | 회차 | 자료 | 내용 |
 |---|---|---|
 | 1회차 | [session-01-introduction.md](./sessions/session-01-introduction.md) | 과정 소개, 에이전트·도구·권한·환경·확장 생태계 개념, 토론 (1~2시간) |
+| 2회차 | [session-02-hands-on-kickoff.md](./sessions/session-02-hands-on-kickoff.md) | 토큰 절약 습관 보강, 아키텍처 지식·환경 분리, EduHub 요구사항·7주 계획, 데스크톱 앱 설치~첫 요구사항·PR 따라하기, 주요 명령어 체험 (2시간) |
 
 ---
 
