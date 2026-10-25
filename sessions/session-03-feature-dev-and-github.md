@@ -101,6 +101,8 @@ CourseServiceTest에 "종료된 과정은 수정할 수 없다" 테스트를 추
 - 완료 기준: cd backend && ./gradlew test --tests "*CourseServiceTest" 통과
 ```
 
+> 📎 **예제 테스트 코드**: [CourseServiceTest — 과정·회차 관리(FR-03) 서비스 단위 테스트](../examples/31-course-service-test.md). 테스트 11개(등록, 수정, 회차 추가, 종료)와 해설, Claude에게 줄 지시문, 비교용 참고 구현이 들어 있습니다.
+
 > 💡 테스트를 사람이 쓰면 **요구사항을 정확히 이해했는지** 스스로 확인하게 되고, Claude는 "테스트를 통과하도록 테스트를 고치는" 꼼수를 쓸 수 없습니다. 모든 테스트를 사람이 쓸 필요는 없습니다. **핵심 업무 규칙의 테스트만큼은 사람이** 씁니다.
 
 ---
@@ -623,7 +625,7 @@ class CourseControllerTest {
 
 > 💡 Spring Boot 버전에 따라 `@MockitoBean`(3.4 이상) 대신 `@MockBean`을 씁니다. Claude가 프로젝트 버전에 맞게 고르는지 확인해 보세요.
 
-**B (FR-03)의 지시 핵심**: `POST /api/v1/courses`(등록, 입력 검증 `@Valid`), `PUT /{id}`(수정, 종료된 과정은 409), `POST /{id}/sessions`(회차 추가, 정원 1 이상), `POST /{id}/close`(종료). **"종료된 과정 수정 시 예외" 테스트는 B가 먼저 직접 작성**하고 Claude에게 통과시키게 합니다 (1-2 TDD).
+**B (FR-03)의 지시 핵심**: `POST /api/v1/courses`(등록, 입력 검증 `@Valid`), `PUT /{id}`(수정, 종료된 과정은 409), `POST /{id}/sessions`(회차 추가, 정원 1 이상), `POST /{id}/close`(종료). **"종료된 과정 수정 시 예외" 테스트는 B가 먼저 직접 작성**하고 Claude에게 통과시키게 합니다 (1-2 TDD). 작성할 테스트는 [CourseServiceTest 예제](../examples/31-course-service-test.md)를 그대로 쓰거나 참고합니다.
 
 **diff 검토 체크리스트**
 - [ ] Controller가 Repository를 직접 부르지 않는가?
@@ -935,4 +937,4 @@ paths:
 ## 참고 자료
 
 - Claude Code 공식 문서 (2026년 10월 확인): Common workflows(재개, worktree, Plan 모드), Memory(CLAUDE.md 로딩·import·rules) — https://code.claude.com/docs
-- 교육 저장소: [2회차 자료](./session-02-hands-on-kickoff.md), [샘플 프로젝트 EduHub](../examples/00-sample-project.md), [기본 워크플로우](../examples/01-basics-and-workflow.md), [CLAUDE.md 예제](../examples/02-claude-md.md), [GitHub와 버전관리](../examples/06-github-version-control.md), [프롬프트 모범 사례](../examples/11-prompting-best-practices.md), [프로젝트·디렉터리·세션](../examples/15-project-directory-session.md), [저장소 구조](../examples/20-repository-structure.md), [마크다운 작성 가이드](../examples/30-markdown-guide.md)
+- 교육 저장소: [2회차 자료](./session-02-hands-on-kickoff.md), [샘플 프로젝트 EduHub](../examples/00-sample-project.md), [기본 워크플로우](../examples/01-basics-and-workflow.md), [CLAUDE.md 예제](../examples/02-claude-md.md), [GitHub와 버전관리](../examples/06-github-version-control.md), [프롬프트 모범 사례](../examples/11-prompting-best-practices.md), [프로젝트·디렉터리·세션](../examples/15-project-directory-session.md), [저장소 구조](../examples/20-repository-structure.md), [마크다운 작성 가이드](../examples/30-markdown-guide.md), [CourseServiceTest 예제](../examples/31-course-service-test.md)
