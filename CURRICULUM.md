@@ -462,6 +462,13 @@
 |---|---|---|
 | 1회차 | [session-01-introduction.md](./sessions/session-01-introduction.md) | 과정 소개, 에이전트·도구·권한·환경·확장 생태계 개념, 토론 (1~2시간) |
 | 2회차 | [session-02-hands-on-kickoff.md](./sessions/session-02-hands-on-kickoff.md) | 토큰 절약 습관 보강, 아키텍처 지식·환경 분리, EduHub 요구사항·7주 계획, 데스크톱 앱 설치~첫 요구사항·PR 따라하기, 주요 명령어 체험 (2시간) |
+| 3회차 | [session-03-feature-dev-and-github.md](./sessions/session-03-feature-dev-and-github.md) | 기능 개발 워크플로(탐색→계획→구현→검증), 재현 테스트로 버그 수정, main 보호·PR 템플릿·리뷰·충돌 해결, 세션 관리와 CLAUDE.md 분리 / EduHub FR-01~03 |
+| 4회차 | [session-04-permissions-skills-subagents.md](./sessions/session-04-permissions-skills-subagents.md) | settings.json 권한, 스킬과 슬래시 커맨드, 서브에이전트 역할 분담(Opus 설계 → Sonnet 구현·검토 → Opus 최종 검토) / EduHub FR-04~06, 동시성 NFR-01 |
+| 5회차 | [session-05-hooks-and-mcp.md](./sessions/session-05-hooks-and-mcp.md) | 훅(포맷·보호 파일·위험 명령 차단·Stop 테스트), MCP(개발 DB 읽기 전용, MCP vs CLI), OpenAPI 누락 토론 재진행 / EduHub FR-07~08 |
+| 6회차 | [session-06-plugins-artifacts-mfe.md](./sessions/session-06-plugins-artifacts-mfe.md) | 마이크로프론트엔드 분리와 병렬 작업, 팀 플러그인 패키징, 아티팩트 진행 리포트 / EduHub FR-09 알림 |
+| 7회차 | [session-07-cicd-framework-tokens.md](./sessions/session-07-cicd-framework-tokens.md) | GitHub Actions CI, 승인 기반 스테이징 배포, 환경 분리 완성과 런북, 사내 공통 모듈 적용, 토큰 사용량 측정·개선 / NFR-05, NFR-06 |
+| 8회차 | [session-08-automation-sdk-governance.md](./sessions/session-08-automation-sdk-governance.md) | 헤드리스·CI 자동 리뷰, Agent SDK, 거버넌스, 성능(N+1) 개선과 보안 점검, AI 없이 핫픽스 훈련 / NFR-02, NFR-03 |
+| 9회차 | [session-09-capstone.md](./sessions/session-09-capstone.md) | 캡스톤 발표(구조 설명, 직접 수정·빌드 시연), 평가 루브릭, 과정 회고, 팀 도입 로드맵 |
 
 ---
 

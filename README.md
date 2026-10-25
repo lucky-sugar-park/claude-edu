@@ -8,6 +8,13 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
 - [sessions/](./sessions/) — 회차별 강의 자료
   - [1회차: 오리엔테이션 & 핵심 개념 (1~2시간)](./sessions/session-01-introduction.md)
   - [2회차: 환경 준비부터 첫 요구사항까지 + Toy 프로젝트(EduHub) 킥오프 (2시간, 따라하기 중심)](./sessions/session-02-hands-on-kickoff.md)
+  - [3회차: 기능 개발과 GitHub 협업 — 과정 조회·관리 API(FR-01~03)](./sessions/session-03-feature-dev-and-github.md)
+  - [4회차: 권한·스킬·서브에이전트 — 수강 신청과 동시성 (FR-04~06, NFR-01)](./sessions/session-04-permissions-skills-subagents.md)
+  - [5회차: 훅과 MCP — 품질 자동화와 외부 연결 (FR-07~08)](./sessions/session-05-hooks-and-mcp.md)
+  - [6회차: 플러그인·아티팩트 — 마이크로프론트엔드 완성과 알림(FR-09)](./sessions/session-06-plugins-artifacts-mfe.md)
+  - [7회차: CI/CD·환경 분리 완성·사내 프레임워크·토큰 최적화 (NFR-05, NFR-06)](./sessions/session-07-cicd-framework-tokens.md)
+  - [8회차: 자동화·Agent SDK·거버넌스 — 성능·보안 점검과 AI 없이 핫픽스 훈련 (NFR-02, NFR-03)](./sessions/session-08-automation-sdk-governance.md)
+  - [9회차: 캡스톤 발표 — EduHub 7주 결과와 앞으로](./sessions/session-09-capstone.md)
 - [examples/](./examples/) — 실습 예제 (EduHub: Java + Spring Boot + JPA + OpenAPI + React MFE + MUI + Axios)
   - [00 예제 프로젝트](./examples/00-sample-project.md)
   - [01 기본 사용과 워크플로우](./examples/01-basics-and-workflow.md)

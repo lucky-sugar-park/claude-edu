@@ -1,5 +1,7 @@
 # 7회차: CI/CD·환경 분리 완성·사내 프레임워크·토큰 최적화 (NFR-05, NFR-06)
 
+🧭 ⬅️ 이전: [6회차: 플러그인·아티팩트 — 마이크로프론트엔드 완성과 알림(FR-09)](./session-06-plugins-artifacts-mfe.md) · ➡️ 다음: [8회차: 자동화·Agent SDK·거버넌스 — 성능·보안 점검과 AI 없이 핫픽스 훈련 (NFR-02, NFR-03)](./session-08-automation-sdk-governance.md) · 📚 [전체 커리큘럼](../CURRICULUM.md#-회차별-강의-자료)
+
 > **대상**: 6회차까지 EduHub의 기능(FR-01~09)과 MFE 분리를 진행한 팀
 > **시간**: 120분 (강의 약 40% + 따라하기 약 60%)
 > **목표**

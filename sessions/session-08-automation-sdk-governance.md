@@ -1,5 +1,7 @@
 # 8회차: 자동화·Agent SDK·거버넌스 — 성능·보안 점검과 AI 없이 핫픽스 훈련 (NFR-02, NFR-03)
 
+🧭 ⬅️ 이전: [7회차: CI/CD·환경 분리 완성·사내 프레임워크·토큰 최적화 (NFR-05, NFR-06)](./session-07-cicd-framework-tokens.md) · ➡️ 다음: [9회차: 캡스톤 발표 — EduHub 7주 결과와 앞으로](./session-09-capstone.md) · 📚 [전체 커리큘럼](../CURRICULUM.md#-회차별-강의-자료)
+
 > **대상**: 7회차까지 EduHub에 CI/CD와 스테이징 배포를 갖춘 팀
 > **시간**: 120분 (강의 약 40%, 따라하기 약 60%)
 > **목표**
@@ -449,7 +451,7 @@ git switch -c fix/nfr-03-security
 새 세션(`/clear`)에서 다음 순서로 진행합니다.
 
 1. 내장 명령 `/security-review`로 현재 브랜치 변경의 보안 점검을 돌려 봅니다 (변경이 없으면 결과가 적을 수 있습니다)
-2. 저장소 전체 관점의 점검은 읽기 전용으로 지시합니다. 4주차에 만든 `security-reviewer` 에이전트가 있으면 그것을 씁니다 ([security-reviewer 예시](../examples/18-java-react-agents.md#3-5-security-reviewer-리뷰-읽기-전용-고성능-모델))
+2. 저장소 전체 관점의 점검은 읽기 전용으로 지시합니다. 보안 점검 전용 `security-reviewer` 에이전트를 아래 예시대로 만들어 두면 반복해서 쓸 수 있습니다 ([security-reviewer 예시](../examples/18-java-react-agents.md#3-5-security-reviewer-리뷰-읽기-전용-고성능-모델))
 
 ```text
 [목표] EduHub의 NFR-03(인증·인가, 입력 검증, 비밀 정보) 점검. 수정하지 말고 발견 사항만 보고해줘.

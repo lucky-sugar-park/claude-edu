@@ -1,5 +1,7 @@
 # 2회차: 환경 준비부터 첫 요구사항까지 + Toy 프로젝트(EduHub) 킥오프
 
+🧭 ⬅️ 이전: [1회차: Claude Code 개발자 교육과정 오리엔테이션 & 핵심 개념](./session-01-introduction.md) · ➡️ 다음: [3회차: 기능 개발과 GitHub 협업 — 과정 조회·관리 API(FR-01~03)](./session-03-feature-dev-and-github.md) · 📚 [전체 커리큘럼](../CURRICULUM.md#-회차별-강의-자료)
+
 > **대상**: 1회차 오리엔테이션을 들은 개발자
 > **시간**: 120분 (따라하기 중심)
 > **목표**
@@ -381,6 +383,8 @@ erDiagram
 | **6주** | 7주차 | CI/CD, 스테이징 배포, 환경 분리 완성(NFR-06) | 사내 프레임워크 적용, 토큰 최적화 측정 (16, 19) | GitHub Actions, 런북, 사용량 리포트 |
 | **7주** | 8주차 | 성능 개선(NFR-02), 보안 점검, **AI 없이 핫픽스 훈련** | 헤드리스·CI 자동 리뷰, Agent SDK, 거버넌스 (17, 18, 20) | 성능 리포트, 핫픽스 훈련 기록 |
 | — | 9주차 | **캡스톤 발표** | — | 데모, 구조 설명, 직접 수정·빌드 시연 |
+
+> 📎 주차별 강의 자료: [3회차](./session-03-feature-dev-and-github.md) · [4회차](./session-04-permissions-skills-subagents.md) · [5회차](./session-05-hooks-and-mcp.md) · [6회차](./session-06-plugins-artifacts-mfe.md) · [7회차](./session-07-cicd-framework-tokens.md) · [8회차](./session-08-automation-sdk-governance.md) · [9회차](./session-09-capstone.md)
 
 ---
 
@@ -1228,7 +1232,7 @@ git branch -d feature/week1-skeleton
 
 ## 7-4. 다음 회차 예고
 
-**3주차: 기능 개발과 GitHub 협업 (모듈 6, 7, 8)**
+**3주차: 기능 개발과 GitHub 협업 (모듈 6, 7, 8)** → [3회차 자료](./session-03-feature-dev-and-github.md)
 - EduHub 과정 조회·관리 API(FR-01~03)와 과정 목록 화면
 - 브랜치 전략, PR 리뷰, 충돌 해결을 Claude와 함께
 - 세션 관리와 CLAUDE.md 다듬기
