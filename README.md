@@ -39,3 +39,4 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [27 ⭐ 바이브 코딩 시대, 개발자가 놓치면 안 되는 것](./examples/27-developer-responsibility.md)
   - [28 빌드·배포 파이프라인 모범 사례](./examples/28-build-deploy-pipeline.md)
   - [29 모델 가이드: 모델별 특징과 선택 모범 사례](./examples/29-models-guide.md)
+  - [30 마크다운 작성 가이드: 자주 쓰는 글머리·표·코드·링크 문법](./examples/30-markdown-guide.md)

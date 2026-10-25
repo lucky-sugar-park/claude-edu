@@ -764,11 +764,52 @@ cd eduhub
 
 ---
 
+## 잠깐: 마크다운 기본 (5분)
+
+Step 7부터 쓰는 요구사항 문서, CLAUDE.md, PR 본문은 모두 **마크다운(.md)**입니다. 제목·목록·표로 구조를 나누면 사람도 읽기 쉽고 **Claude도 지시와 규칙을 정확히 구분**합니다. 오늘은 가장 자주 쓰는 문법만 익히고, 자세한 내용은 [마크다운 작성 가이드](../examples/30-markdown-guide.md)를 봅니다.
+
+| 쓰임 | 이렇게 쓴다 | 이렇게 보인다 / 요령 |
+|---|---|---|
+| **제목** | `# 문서 제목`, `## 절`, `### 소절` | `#` 뒤에 한 칸 띄우기. `#`은 문서에 하나 |
+| **글머리 목록** | `- 항목`, 하위는 두 칸 들여쓰고 `- 하위` | 순서 없는 나열 (규칙, 특징). 기호는 `-`로 통일 |
+| **번호 목록** | `1. 첫째`, `2. 둘째` | 순서가 있는 절차 |
+| **체크리스트** | `- [ ] 할 일`, `- [x] 한 일` | GitHub에서 클릭해 체크 가능. 과제·PR 확인 항목 |
+| **강조** | `**굵게**` | 핵심 단어만 |
+| **인라인 코드** | `` `./gradlew test` `` | 파일명, 명령, 클래스명은 항상 백틱으로 |
+| **코드 블록** | ```` ```bash ```` … ```` ``` ```` | 여는 백틱 뒤에 언어 이름 (`java`, `bash`, `yaml`) |
+| **링크** | `[1회차 자료](./session-01-introduction.md)` | 저장소 안 문서는 **상대 경로** |
+| **인용(참고 문단)** | `> 💡 참고할 내용` | 주의·참고를 눈에 띄게 |
+| **구분선** | `---` (앞뒤 빈 줄) | 큰 주제 나누기 |
+
+**표 쓰는 법** (요구사항 정리에 가장 많이 씁니다)
+
+```markdown
+| ID | 요구사항 | 우선순위 |
+|---|---|:---:|
+| FR-01 | 과정 목록을 조회하고 검색한다 | 필수 |
+| FR-02 | 과정 상세와 회차를 조회한다 | 필수 |
+```
+
+| ID | 요구사항 | 우선순위 |
+|---|---|:---:|
+| FR-01 | 과정 목록을 조회하고 검색한다 | 필수 |
+| FR-02 | 과정 상세와 회차를 조회한다 | 필수 |
+
+- 첫 줄은 머리글, **둘째 줄 `|---|`은 꼭 있어야** 표가 됩니다. `:---:`은 가운데 정렬
+- 표 **위아래에 빈 줄**을 둡니다. 칸 안에서 줄을 바꾸려면 `<br>`
+- 줄마다 `|` 개수(칸 수)를 맞춥니다
+
+**자주 하는 실수 3가지**: `#제목`(공백 없음), 표 앞에 빈 줄 없음, 코드 블록을 닫지 않음
+
+> 💡 **미리보기로 확인하는 습관**: VS Code `Ctrl+Shift+V`(Mac `Cmd+Shift+V`), IntelliJ는 편집기 옆 미리보기, GitHub는 **Preview** 탭. Claude에게 "표로 정리해줘", "체크리스트로 만들어줘"처럼 **형식을 지정**하면 원하는 모양으로 받을 수 있습니다.
+
+---
+
 ## Step 7. 요구사항 문서를 저장소에 넣기
 
 Claude에게 요구사항을 줄 때 **대화창에 길게 붙여넣기보다 파일로 저장**하는 것이 좋습니다. 다음 세션에서도 다시 쓸 수 있고, 팀원과 공유되고, 필요한 부분만 `@`로 참조할 수 있기 때문입니다.
 
-1. `eduhub/docs/requirements.md` 파일을 만들고 [3-3. 기능 요구사항](#3-3-기능-요구사항-개략)과 [3-4. 비기능 요구사항](#3-4-비기능-요구사항-개략) 표를 복사해 넣습니다
+1. `eduhub/docs/requirements.md` 파일을 만들고 (바로 위 [마크다운 기본](#잠깐-마크다운-기본-5분)의 제목·표 문법으로) [3-3. 기능 요구사항](#3-3-기능-요구사항-개략)과 [3-4. 비기능 요구사항](#3-4-비기능-요구사항-개략) 표를 복사해 넣습니다
 2. 맨 위에 프로젝트 개요와 기술 스택을 몇 줄 적습니다
 
 ```markdown
@@ -1182,6 +1223,7 @@ git branch -d feature/week1-skeleton
 - [ ] 6-1 토큰 절약 체험과 6-2 환경 분리 맛보기를 하고 결과를 PR 본문이나 팀 채널에 공유
 - [ ] 팀원 PR 하나를 리뷰하고 코멘트 1개 이상 남기기
 - [ ] 팀에서 요구사항의 애매한 점 3가지를 골라 결정하고 `docs/requirements.md`에 반영 (예: 취소 마감 시점, 대기 인원 상한, 수료 기준)
+- [ ] [마크다운 작성 가이드](../examples/30-markdown-guide.md)의 실습 1~2로 `docs/requirements.md`와 CLAUDE.md 다듬기
 - [ ] 1주차 회고 한 줄: Claude에게 맡긴 것 / 직접 한 것 / 아낀 토큰 방법
 
 ## 7-4. 다음 회차 예고
@@ -1201,4 +1243,4 @@ git branch -d feature/week1-skeleton
 ## 참고 자료
 
 - Claude Code 공식 문서 (2026년 10월 확인): Desktop quickstart, Desktop, Commands, Interactive mode, Checkpointing, Memory, Permission modes — https://code.claude.com/docs
-- 교육 저장소: [1회차 자료](./session-01-introduction.md), [샘플 프로젝트 EduHub](../examples/00-sample-project.md), [토큰 최적화](../examples/08-token-optimization.md), [개발자의 책임](../examples/27-developer-responsibility.md), [주요 명령어](../examples/16-commands.md), [사용 환경과 터미널 도구](../examples/14-environments-and-terminals.md), [권한](../examples/23-permissions.md)
+- 교육 저장소: [1회차 자료](./session-01-introduction.md), [마크다운 작성 가이드](../examples/30-markdown-guide.md), [샘플 프로젝트 EduHub](../examples/00-sample-project.md), [토큰 최적화](../examples/08-token-optimization.md), [개발자의 책임](../examples/27-developer-responsibility.md), [주요 명령어](../examples/16-commands.md), [사용 환경과 터미널 도구](../examples/14-environments-and-terminals.md), [권한](../examples/23-permissions.md)

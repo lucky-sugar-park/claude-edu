@@ -499,6 +499,7 @@
 | [27-developer-responsibility.md](./examples/27-developer-responsibility.md) | ⭐ 바이브 코딩 시대 개발자의 책임: 구조 통제, 긴급 직접 대응, 환경 분리 | 1, 20, 전체 |
 | [28-build-deploy-pipeline.md](./examples/28-build-deploy-pipeline.md) | Claude Code로 빌드·배포 파이프라인 구축 모범 사례 | 17 |
 | [29-models-guide.md](./examples/29-models-guide.md) | Claude Code의 모델(Fable·Opus·Sonnet·Haiku, opusplan)과 GPT 모델 활용, 토큰 사용, 작업별 모델 선택 모범 사례 | 1, 11, 19 |
+| [30-markdown-guide.md](./examples/30-markdown-guide.md) | 마크다운 작성법: 제목, 글머리·번호 목록, 체크리스트, 표, 코드, 링크, 알림 상자, Mermaid, CLAUDE.md·프롬프트 작성 요령 | 3, 8 |
 
 ---
 
