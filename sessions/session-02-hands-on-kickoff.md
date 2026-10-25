@@ -21,11 +21,11 @@
 | 0:00 – 0:05 | 오프닝, 1회차 핵심 3문장 복습 | 강의 |
 | 0:05 – 0:20 | 1. 1회차 보강: 토큰을 아끼는 경험적 방법 | 강의 + 시연 |
 | 0:20 – 0:35 | 2. 코딩은 Claude가, 아키텍처와 환경 분리는 개발자가 | 강의 + 토론 |
-| 0:35 – 0:55 | 3. Toy 프로젝트 EduHub 소개와 7주 진행 계획 | 강의 |
-| 0:55 – 1:05 | ☕ 휴식 (설치가 덜 된 사람은 이 시간에 마무리) | — |
-| 1:05 – 1:40 | 4. 따라하기 ①: 설치 → 로그인 → GitHub → 프로젝트 생성 → 첫 요구사항 | 실습 |
-| 1:40 – 1:55 | 5. 따라하기 ②: 주요 명령어 체험 | 실습 |
-| 1:55 – 2:00 | 7. 정리, 과제 안내 | 강의 |
+| 0:35 – 1:00 | 3. Toy 프로젝트 EduHub 소개와 7주 진행 계획 (Git 2단계 커밋, 브랜치 → 개발 → 병합 포함) | 강의 |
+| 1:00 – 1:08 | ☕ 휴식 (설치가 덜 된 사람은 이 시간에 마무리) | — |
+| 1:08 – 1:42 | 4. 따라하기 ①: 설치 → 로그인 → GitHub → 프로젝트 생성 → 브랜치 → 첫 요구사항 → PR | 실습 |
+| 1:42 – 1:57 | 5. 따라하기 ②: 주요 명령어 체험 | 실습 |
+| 1:57 – 2:00 | 7. 정리, 과제 안내 | 강의 |
 
 > 6장(토큰 절약 체험, 환경 분리 맛보기)은 시간이 남으면 수업 중에, 아니면 **과제**로 진행합니다.
 
@@ -424,7 +424,203 @@ flowchart LR
 
 ---
 
-## ☕ 휴식 (10분)
+## 3-8. 7주 동안 쓰는 Git 작업 방식: 2단계 커밋과 브랜치 → 개발 → 병합
+
+> 7주 동안 모든 변경은 **브랜치에서 개발하고 PR로 병합**합니다. Claude Code가 커밋과 푸시를 대신해 줄 수 있지만, **무엇이 어디에 기록되는지**는 개발자가 알아야 AI의 실수를 잡고 직접 되돌릴 수 있습니다. 자세한 모범 사례는 [GitHub 연결과 버전관리](../examples/06-github-version-control.md)를 봅니다.
+
+---
+
+### 3-8-1. Git의 4개 영역과 "2단계 커밋"
+
+Git에서 변경이 기록되기까지는 **두 단계**를 거칩니다. 먼저 커밋할 변경을 **골라 담고(`git add`, 스테이징)**, 그다음 담은 것을 **한 번에 기록(`git commit`)**합니다. 이것을 흔히 "2단계 커밋"이라고 부릅니다. 그리고 기록은 아직 내 PC에만 있으므로, **`git push`로 GitHub에 올려야** 팀이 볼 수 있습니다.
+
+```mermaid
+flowchart LR
+    subgraph PC["💻 내 PC"]
+        WD["① 작업 디렉터리<br/>(Working Directory)<br/>파일을 고치는 곳"]
+        ST["② 스테이징 영역<br/>(Staging Area / Index)<br/>이번 커밋에 담을 변경"]
+        LR["③ 로컬 저장소<br/>(.git)<br/>커밋 이력"]
+    end
+    RR["④ 원격 저장소<br/>(GitHub)<br/>팀이 공유하는 이력"]
+    WD -- "1단계: git add<br/>(골라 담기)" --> ST
+    ST -- "2단계: git commit<br/>(기록)" --> LR
+    LR -- "git push<br/>(공유)" --> RR
+    RR -- "git pull / fetch<br/>(가져오기)" --> LR
+    ST -. "git restore --staged<br/>(담은 것 빼기)" .-> WD
+    LR -. "git switch / restore<br/>(파일로 꺼내기)" .-> WD
+```
+
+> 💡 **용어 주의**: 데이터베이스·분산 시스템의 **2PC(Two-Phase Commit, 분산 트랜잭션 합의 프로토콜)**와는 다른 개념입니다. Git에서는 "스테이징 → 커밋"의 두 단계를 가리키며, 공식 용어라기보다 설명을 위한 표현입니다.
+
+**왜 굳이 두 단계로 나눌까?**
+
+| 이유 | 설명 | 예 (EduHub) |
+|---|---|---|
+| **골라 담기** | 고친 파일 중 일부만, 한 파일 안에서도 일부만 커밋할 수 있다 | 기능 코드와 오타 수정이 섞였으면 따로 커밋 (`git add -p`) |
+| **커밋 전 검토** | 담은 내용을 `git diff --staged`로 마지막으로 확인할 수 있다 | `.env`나 디버깅용 코드가 들어가지 않았는지 확인 |
+| **의미 있는 이력** | 커밋 하나 = 의미 하나. 리뷰와 되돌리기가 쉬워진다 | "백엔드 API"와 "화면"을 별도 커밋 |
+| **로컬 기록과 공유 분리** | 커밋은 내 PC 기록이라 푸시 전까지는 정리할 수 있다 | 푸시 전에 커밋 메시지 수정 (`git commit --amend`) |
+
+**파일 상태와 확인 명령**
+
+| `git status`에 보이는 상태 | 뜻 | 다음 할 일 |
+|---|---|---|
+| Untracked files | Git이 아직 모르는 새 파일 | 커밋할 파일이면 `git add`, 아니면 `.gitignore`에 추가 |
+| Changes not staged for commit | 고쳤지만 아직 담지 않음 | `git diff`로 확인 후 `git add` |
+| Changes to be committed | 담겨서 커밋을 기다림 | `git diff --staged`로 확인 후 `git commit` |
+| Your branch is ahead of 'origin/…' by N commits | 커밋했지만 아직 푸시하지 않음 | `git push` |
+| nothing to commit, working tree clean | 모든 변경이 커밋됨 | 다음 작업 |
+
+```bash
+# 2단계 커밋의 기본 흐름
+git status                  # 무엇이 바뀌었나
+git diff                    # 아직 담지 않은 변경 보기
+git add backend/src/...     # 1단계: 커밋할 것만 골라 담기 (모르면 git add -p 로 조각 단위)
+git diff --staged           # 담은 내용 최종 확인
+git commit -m "feat(course): 과정 목록 조회 API 추가"   # 2단계: 기록
+git push                    # 공유
+```
+
+> ⚠️ **AI와 함께 쓸 때 주의**: Claude에게 "커밋해줘"라고 하면 `git add .`처럼 **전부 담을 수 있습니다.** 처음 몇 주는 커밋 전에 `git status`, `git diff --staged`를 직접 보거나 "커밋 전에 담을 파일 목록을 먼저 보여줘"라고 지시합니다. `.env` 같은 비밀 파일은 `.gitignore`와 권한 설정으로 이중으로 막습니다.
+
+---
+
+### 3-8-2. 브랜치 → 개발 → 병합: GitHub Flow
+
+EduHub는 가장 보편적이고 단순한 **GitHub Flow**를 씁니다. 규칙은 하나입니다: **`main`은 항상 동작하는 상태로 두고, 모든 작업은 브랜치에서 한 뒤 PR로 병합한다.**
+
+```mermaid
+gitGraph
+    commit id: "README"
+    commit id: "요구사항 문서"
+    branch feature/week1-skeleton
+    checkout feature/week1-skeleton
+    commit id: "백엔드 뼈대"
+    commit id: "CLAUDE.md"
+    checkout main
+    merge feature/week1-skeleton id: "PR #1 병합"
+    branch feature/fr-01-course-list
+    checkout feature/fr-01-course-list
+    commit id: "과정 목록 API"
+    commit id: "테스트 추가"
+    checkout main
+    branch fix/health-message
+    checkout fix/health-message
+    commit id: "응답 문구 수정"
+    checkout main
+    merge fix/health-message id: "PR #2 병합"
+    checkout feature/fr-01-course-list
+    merge main id: "main 최신화"
+    commit id: "리뷰 반영"
+    checkout main
+    merge feature/fr-01-course-list id: "PR #3 병합"
+```
+
+> 그림 읽는 법: 가로선 하나가 브랜치입니다. `main`에서 갈라져 나간 브랜치에서 커밋을 쌓고, PR이 승인되면 다시 `main`으로 합쳐집니다. 작업 중에 `main`이 바뀌었으면 `main`을 내 브랜치로 가져와(최신화) 충돌을 미리 해결합니다.
+
+**작업 하나의 생애 (이슈부터 브랜치 삭제까지)**
+
+```mermaid
+flowchart TD
+    A["① 이슈 확인<br/>예: FR-01 과정 목록 조회"] --> B["② main 최신화<br/>git switch main · git pull"]
+    B --> C["③ 브랜치 생성<br/>git switch -c feature/fr-01-course-list"]
+    C --> D["④ 개발<br/>Claude + 직접 수정, 테스트"]
+    D --> E["⑤ 2단계 커밋<br/>git add → git commit"]
+    E --> D
+    E --> F["⑥ 푸시<br/>git push -u origin 브랜치"]
+    F --> G["⑦ PR 생성<br/>무엇을·왜·어떻게 확인했나"]
+    G --> H{"⑧ 리뷰 + CI<br/>통과?"}
+    H -- "수정 요청" --> D
+    H -- "승인" --> I["⑨ main에 병합<br/>(Squash merge)"]
+    I --> J["⑩ 브랜치 삭제<br/>내 PC도 main으로 돌아와 pull"]
+```
+
+| 단계 | 명령 / 화면 | Claude에게 맡길 때 지시 예 |
+|---|---|---|
+| ② main 최신화 | `git switch main` → `git pull` | — (직접 하는 편이 빠름) |
+| ③ 브랜치 생성 | `git switch -c feature/fr-01-course-list` | "작업 시작 전에 feature/fr-01-course-list 브랜치를 만들어줘" |
+| ④ 개발 | 편집기, 테스트 | Plan 모드로 계획 → 구현 |
+| ⑤ 커밋 | `git add …` → `git diff --staged` → `git commit` | "백엔드와 테스트를 따로 커밋해줘. 담을 파일 목록을 먼저 보여줘" |
+| ⑥ 푸시 | `git push -u origin feature/fr-01-course-list` | "이 브랜치를 푸시해줘" |
+| ⑦ PR | GitHub의 **Compare & pull request**, 데스크톱 앱 **Create PR** | "PR 템플릿에 맞춰 PR 본문을 써줘" |
+| ⑧ 리뷰·CI | GitHub PR 화면 | "리뷰 코멘트 3개를 반영해줘" |
+| ⑨ 병합 | GitHub의 **Squash and merge** 버튼 | **사람이 직접** 누른다 |
+| ⑩ 정리 | `git switch main` → `git pull` → `git branch -d …` | — |
+
+---
+
+### 3-8-3. 충돌(conflict)이 나면
+
+두 브랜치가 **같은 파일의 같은 부분**을 다르게 고치면 병합할 때 충돌이 납니다.
+
+```mermaid
+flowchart LR
+    A["내 브랜치에서<br/>git merge main"] --> B{"충돌?"}
+    B -- "아니오" --> C["테스트 → 푸시"]
+    B -- "예" --> D["충돌 파일 열기<br/><<<<<<< ======= >>>>>>> 표시"]
+    D --> E["두 변경의 의도를 이해하고<br/>최종 코드로 정리"]
+    E --> F["git add → git commit"]
+    F --> C
+```
+
+- 충돌은 **오래 떨어져 있던 브랜치**에서 많이 납니다 → 브랜치는 짧게(며칠 이내), 자주 `main`을 가져온다
+- Claude에게 "충돌을 해결해줘"라고 맡길 수 있지만, **두 변경의 의도를 아는 사람이 결과를 확인**해야 합니다. 어느 한쪽 변경이 조용히 사라지는 것이 가장 흔한 사고입니다
+
+---
+
+### 3-8-4. 병합 방식 비교
+
+| 방식 | GitHub 버튼 | 결과 | 장점 | 단점 |
+|---|---|---|---|---|
+| **Merge commit** | Create a merge commit | 브랜치의 커밋이 모두 남고 병합 커밋이 추가됨 | 이력이 그대로 보존 | `main` 이력이 복잡해짐 |
+| **Squash merge** | Squash and merge | 브랜치의 커밋을 **하나로 합쳐** `main`에 추가 | `main` 이력이 "PR 하나 = 커밋 하나"로 깔끔. 되돌리기 쉬움 | 브랜치 안의 세부 커밋은 `main`에 남지 않음 |
+| **Rebase merge** | Rebase and merge | 브랜치의 커밋을 `main` 끝에 다시 쌓음 | 병합 커밋 없이 일직선 이력 | 이력을 다시 쓰므로 이해하고 써야 함 |
+
+> **EduHub 규칙: Squash merge.** AI와 작업하면 "테스트 수정", "리뷰 반영" 같은 작은 커밋이 많아지는데, `main`에는 PR 단위로 하나씩만 남기는 편이 읽고 되돌리기 쉽습니다.
+
+---
+
+### 3-8-5. 이름 규칙과 보호 설정 (EduHub)
+
+| 항목 | 규칙 | 예 |
+|---|---|---|
+| 브랜치 | `종류/요구사항ID-짧은-설명` | `feature/fr-04-enroll`, `fix/n-plus-one-course-list`, `chore/gradle-update` |
+| 커밋 메시지 | Conventional Commits: `종류(범위): 설명` | `feat(enrollment): 대기자 자동 승급`, `fix(course): 목록 N+1 쿼리 제거`, `test(enrollment): 동시 신청 테스트` |
+| PR 제목 | 커밋 메시지와 같은 형식 (Squash 시 그대로 커밋 메시지가 됨) | `feat(course): 과정 목록 조회 API (FR-01)` |
+| PR 본문 | 변경 내용, 확인 방법, **Claude에게 맡긴 것 / 직접 한 것** | — |
+| `main` 보호 | 직접 푸시·강제 푸시 금지, 리뷰 1명 이상, CI 통과 필수 | GitHub → Settings → Branches(또는 Rules) |
+
+> 💡 **브랜치 보호는 AI 시대의 안전장치입니다.** Claude가 실수로 `main`에 푸시하거나 강제 푸시(`--force`)를 시도해도 GitHub가 막아 줍니다. 보호 설정은 3주차에 함께 켭니다.
+
+---
+
+### 3-8-6. 다른 브랜치 전략과 비교
+
+| 전략 | 구조 | 어울리는 곳 |
+|---|---|---|
+| **GitHub Flow** ⭐ (EduHub) | `main` + 짧은 작업 브랜치 | 자주 배포하는 웹 서비스, 작은 팀. 가장 단순 |
+| **Git Flow** | `main`, `develop`, `feature/*`, `release/*`, `hotfix/*` | 정해진 주기로 버전을 출시하는 제품 (패키지, 설치형 소프트웨어) |
+| **Trunk-based** | 모두 `main`(trunk)에 아주 짧은 브랜치로 자주 병합, 미완성 기능은 기능 플래그로 숨김 | CI/CD와 테스트 자동화가 성숙한 팀 |
+
+> 회사 프로젝트가 Git Flow를 쓰더라도 **"브랜치에서 개발 → 검증 → 병합"**이라는 원리는 같습니다. 1회차 원칙 ②의 **긴급 핫픽스**는 `main`(또는 운영 태그)에서 `hotfix/…` 브랜치를 따서 고친 뒤 병합합니다.
+
+---
+
+### 3-8-7. 되돌리기 한눈에
+
+| 상황 | 방법 |
+|---|---|
+| Claude가 방금 한 수정이 마음에 들지 않음 (커밋 전) | `/rewind` 또는 `git restore 파일` |
+| 담은(add) 것을 빼고 싶음 | `git restore --staged 파일` |
+| 커밋했지만 아직 푸시 전 | `git commit --amend`(메시지 수정), `git reset --soft HEAD~1`(커밋 취소, 변경은 유지) |
+| 이미 푸시해서 공유됨 | `git revert 커밋` → 되돌리는 새 커밋. **공유된 이력은 다시 쓰지 않는다** |
+| `main`에 병합된 PR을 되돌려야 함 | GitHub PR 화면의 **Revert** 버튼 → 되돌리는 PR 생성 |
+
+> 💬 **강사 노트:** 3-8-1의 4개 영역 그림과 3-8-2의 gitGraph 그림 두 장만 확실히 이해시키면 됩니다. Git이 처음인 수강생이 있으면 따라하기 ①의 Step 8(브랜치 만들기)과 Step 11(커밋·푸시)에서 이 그림을 다시 띄워 "지금 어느 영역에 있는지" 짚어 줍니다.
+
+---
+
+## ☕ 휴식 (8분)
 
 > 설치가 덜 끝난 사람은 이 시간에 [4-0. 준비물 체크리스트](#4-0-준비물-체크리스트)를 마무리합니다.
 
@@ -599,7 +795,16 @@ Claude에게 요구사항을 줄 때 **대화창에 길게 붙여넣기보다 �
 
 ## Step 8. 첫 요구사항 전달: Plan 모드로 계획부터
 
-권한 모드를 **Plan**으로 바꾸고 다음처럼 지시합니다.
+**먼저 작업 브랜치를 만듭니다** ([3-8-2](#3-8-2-브랜치--개발--병합-github-flow)의 ③). `main`에서 바로 작업하지 않는 습관을 첫날부터 들입니다.
+
+```bash
+git switch -c feature/week1-skeleton
+git branch --show-current     # feature/week1-skeleton 이 보이면 OK
+```
+
+> 💡 Claude에게 "작업 전에 feature/week1-skeleton 브랜치를 만들어줘"라고 맡겨도 됩니다. 데스크톱 앱 화면이나 `git branch --show-current`로 지금 브랜치를 꼭 확인합니다.
+
+그다음 권한 모드를 **Plan**으로 바꾸고 다음처럼 지시합니다.
 
 ```text
 @docs/requirements.md 를 읽고 EduHub 프로젝트의 1주차 작업을 계획해줘.
@@ -685,23 +890,41 @@ Claude에게 요구사항을 줄 때 **대화창에 길게 붙여넣기보다 �
 **방법 A: Claude에게 맡기기**
 
 ```text
-지금까지 변경을 feature/week1-skeleton 브랜치에 커밋하고 푸시해줘.
-커밋 메시지는 "EduHub 백엔드 뼈대와 요구사항 문서 추가"로 해줘.
+지금까지 변경을 커밋하고 푸시해줘.
+- 커밋 전에 담을 파일 목록을 먼저 보여줘 (.env가 없는지 확인할게)
+- 요구사항 문서와 백엔드 뼈대는 별도 커밋으로 나눠줘
+- 커밋 메시지는 Conventional Commits 형식으로
 ```
 
 - 데스크톱 앱의 **Create PR** 기능으로 PR을 만들 수 있습니다. `gh`가 없으면 처음 쓸 때 설치를 안내합니다
 
-**방법 B: 직접 하기** (한 번은 꼭 직접 해 봅니다)
+**방법 B: 직접 하기** (한 번은 꼭 직접 해 봅니다. [3-8-1의 2단계 커밋](#3-8-1-git의-4개-영역과-2단계-커밋)을 떠올리며)
 
 ```bash
-git switch -c feature/week1-skeleton
-git status                 # 무엇이 바뀌었는지 직접 확인
-git add .
-git commit -m "EduHub 백엔드 뼈대와 요구사항 문서 추가"
-git push -u origin feature/week1-skeleton
+git branch --show-current          # feature/week1-skeleton 인지 확인
+git status                         # 무엇이 바뀌었는지 직접 확인
+
+# 커밋 1: 요구사항 문서
+git add docs/requirements.md       # 1단계: 골라 담기
+git diff --staged                  # 담은 내용 확인
+git commit -m "docs: EduHub 요구사항 문서 추가"   # 2단계: 기록
+
+# 커밋 2: 백엔드 뼈대와 설정
+git add backend CLAUDE.md .gitignore .env.example
+git status                         # .env 가 담기지 않았는지 확인
+git commit -m "feat(backend): Spring Boot 뼈대와 health API 추가"
+
+git log --oneline                  # 커밋 이력 확인
+git push -u origin feature/week1-skeleton          # 공유
 ```
 
-그 다음 GitHub 저장소 화면의 **Compare & pull request** 버튼으로 PR을 만듭니다.
+그다음 GitHub 저장소 화면의 **Compare & pull request** 버튼으로 PR을 만들고, 팀원(또는 강사)의 리뷰를 받은 뒤 **Squash and merge**로 병합합니다. 병합 후에는 내 PC도 정리합니다.
+
+```bash
+git switch main
+git pull                           # 병합된 main 가져오기
+git branch -d feature/week1-skeleton
+```
 
 > ✅ **최종 확인**: GitHub에 PR이 생기고, 파일 목록에 `docs/requirements.md`, `backend/`, `CLAUDE.md`, `.gitignore`가 보이면 따라하기 ①이 끝난 것입니다. `.env`가 올라가지 않았는지 꼭 확인합니다.
 
@@ -920,6 +1143,7 @@ git push -u origin feature/week1-skeleton
 3. **환경 분리**: Claude Code는 개발·테스트까지. 운영은 사람 승인과 파이프라인으로만
 4. **EduHub 7주**: 매주 배운 기능을 바로 적용, 모든 변경은 PR, 매주 "AI 없이 설명하기"
 5. **요구사항은 파일로, 지시는 범위·완료 기준과 함께, 결과는 diff와 직접 실행으로 확인**
+6. **Git은 2단계 커밋(add → commit) 후 push**, 작업은 **브랜치 → 개발 → PR → 병합**. `main`은 항상 동작하는 상태로
 
 ---
 
@@ -932,6 +1156,8 @@ git push -u origin feature/week1-skeleton
 5. Claude Code가 운영 DB에 접근하면 안 되는 이유 세 가지는?
 6. 요구사항을 대화창에 붙여넣지 않고 `docs/requirements.md` 파일로 두는 장점은?
 7. `/rewind`로 되돌릴 수 없는 변경은? 그래서 무엇을 함께 써야 하나?
+8. Git의 "2단계 커밋"에서 두 단계는 무엇이고, 나눠 두면 무엇이 좋은가? 커밋만 하고 푸시하지 않으면 팀원에게 보일까?
+9. EduHub에서 기능 하나를 개발해 `main`에 반영하기까지의 순서는?
 
 <details>
 <summary>정답 보기</summary>
@@ -943,6 +1169,8 @@ git push -u origin feature/week1-skeleton
 5. 잘못된 명령 하나가 장애·데이터 손실로 이어짐, 프롬프트 인젝션으로 의도하지 않은 명령이 실행될 수 있음, 운영 데이터(개인정보)가 AI 도구로 전송되어 정책 위반이 될 수 있음
 6. 다음 세션과 팀원이 다시 쓸 수 있고, `@`로 필요할 때만 참조해 토큰을 아끼며, 변경 이력이 Git에 남는다
 7. 셸 명령(`rm`, `mv`, 빌드 스크립트 등)으로 바뀐 파일, 외부에서 바꾼 파일. 그래서 의미 있는 단위마다 **Git 커밋**을 함께 쓴다
+8. 1단계 `git add`(스테이징에 골라 담기), 2단계 `git commit`(로컬 저장소에 기록). 일부만 골라 의미 있는 단위로 커밋하고, `git diff --staged`로 커밋 전에 검토할 수 있다. 커밋은 내 PC에만 있으므로 `git push` 전에는 팀원에게 보이지 않는다
+9. main 최신화 → 브랜치 생성 → 개발·테스트 → 2단계 커밋(반복) → 푸시 → PR → 리뷰·CI → Squash merge → 브랜치 삭제와 main pull
 
 </details>
 
