@@ -859,6 +859,146 @@ flowchart LR
 
 ---
 
+## Step 8 전에: GitHub 인증 한눈에
+
+처음 `git push`를 하면 GitHub는 **"당신이 이 저장소에 쓸 권한이 있는 사람인가?"**를 확인합니다. 여기서 막히는 수강생이 가장 많으므로, 연결하기 전에 인증 방식을 하나 정해 둡니다.
+
+> ⚠️ **GitHub 계정 비밀번호로는 `git push`를 할 수 없습니다.** GitHub는 2021년 8월부터 Git 작업에 비밀번호 인증을 받지 않습니다. 터미널이 `Password:`를 물을 때 계정 비밀번호를 넣으면 `Support for password authentication was removed` 오류가 납니다. 아래 방법 중 하나를 씁니다.
+
+### A. 인증이 필요한 곳은 세 군데
+
+| 무엇이 GitHub에 접근하나 | 언제 | 인증 방법 |
+|---|---|---|
+| **Git** (`git push`, `git pull`, `git clone`) | 오늘 Step 8부터 매일 | 아래 B의 방법 ①~④ 중 하나 |
+| **GitHub CLI `gh`** (`gh repo create`, `gh pr create`) | Step 8 방법 B, 데스크톱 앱의 **Create PR** | `gh auth login` (브라우저 로그인) |
+| **Claude Code 클라우드 세션** (웹·데스크톱의 Cloud 환경) | 오늘은 쓰지 않음 | claude.ai에서 **Claude GitHub App** 설치·저장소 권한 부여 |
+
+> 💡 **로컬(Local) 환경의 Claude Code는 따로 GitHub 인증을 하지 않습니다.** Claude가 `git push`를 실행하면 **내 PC에 저장된 내 Git 인증 정보**를 그대로 씁니다. 그래서 Claude가 할 수 있는 일 = 내 계정이 할 수 있는 일입니다. 권한 설정(3주차)과 `main` 보호(3주차)가 중요한 이유입니다.
+
+### B. Git 인증 방법 비교
+
+| 방법 | 원리 | 장점 | 주의 | 추천 대상 |
+|---|---|---|---|---|
+| **① Git Credential Manager (GCM)** | 처음 push할 때 **브라우저 로그인 창**이 뜨고, 받은 토큰을 OS 보관함에 저장 | 아무것도 만들 필요 없음. 2FA도 브라우저에서 처리 | Windows는 Git for Windows에 포함. macOS·Linux는 별도 설치 | ⭐ **Windows 수강생** |
+| **② GitHub CLI `gh auth login`** | `gh`로 브라우저 로그인 → `gh`가 Git의 인증 도우미 역할 | `gh` 명령(저장소 생성, PR)까지 한 번에 해결 | `gh` 설치 필요 | ⭐ **macOS·Linux 수강생**, `gh`를 쓸 사람 |
+| **③ Personal Access Token (PAT)** | GitHub에서 토큰을 만들어 비밀번호 자리에 입력 | 도구 설치 없이 어디서나 | 토큰 = 비밀번호. 유출·만료 관리 필요 | 서버, 사내 제약 환경 |
+| **④ SSH 키** | 내 PC에서 키 쌍을 만들고 공개키를 GitHub에 등록. 주소가 `git@github.com:…` | 한 번 등록하면 오래 사용, 토큰 만료 없음 | 회사 방화벽이 22번 포트를 막는 경우가 있음 | Linux·WSL, 이미 SSH를 쓰는 사람 |
+
+```mermaid
+flowchart TD
+    Q["처음 GitHub에 push 한다"] --> W{"Windows이고<br/>Git for Windows 설치?"}
+    W -- "예" --> GCM["① GCM<br/>push 하면 브라우저 로그인 창"]
+    W -- "아니오" --> G{"gh 를 설치할 수 있나?"}
+    G -- "예" --> GH["② gh auth login<br/>(HTTPS, Git 인증 연동: Yes)"]
+    G -- "아니오" --> S{"SSH(22번 포트)<br/>사용 가능?"}
+    S -- "예" --> SSH["④ SSH 키 등록<br/>remote 주소를 git@github.com:…"]
+    S -- "아니오" --> PAT["③ PAT 발급<br/>비밀번호 자리에 입력"]
+```
+
+> 오늘 수업은 **①(Windows) 또는 ②(macOS·Linux)**로 진행합니다. 둘 다 브라우저 로그인 한 번이면 끝납니다.
+
+> 💬 **강사 노트:** 수업에서는 A·B 표와 C의 ①② 따라하기만 다루고(5분), ③④와 D~F는 막힌 수강생이 찾아보는 참고 자료로 씁니다. 사전 준비 안내 때 "`gh auth login`까지 해 오기"를 함께 요청하면 수업 중 인증 문제가 크게 줄어듭니다.
+
+### C. 방법별 따라하기
+
+**① Git Credential Manager (Windows 기본)**
+
+```bash
+git config --global credential.helper     # manager 가 나오면 GCM이 설정된 상태
+git push -u origin main                   # 브라우저(또는 로그인 창)가 뜨면 "Sign in with your browser"
+```
+
+- 브라우저에서 GitHub에 로그인하고 **Authorize**를 누르면 끝입니다. 이후에는 다시 묻지 않습니다
+- 저장 위치: Windows **자격 증명 관리자**(Credential Manager) → Windows 자격 증명 → `git:https://github.com`
+
+**② GitHub CLI (macOS·Linux 권장, Windows도 가능)**
+
+```bash
+# 설치: macOS  brew install gh  /  Windows  winget install --id GitHub.cli  /  Linux 배포판 패키지 (cli.github.com 안내 참고)
+gh auth login
+```
+
+질문에 이렇게 답합니다.
+
+| 질문 | 선택 |
+|---|---|
+| Where do you use GitHub? | **GitHub.com** (사내 GitHub Enterprise면 그 서버) |
+| What is your preferred protocol for Git operations? | **HTTPS** |
+| Authenticate Git with your GitHub credentials? | **Yes** ← Git push 인증까지 연결됨 |
+| How would you like to authenticate GitHub CLI? | **Login with a web browser** → 화면의 일회용 코드를 브라우저에 입력 |
+
+```bash
+gh auth status        # Logged in to github.com account <내 아이디> ... 가 보이면 성공
+```
+
+> 💡 이미 `gh`로 로그인했는데 `git push`가 인증을 묻는다면 `gh auth setup-git`으로 Git 연동을 다시 설정합니다.
+
+**③ Personal Access Token (도구를 설치할 수 없을 때)**
+
+1. GitHub 오른쪽 위 프로필 → **Settings** → **Developer settings** → **Personal access tokens**
+2. **Fine-grained tokens**(권장) → **Generate new token**
+   - Expiration: **30~90일** (교육 기간에 맞게)
+   - Repository access: **Only select repositories** → `eduhub`만
+   - Permissions → Repository permissions → **Contents: Read and write**
+   - (6주차에 `.github/workflows/` 파일을 푸시할 때는 **Workflows: Read and write**도 필요)
+3. 생성된 토큰(`github_pat_…`)은 **이 화면에서 한 번만** 보입니다. 바로 복사합니다
+4. `git push` 때 Username에 GitHub 아이디, **Password에 토큰**을 붙여 넣습니다. GCM이나 OS 보관함이 기억합니다
+
+**④ SSH 키 (Linux·WSL에서 많이 씀)**
+
+```bash
+ssh-keygen -t ed25519 -C "gildong@example.com"   # 엔터로 기본 위치, 암호(passphrase)는 설정 권장
+cat ~/.ssh/id_ed25519.pub                         # 공개키(.pub)만 복사. 개인키(id_ed25519)는 절대 공유 금지
+```
+
+1. GitHub **Settings** → **SSH and GPG keys** → **New SSH key** → 공개키 붙여 넣기
+2. 연결 확인
+
+```bash
+ssh -T git@github.com     # "Hi <내 아이디>! You've successfully authenticated..." 가 나오면 성공
+```
+
+3. Step 8에서 원격 주소를 **SSH 주소**로 등록합니다: `git remote add origin git@github.com:<내-아이디>/eduhub.git` (이미 HTTPS로 등록했다면 `git remote set-url origin git@github.com:<내-아이디>/eduhub.git`)
+
+### D. 2단계 인증(2FA)과 회사 계정
+
+| 상황 | 해야 할 것 |
+|---|---|
+| **2FA를 켰다** (Step 6) | **복구 코드(recovery codes)를 내려받아 안전한 곳에 보관.** 휴대폰을 잃으면 계정에 들어갈 방법이 이것뿐일 수 있다. ①②는 브라우저에서 2FA를 처리하므로 추가 작업 없음 |
+| **회사 Organization이 SSO(SAML)를 쓴다** | 토큰·SSH 키를 만든 뒤 **Configure SSO → Authorize**로 그 조직에 승인해야 조직 저장소에 push 가능. 승인 안 하면 403 |
+| **사내 GitHub Enterprise Server** | `gh auth login`의 첫 질문에서 사내 서버 주소 선택, 원격 주소도 사내 도메인 |
+| **개인 계정과 회사 계정을 함께 쓴다** | 저장된 인증이 다른 계정일 수 있다. `gh auth status`로 지금 계정 확인, 필요하면 `gh auth switch`. 교육 중에는 **한 계정으로 통일** 권장 |
+
+### E. 인증 정보 보안 수칙 (AI와 함께 쓸 때 특히)
+
+- ❌ 토큰·개인키를 **Claude 대화창, CLAUDE.md, 코드, `.env.example`, 커밋**에 넣지 않는다 (대화 내용은 모델로 전송되고, 커밋은 이력에 영원히 남는다)
+- ❌ 원격 주소에 토큰을 끼워 넣지 않는다 (`https://<토큰>@github.com/...` → `.git/config`에 평문 저장)
+- ✅ 토큰은 **필요한 저장소, 필요한 권한, 짧은 만료**로 (Fine-grained)
+- ✅ 유출이 의심되면 즉시 GitHub에서 **토큰 삭제(Revoke)**, SSH 키 삭제
+- ✅ 3주차에 `.env`, `~/.ssh/` 같은 파일은 Claude가 읽지 못하도록 **권한 deny 규칙**을 넣는다
+
+### F. 인증 오류 빠르게 해결하기
+
+| 오류 메시지 | 원인 | 해결 |
+|---|---|---|
+| `Support for password authentication was removed` | 계정 비밀번호를 입력함 | ①~④ 중 하나로 다시 인증 |
+| `remote: Repository not found` (내 저장소인데) | **비공개 저장소 + 다른 계정으로 인증됨** (권한 없는 계정에는 "없음"으로 보임) | 저장된 인증 지우고 다시 로그인 (아래 명령), 주소 오타도 확인 |
+| `403` / `Permission to … denied to <다른 아이디>` | 다른 계정이 저장되어 있음, 또는 조직 SSO 미승인 | 저장된 인증 삭제, SSO Authorize |
+| `Permission denied (publickey)` | SSH 공개키 미등록, 다른 키 사용 | `ssh -T git@github.com`으로 확인, 공개키 등록 |
+| `refusing to allow … to create or update workflow` | 토큰에 workflow 권한 없음 (6주차) | PAT에 Workflows 권한 추가, `gh auth refresh -s workflow` |
+| 인증 창이 안 뜨고 계속 실패 | 회사 프록시·보안 프로그램 | `gh auth login`으로 일회용 코드 방식 사용, 사내 담당자 문의 |
+
+**저장된 GitHub 인증 지우기** (계정을 바꾸거나 꼬였을 때, 모든 OS 공통)
+
+```bash
+printf "protocol=https\nhost=github.com\n\n" | git credential reject
+# 다음 git push 때 다시 로그인 창이 뜬다
+```
+
+> ✅ **확인**: `gh auth status`(②) 또는 `ssh -T git@github.com`(④)이 내 아이디를 보여 주거나, 다음 Step 8의 `git push`가 비밀번호를 묻지 않고 끝나면 인증 준비가 된 것입니다.
+
+---
+
 ## Step 8. 로컬 저장소를 GitHub에 연결하고 푸시하기
 
 세 가지 방법 중 하나를 고릅니다. **처음에는 방법 A(직접)를 권합니다.** 무엇이 연결되는지 눈으로 확인할 수 있기 때문입니다.
@@ -874,7 +1014,7 @@ git push -u origin main                                           # ④ 올리�
 ```
 
 - 처음 푸시할 때 로그인 창이 뜨면 브라우저로 GitHub에 로그인합니다 (윈도우는 Git Credential Manager가 처리)
-- 비밀번호를 물으면 GitHub 비밀번호가 아니라 **브라우저 로그인**이나 **토큰**이 필요합니다. `gh auth login`으로 로그인해 두면 가장 간단합니다
+- 비밀번호를 물으면 GitHub 비밀번호가 아니라 **브라우저 로그인**이나 **토큰**이 필요합니다. 방법은 바로 위 [GitHub 인증 한눈에](#step-8-전에-github-인증-한눈에)를 봅니다
 
 **방법 B: GitHub CLI로 한 번에** (`gh` 설치·로그인한 경우)
 
@@ -1222,7 +1362,7 @@ git branch -d feature/week1-skeleton
 | `git push`에서 `src refspec main does not match any` | 아직 커밋이 없음. Step 5의 첫 커밋을 먼저 한다 (`git log`로 확인) |
 | `error: remote origin already exists` | 이미 연결되어 있음. 주소가 틀렸다면 `git remote set-url origin <올바른 주소>` |
 | 첫 푸시가 `rejected (fetch first)` 또는 `non-fast-forward`로 거절됨 | GitHub 저장소를 만들 때 README 등을 추가해 이력이 둘로 나뉨. `git pull --rebase origin main`으로 GitHub 커밋 위에 내 커밋을 다시 쌓고 `git push -u origin main`. README가 양쪽에 있어 충돌하면 내용을 정리한 뒤 `git add README.md && git rebase --continue` |
-| 푸시할 때 인증 실패, 비밀번호를 물음 | GitHub는 비밀번호 로그인을 받지 않음. 브라우저 로그인 창(Git Credential Manager)이나 `gh auth login`으로 로그인 |
+| 푸시할 때 인증 실패, 비밀번호를 물음 | GitHub는 비밀번호 로그인을 받지 않음. 브라우저 로그인 창(Git Credential Manager)이나 `gh auth login`으로 로그인. 오류별 해결은 [인증 오류 빠르게 해결하기](#f-인증-오류-빠르게-해결하기) |
 | 다른 저장소에 푸시한 것 같음 | `git remote -v`로 주소 확인. 7주 내내 처음 한 번은 꼭 확인 |
 | `./gradlew` 권한 오류 (Mac/Linux) | `chmod +x gradlew` (Claude에게 맡겨도 되지만 직접 하는 편이 빠르다) |
 | `java -version`이 21이 아님 | JDK 21 설치 후 `JAVA_HOME` 확인 |
@@ -1448,6 +1588,7 @@ git branch -d feature/week1-skeleton
 9. EduHub에서 기능 하나를 개발해 `main`에 반영하기까지의 순서는?
 10. 로컬에서 시작한 프로젝트를 올릴 GitHub 저장소를 만들 때 README를 추가하지 않는 이유는?
 11. 요구사항을 기능 → 비기능 → 범위 순서로 나눠 전달하는 이유는? 비기능 요구사항을 구현 뒤로 미루면 어떤 문제가 생길까?
+12. `git push`에서 GitHub 계정 비밀번호를 넣으면 왜 실패할까? 대신 쓸 수 있는 인증 방법 두 가지는? 로컬에서 Claude가 `git push`를 하면 누구의 인증으로 실행될까?
 
 <details>
 <summary>정답 보기</summary>
@@ -1463,6 +1604,8 @@ git branch -d feature/week1-skeleton
 9. main 최신화 → 브랜치 생성 → 개발·테스트 → 2단계 커밋(반복) → 푸시 → PR → 리뷰·CI → Squash merge → 브랜치 삭제와 main pull
 10. 내 PC에 이미 첫 커밋이 있으므로, GitHub에서도 README 커밋을 만들면 서로 다른 두 이력이 생겨 첫 푸시가 거절된다. 로컬에서 시작한 프로젝트는 빈 저장소에 올린다
 11. 기능으로 "무엇을"과 도메인 용어를 먼저 맞춰야 제약이 걸리는 곳을 판단할 수 있고, 비기능은 패키지 구조·보안·환경 분리처럼 구조를 결정하므로 구현 전에 반영해야 한다. 범위는 마지막에 작게 잘라야 결과를 검토할 수 있다. 비기능을 미루면 구조를 다시 만드는 재작업이 생긴다
+
+12. GitHub는 Git 작업에 계정 비밀번호 인증을 받지 않는다(2021년 8월부터). 브라우저 로그인(Git Credential Manager), `gh auth login`, Personal Access Token, SSH 키 중 하나를 쓴다. 로컬 Claude Code는 내 PC에 저장된 **내 Git 인증**으로 실행하므로, Claude가 할 수 있는 일 = 내 계정이 할 수 있는 일이다
 
 </details>
 
