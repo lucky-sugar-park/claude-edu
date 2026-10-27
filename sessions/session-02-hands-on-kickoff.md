@@ -8,11 +8,11 @@
 > 1. 1회차에서 시간이 부족했던 **토큰 절약 습관**을 실제 화면에서 확인한다
 > 2. "코딩은 Claude가 해도 **아키텍처 지식과 환경 분리는 개발자 몫**"인 이유를 EduHub 예시로 이해한다
 > 3. 7주 동안 진행할 **Toy 프로젝트 EduHub**의 요구사항, 아키텍처, 주차별 계획을 이해한다
-> 4. 데스크톱 앱 설치 → 로그인 → GitHub 저장소 생성 → Claude에게 첫 요구사항 전달 → 커밋·푸시까지 **직접 따라 한다**
+> 4. Claude Code로 **프로젝트를 만들고** → **GitHub 저장소와 동기화**한 뒤 → **기능·비기능 요구사항을 순서대로 전달**해 첫 PR까지 **직접 따라 한다**
 > 5. `/context`, `/compact`, `/clear`, `/rewind` 같은 주요 명령을 **직접 써 보고 차이를 느낀다**
 >
 > **관련 모듈**: 3(사용 환경), 4(코드베이스 탐색), 5(프롬프트)
-> **사전 준비**: 아래 [준비물 체크리스트](#4-0-준비물-체크리스트)를 수업 전에 확인합니다. 설치에 시간을 쓰면 따라하기가 밀립니다.
+> **사전 준비**: 아래 [준비물 체크리스트](#4-0-준비물-체크리스트)와 따라하기 ①의 **⓪ 준비(Step 1~3: Git·데스크톱 앱 설치, 로그인)**를 수업 전에 끝내 옵니다. 설치에 시간을 쓰면 따라하기가 밀립니다.
 
 ---
 
@@ -23,9 +23,9 @@
 | 0:00 – 0:05 | 오프닝, 1회차 핵심 3문장 복습 | 강의 |
 | 0:05 – 0:20 | 1. 1회차 보강: 토큰을 아끼는 경험적 방법 | 강의 + 시연 |
 | 0:20 – 0:35 | 2. 코딩은 Claude가, 아키텍처와 환경 분리는 개발자가 | 강의 + 토론 |
-| 0:35 – 1:00 | 3. Toy 프로젝트 EduHub 소개와 7주 진행 계획 (Git 2단계 커밋, 브랜치 → 개발 → 병합 포함) | 강의 |
-| 1:00 – 1:08 | ☕ 휴식 (설치가 덜 된 사람은 이 시간에 마무리) | — |
-| 1:08 – 1:42 | 4. 따라하기 ①: 설치 → 로그인 → GitHub → 프로젝트 생성 → 브랜치 → 첫 요구사항 → PR | 실습 |
+| 0:35 – 0:55 | 3. Toy 프로젝트 EduHub 소개와 7주 진행 계획 (Git 2단계 커밋, 브랜치 → 개발 → 병합 포함) | 강의 |
+| 0:55 – 1:03 | ☕ 휴식 (설치가 덜 된 사람은 이 시간에 마무리) | — |
+| 1:03 – 1:42 | 4. 따라하기 ①: ① 프로젝트 생성 → ② GitHub 동기화 → ③ 요구사항 전달(기능 → 비기능 → 범위) → 구현 → PR | 실습 |
 | 1:42 – 1:57 | 5. 따라하기 ②: 주요 명령어 체험 | 실습 |
 | 1:57 – 2:00 | 7. 정리, 과제 안내 | 강의 |
 
@@ -620,7 +620,7 @@ flowchart LR
 | 이미 푸시해서 공유됨 | `git revert 커밋` → 되돌리는 새 커밋. **공유된 이력은 다시 쓰지 않는다** |
 | `main`에 병합된 PR을 되돌려야 함 | GitHub PR 화면의 **Revert** 버튼 → 되돌리는 PR 생성 |
 
-> 💬 **강사 노트:** 3-8-1의 4개 영역 그림과 3-8-2의 gitGraph 그림 두 장만 확실히 이해시키면 됩니다. Git이 처음인 수강생이 있으면 따라하기 ①의 Step 8(브랜치 만들기)과 Step 11(커밋·푸시)에서 이 그림을 다시 띄워 "지금 어느 영역에 있는지" 짚어 줍니다.
+> 💬 **강사 노트:** 3-8-1의 4개 영역 그림과 3-8-2의 gitGraph 그림 두 장만 확실히 이해시키면 됩니다. Git이 처음인 수강생이 있으면 따라하기 ①의 Step 8(GitHub 동기화), Step 9(브랜치 만들기), Step 14(커밋·푸시)에서 이 그림을 다시 띄워 "지금 어느 영역에 있는지" 짚어 줍니다.
 
 ---
 
@@ -630,22 +630,35 @@ flowchart LR
 
 ---
 
-# 4. 따라하기 ①: 설치부터 첫 요구사항까지
+# 4. 따라하기 ①: 프로젝트 생성 → GitHub 동기화 → 요구사항 전달
 
-> **목표**: 아무것도 없는 상태에서 시작해 **GitHub 저장소에 EduHub 뼈대를 푸시**합니다.
+> **목표**: 빈 폴더에서 시작해 **Claude Code로 프로젝트를 만들고**, **GitHub 저장소와 동기화**한 뒤, **기능·비기능 요구사항을 순서대로 전달**해 EduHub 뼈대를 PR로 올립니다.
 > 화면 이름과 메뉴 위치는 2026년 10월 Claude Code 공식 문서(Desktop quickstart, Desktop) 기준입니다. 앱 업데이트로 위치가 조금 바뀔 수 있습니다.
 
 ```mermaid
 flowchart LR
-    A["Step 1<br/>GitHub 계정"] --> B["Step 2<br/>Git 설치·설정"]
-    B --> C["Step 3<br/>저장소 생성·클론"]
-    C --> D["Step 4~5<br/>데스크톱 앱 설치·로그인"]
-    D --> E["Step 6<br/>폴더 열기·권한 모드"]
-    E --> F["Step 7~8<br/>요구사항 전달·계획"]
-    F --> G["Step 9<br/>구현·diff 검토"]
-    G --> H["Step 10<br/>CLAUDE.md"]
-    H --> I["Step 11<br/>커밋·푸시·PR"]
+    subgraph P0["⓪ 준비 (수업 전)"]
+        S1["Step 1~3<br/>Git·앱 설치<br/>로그인"]
+    end
+    subgraph P1["① 프로젝트 만들기"]
+        S4["Step 4<br/>폴더 만들고<br/>Claude Code로 열기"] --> S5["Step 5<br/>초기 구성과<br/>첫 커밋"]
+    end
+    subgraph P2["② GitHub 동기화"]
+        S6["Step 6<br/>GitHub 계정"] --> S7["Step 7<br/>빈 저장소 생성"] --> S8["Step 8<br/>연결·푸시·pull 확인"]
+    end
+    subgraph P3["③ 요구사항 전달"]
+        S9["Step 9<br/>작업 브랜치"] --> S10["Step 10<br/>요구사항 문서"] --> S11["Step 11<br/>기능 → 비기능<br/>→ 범위·계획"]
+        S11 --> S12["Step 12~14<br/>구현·CLAUDE.md<br/>커밋·PR"]
+    end
+    P0 --> P1 --> P2 --> P3
 ```
+
+| 단계 | 하는 일 | 결과 |
+|---|---|---|
+| ⓪ 준비 | Git, 데스크톱 앱 설치와 로그인 (**수업 전에 끝내 오기**) | Claude Code를 쓸 수 있는 상태 |
+| ① 프로젝트 만들기 | 내 PC에 폴더를 만들고 Claude Code로 열어 초기 파일과 Git 저장소 구성 | 첫 커밋이 있는 로컬 저장소 |
+| ② GitHub 동기화 | GitHub에 빈 저장소를 만들고 로컬 저장소를 연결해 푸시 | 내 PC와 GitHub의 `main`이 같은 상태 |
+| ③ 요구사항 전달 | 요구사항 문서 작성 → 기능 → 비기능 → 범위 순서로 전달 → 구현 → PR | 리뷰를 기다리는 첫 PR |
 
 ---
 
@@ -656,7 +669,7 @@ flowchart LR
 - [ ] **JDK 21**, **Node.js LTS** (EduHub 빌드용)
 - [ ] **Docker Desktop** (개발용 PostgreSQL. 3주차부터 필요)
 - [ ] (선택) IDE: IntelliJ IDEA 또는 VS Code
-- [ ] (선택) GitHub CLI `gh`: 데스크톱 앱에서 PR을 만들거나 PR 상태를 볼 때 필요. 없으면 처음 쓸 때 설치를 안내합니다
+- [ ] (선택) GitHub CLI `gh`: 저장소 생성·PR을 명령으로 할 때 편리. 데스크톱 앱에서 PR을 만들 때 없으면 처음 쓸 때 설치를 안내합니다
 
 ```bash
 # 설치 확인 (터미널 또는 PowerShell)
@@ -668,62 +681,26 @@ docker --version
 
 ---
 
-## Step 1. GitHub 계정 만들기
-
-1. https://github.com/signup 에 접속합니다
-2. 이메일, 비밀번호, 사용자 이름(username)을 입력하고 이메일 인증을 마칩니다
-   - 회사 업무용이면 **회사 정책에 맞는 이메일**을 씁니다 (사내 GitHub Enterprise가 있으면 그 계정을 씁니다)
-3. **2단계 인증(2FA)을 켭니다**: Settings → Password and authentication → Two-factor authentication
-   - AI 도구에 저장소 권한을 주게 되므로 계정 보안이 더 중요합니다
-
-> ✅ **확인**: 오른쪽 위 프로필 사진을 눌러 내 사용자 이름이 보이면 됩니다.
+# ⓪ 준비 (수업 전에 끝내 오기)
 
 ---
 
-## Step 2. Git 설치와 기본 설정
+## Step 1. Git 설치와 기본 설정
 
 1. https://git-scm.com/downloads 에서 설치합니다 (윈도우는 Git for Windows, 기본 옵션 그대로)
 2. 내 이름과 이메일을 설정합니다. 커밋 작성자로 기록됩니다
 
 ```bash
 git config --global user.name "홍길동"
-git config --global user.email "gildong@example.com"   # GitHub 계정 이메일
-git config --global init.defaultBranch main
+git config --global user.email "gildong@example.com"   # Step 6에서 만들 GitHub 계정 이메일
+git config --global init.defaultBranch main            # 새 저장소의 기본 브랜치를 main으로
 ```
 
 > 💡 데스크톱 앱은 Claude Code를 내장하고 있어 Node.js나 CLI를 따로 설치하지 않아도 됩니다. 하지만 **Git은 필요합니다**. 워크트리(병렬 작업 격리)에 Git을 쓰고, 없으면 "Git is required" 오류가 납니다.
 
 ---
 
-## Step 3. GitHub에 저장소를 만들고 내 PC로 가져오기
-
-1. GitHub 오른쪽 위 **+** → **New repository**
-2. 다음처럼 입력합니다
-
-| 항목 | 값 |
-|---|---|
-| Repository name | `eduhub` (팀이면 `eduhub-team1`) |
-| Visibility | **Private** |
-| Add a README file | **체크** (빈 저장소보다 클론이 쉽습니다) |
-| .gitignore | 비워 둠 (나중에 Claude와 함께 만듭니다) |
-
-3. **Create repository** → 초록색 **Code** 버튼 → HTTPS 주소 복사
-4. 작업 폴더에서 클론합니다
-
-```bash
-mkdir -p ~/workspace && cd ~/workspace
-git clone https://github.com/<내-아이디>/eduhub.git
-cd eduhub
-```
-
-- 처음 클론·푸시할 때 로그인 창이 뜨면 브라우저로 GitHub에 로그인합니다 (윈도우는 Git Credential Manager가 처리)
-- `gh`를 설치했다면 `gh auth login`으로 미리 로그인해 두면 편합니다
-
-> ✅ **확인**: `eduhub` 폴더 안에 `README.md`와 숨김 폴더 `.git`이 있으면 됩니다.
-
----
-
-## Step 4. Claude 데스크톱 앱 설치
+## Step 2. Claude 데스크톱 앱 설치
 
 1. Claude 공식 다운로드 페이지(https://claude.com/download)에서 내 운영체제용 앱을 받습니다
    - macOS: Intel과 Apple Silicon 공용 DMG
@@ -735,7 +712,7 @@ cd eduhub
 
 ---
 
-## Step 5. 로그인하고 Code 탭 열기
+## Step 3. 로그인하고 Code 탭 열기
 
 1. 앱을 실행하고 **Anthropic 계정으로 로그인**합니다
 2. 사이드바 위쪽의 **Code** 탭을 누릅니다
@@ -749,28 +726,205 @@ cd eduhub
 
 ---
 
-## Step 6. 프로젝트 폴더 열기와 권한 모드 고르기
+# ① Claude Code에서 프로젝트 만들기
 
-1. 입력창 아래 줄의 **환경 선택**에서 **Local**을 고릅니다
+> **프로젝트 = 폴더 하나.** Claude Code에는 "새 프로젝트" 버튼이 따로 있는 것이 아니라, **폴더를 열면 그 폴더가 작업 공간(프로젝트)**이 됩니다. 그 폴더의 CLAUDE.md, `.claude/` 설정이 이 프로젝트에 적용됩니다. ([프로젝트·디렉터리·세션](../examples/15-project-directory-session.md))
+
+---
+
+## Step 4. 프로젝트 폴더를 만들고 Claude Code로 열기
+
+1. 작업할 빈 폴더를 만듭니다. 탐색기(Finder)에서 만들어도 되고, 터미널에서 만들어도 됩니다
+
+```bash
+# macOS / Linux / Git Bash
+mkdir -p ~/workspace/eduhub
+
+# Windows PowerShell
+mkdir $HOME\workspace\eduhub
+```
+
+> 💡 경로에 **한글과 공백이 없는 폴더**를 권합니다. 일부 빌드 도구가 한글·공백 경로에서 오류를 냅니다. 회사 PC라면 OneDrive 동기화 폴더도 피합니다.
+
+2. 데스크톱 앱 **Code** 탭의 입력창 아래 줄에서 **환경 선택**을 **Local**로 고릅니다
    - Local: 내 PC에서 실행 (내 파일, 내 Docker, 사내망 접근 가능)
-   - Cloud: Anthropic 클라우드에서 실행 (앱을 닫아도 계속, GitHub 연결 필요). 오늘은 쓰지 않습니다
-2. 그 옆의 **폴더 선택** → **Open folder…** → Step 3에서 클론한 `eduhub` 폴더를 고릅니다
-3. 같은 줄의 **권한 모드**를 고릅니다
+   - Cloud: Anthropic 클라우드에서 실행 (앱을 닫아도 계속, GitHub 저장소 필요). 오늘은 쓰지 않습니다
+3. 그 옆의 **폴더 선택** → **Open folder…** → 방금 만든 `eduhub` 폴더를 고릅니다
+4. 같은 줄의 **권한 모드**를 고릅니다
 
 | 모드 | 동작 | 오늘의 사용 |
 |---|---|---|
 | **Manual** | 파일 수정·명령 실행마다 승인 요청 | ⭐ 처음에는 이것으로 시작 (무엇을 하려는지 보면서 배우기) |
-| **Plan** | 읽기와 계획만, 수정하지 않음 | Step 7~8 요구사항 분석과 계획 |
-| **Accept edits** | 파일 수정은 자동 승인, 명령은 확인 | 계획에 합의한 뒤 구현할 때 |
+| **Plan** | 읽기와 계획만, 수정하지 않음 | Step 11 요구사항 분석과 계획 |
+| **Accept edits** | 파일 수정은 자동 승인, 명령은 확인 | 계획에 합의한 뒤 구현할 때 (Step 12) |
 | Auto, Bypass | 더 적게 묻거나 묻지 않음 | 오늘은 쓰지 않음 (Bypass는 격리된 환경에서만) |
 
-> ✅ **확인**: 입력창에 `이 폴더에 어떤 파일이 있어?`라고 물어 `README.md`가 보이면 연결이 끝난 것입니다.
+> ✅ **확인**: 입력창에 `지금 열려 있는 폴더 경로와 안에 있는 파일을 알려줘`라고 묻습니다. `eduhub` 경로와 "비어 있음"이 나오면 연결된 것입니다.
+
+> 💡 **CLI로 하는 경우**: `cd ~/workspace/eduhub` 후 `claude`를 실행하면 그 폴더가 프로젝트가 됩니다. 처음 여는 폴더면 "이 폴더를 신뢰하는지" 묻습니다.
+
+---
+
+## Step 5. Claude에게 초기 구성을 맡기고 첫 커밋하기
+
+권한 모드는 **Manual** 그대로 두고, Claude가 무엇을 하는지 **승인 창을 하나씩 읽으며** 진행합니다.
+
+```text
+이 빈 폴더를 EduHub 프로젝트로 초기 구성해줘.
+
+[만들 것]
+- git init (기본 브랜치 main)
+- README.md: 프로젝트 이름 "EduHub"와 한 줄 설명 "사내 교육과정 조회·수강 신청 시스템"
+- .gitignore: Java/Gradle, Node, IntelliJ·VS Code, OS 파일, 그리고 .env
+- .env.example: 지금은 주석 한 줄만 ("# 로컬 개발용 환경 변수 예시. 실제 값은 .env에 쓰고 커밋하지 않는다")
+- docs/ 폴더 (비어 있으면 Git이 추적하지 않으니 docs/.gitkeep)
+
+[하지 않는 것]
+- 소스 코드, 빌드 파일 (요구사항을 준 뒤에 만든다)
+
+[마지막에]
+- 만든 파일 목록을 보여주고, "chore: 프로젝트 초기 구성" 메시지로 main에 첫 커밋해줘
+```
+
+**승인 창에서 볼 것**
+
+| Claude가 요청하는 것 | 확인할 점 |
+|---|---|
+| `git init` 실행 | 지금 폴더(`eduhub`)에서 실행하는가? 상위 폴더가 아닌가? |
+| 파일 생성 (Write) | 파일 이름과 내용이 지시와 같은가? |
+| `git add`, `git commit` 실행 | `.env` 같은 비밀 파일이 담기지 않는가? |
+
+> ✅ **확인** (내 터미널에서 직접):
+>
+> ```bash
+> cd ~/workspace/eduhub
+> git status            # nothing to commit, working tree clean
+> git log --oneline     # chore: 프로젝트 초기 구성 (커밋 1개)
+> ```
+
+> 💡 **왜 첫 커밋만 main에 바로 하나?** 저장소에 아무 커밋도 없으면 브랜치를 나눌 기준점이 없습니다. 첫 커밋(초기 구성)만 `main`에 하고, **이후의 모든 작업은 브랜치에서** 합니다 ([3-8-2](#3-8-2-브랜치--개발--병합-github-flow)).
+
+> 💡 **직접 해도 됩니다**: 위 내용은 `git init`, 파일 4개 만들기, `git add .`, `git commit`으로 사람이 1~2분이면 할 수 있습니다. 오늘은 **Claude가 도구(명령·파일 쓰기)를 어떻게 요청하는지 보는 것**이 목적이라 맡겨 봅니다.
+
+---
+
+# ② GitHub 저장소와 동기화하기
+
+> 지금 저장소는 **내 PC에만** 있습니다. GitHub에 같은 저장소를 만들고 연결(`remote`)해 두면, 내 커밋을 올리고(`push`) 팀원의 커밋을 받아(`pull`) **양쪽을 같은 상태로 맞출 수 있습니다.** 이것이 "동기화"입니다.
+
+```mermaid
+flowchart LR
+    subgraph PC["💻 내 PC: ~/workspace/eduhub"]
+        L["로컬 저장소<br/>main: chore: 프로젝트 초기 구성"]
+    end
+    subgraph GH["☁️ GitHub: 내아이디/eduhub"]
+        R["원격 저장소 (origin)<br/>처음에는 비어 있음"]
+    end
+    L -- "Step 8: git remote add origin URL<br/>(연결 등록)" --> R
+    L -- "git push -u origin main<br/>(올리기)" --> R
+    R -- "git pull<br/>(받기)" --> L
+```
+
+---
+
+## Step 6. GitHub 계정 만들기 (이미 있으면 2FA만 확인)
+
+1. https://github.com/signup 에 접속합니다
+2. 이메일, 비밀번호, 사용자 이름(username)을 입력하고 이메일 인증을 마칩니다
+   - 회사 업무용이면 **회사 정책에 맞는 이메일**을 씁니다 (사내 GitHub Enterprise가 있으면 그 계정을 씁니다)
+   - Step 1의 `git config user.email`과 같은 이메일이면 커밋이 내 계정과 연결되어 보입니다
+3. **2단계 인증(2FA)을 켭니다**: Settings → Password and authentication → Two-factor authentication
+   - AI 도구에 저장소 권한을 주게 되므로 계정 보안이 더 중요합니다
+
+> ✅ **확인**: 오른쪽 위 프로필 사진을 눌러 내 사용자 이름이 보이면 됩니다.
+
+---
+
+## Step 7. GitHub에 빈 저장소 만들기
+
+1. GitHub 오른쪽 위 **+** → **New repository**
+2. 다음처럼 입력합니다
+
+| 항목 | 값 |
+|---|---|
+| Repository name | `eduhub` (팀이면 `eduhub-team1`) |
+| Visibility | **Private** |
+| Add a README file | ⚠️ **체크하지 않음** |
+| .gitignore, license | ⚠️ **None** (선택하지 않음) |
+
+3. **Create repository**를 누르면 "Quick setup" 화면이 나옵니다. **HTTPS** 주소(`https://github.com/<내-아이디>/eduhub.git`)를 복사합니다
+
+> ⚠️ **왜 README를 만들지 않나?** 이미 내 PC에 첫 커밋이 있습니다. GitHub에서도 README로 커밋을 만들면 **서로 다른 두 이력**이 생겨 첫 푸시가 거절됩니다. "로컬에서 시작한 프로젝트"는 **빈 저장소**에 올리는 것이 원칙입니다. 실수로 만들었다면 [4-15. 자주 겪는 문제](#4-15-자주-겪는-문제)를 봅니다.
+
+---
+
+## Step 8. 로컬 저장소를 GitHub에 연결하고 푸시하기
+
+세 가지 방법 중 하나를 고릅니다. **처음에는 방법 A(직접)를 권합니다.** 무엇이 연결되는지 눈으로 확인할 수 있기 때문입니다.
+
+**방법 A: 직접 명령으로** (GitHub "Quick setup" 화면의 "…or push an existing repository from the command line"과 같은 내용)
+
+```bash
+cd ~/workspace/eduhub
+git remote add origin https://github.com/<내-아이디>/eduhub.git   # ① 원격 저장소를 origin이라는 이름으로 등록
+git remote -v                                                     # ② 등록 확인 (fetch, push 두 줄)
+git branch -M main                                                # ③ 브랜치 이름을 main으로 맞춤 (이미 main이면 변화 없음)
+git push -u origin main                                           # ④ 올리기. -u로 이후엔 git push 만으로 동기화
+```
+
+- 처음 푸시할 때 로그인 창이 뜨면 브라우저로 GitHub에 로그인합니다 (윈도우는 Git Credential Manager가 처리)
+- 비밀번호를 물으면 GitHub 비밀번호가 아니라 **브라우저 로그인**이나 **토큰**이 필요합니다. `gh auth login`으로 로그인해 두면 가장 간단합니다
+
+**방법 B: GitHub CLI로 한 번에** (`gh` 설치·로그인한 경우)
+
+```bash
+cd ~/workspace/eduhub
+gh repo create eduhub --private --source=. --remote=origin --push
+```
+
+> 저장소 생성(Step 7), 연결, 푸시를 한 명령으로 합니다. 이 방법을 쓰면 Step 7은 건너뜁니다.
+
+**방법 C: Claude에게 맡기기**
+
+```text
+이 저장소를 GitHub의 https://github.com/<내-아이디>/eduhub.git 에 origin으로 연결하고 main을 푸시해줘.
+실행할 명령을 먼저 보여줘.
+```
+
+> 💡 어떤 방법이든 **`git remote -v`로 연결된 주소를 직접 확인**합니다. 다른 사람의 저장소나 잘못된 주소로 푸시하는 사고를 막습니다.
+
+> ✅ **확인**: GitHub 저장소 화면을 새로 고치면 `README.md`, `.gitignore`, `.env.example`, `docs/`가 보이고 커밋 메시지 `chore: 프로젝트 초기 구성`이 보입니다.
+
+**동기화 체험 (2분)**: 반대 방향(GitHub → 내 PC)도 해 봅니다
+
+1. GitHub 화면에서 `README.md` 오른쪽 위 연필 아이콘(Edit)을 눌러 한 줄을 추가하고 **Commit changes**
+2. 내 PC에서 받아옵니다
+
+```bash
+git pull               # GitHub의 새 커밋을 받아 합침
+git log --oneline      # 커밋이 2개가 됨
+```
+
+| 명령 | 방향 | 언제 |
+|---|---|---|
+| `git push` | 내 PC → GitHub | 내 커밋을 공유할 때 |
+| `git pull` | GitHub → 내 PC | 작업을 시작하기 전, 팀원의 변경을 받을 때 (`fetch` + 합치기) |
+| `git fetch` | GitHub → 내 PC (합치지 않음) | 무엇이 바뀌었는지 먼저 보고 싶을 때 |
+| `git status` | — | "ahead/behind N commits"로 동기화 상태 확인 |
+
+> 💡 **습관**: 작업을 시작할 때 `git switch main && git pull`, 작업이 끝나면 브랜치를 `git push`. 7주 동안 매일 반복합니다.
+
+---
+
+# ③ Claude Code에게 요구사항 전달하기
+
+> 프로젝트와 저장소가 준비되었으니 이제 **무엇을 만들지** 알려 줍니다. 순서는 **① 요구사항을 파일로 정리 → ② 기능 요구사항으로 "무엇을" 이해시키기 → ③ 비기능 요구사항으로 "얼마나 잘"과 설계 제약 이해시키기 → ④ 이번 주 범위만 계획**입니다.
 
 ---
 
 ## 잠깐: 마크다운 기본 (5분)
 
-Step 7부터 쓰는 요구사항 문서, CLAUDE.md, PR 본문은 모두 **마크다운(.md)**입니다. 제목·목록·표로 구조를 나누면 사람도 읽기 쉽고 **Claude도 지시와 규칙을 정확히 구분**합니다. 오늘은 가장 자주 쓰는 문법만 익히고, 자세한 내용은 [마크다운 작성 가이드](../examples/30-markdown-guide.md)를 봅니다.
+Step 10부터 쓰는 요구사항 문서, CLAUDE.md, PR 본문은 모두 **마크다운(.md)**입니다. 제목·목록·표로 구조를 나누면 사람도 읽기 쉽고 **Claude도 지시와 규칙을 정확히 구분**합니다. 오늘은 가장 자주 쓰는 문법만 익히고, 자세한 내용은 [마크다운 작성 가이드](../examples/30-markdown-guide.md)를 봅니다.
 
 | 쓰임 | 이렇게 쓴다 | 이렇게 보인다 / 요령 |
 |---|---|---|
@@ -809,57 +963,140 @@ Step 7부터 쓰는 요구사항 문서, CLAUDE.md, PR 본문은 모두 **마크
 
 ---
 
-## Step 7. 요구사항 문서를 저장소에 넣기
+## Step 9. 작업 브랜치 만들기
+
+이제부터는 `main`에서 바로 작업하지 않습니다 ([3-8-2](#3-8-2-브랜치--개발--병합-github-flow)의 ②③). 요구사항 문서부터 이 브랜치에서 만듭니다.
+
+```bash
+git switch main && git pull           # 시작 전 동기화 습관
+git switch -c feature/week1-skeleton
+git branch --show-current             # feature/week1-skeleton 이 보이면 OK
+```
+
+> 💡 Claude에게 "작업 전에 feature/week1-skeleton 브랜치를 만들어줘"라고 맡겨도 됩니다. 데스크톱 앱 화면이나 `git branch --show-current`로 지금 브랜치를 꼭 확인합니다.
+
+---
+
+## Step 10. 요구사항 문서 작성하기 (기능·비기능을 나눠서)
 
 Claude에게 요구사항을 줄 때 **대화창에 길게 붙여넣기보다 파일로 저장**하는 것이 좋습니다. 다음 세션에서도 다시 쓸 수 있고, 팀원과 공유되고, 필요한 부분만 `@`로 참조할 수 있기 때문입니다.
 
-1. `eduhub/docs/requirements.md` 파일을 만들고 (바로 위 [마크다운 기본](#잠깐-마크다운-기본-5분)의 제목·표 문법으로) [3-3. 기능 요구사항](#3-3-기능-요구사항-개략)과 [3-4. 비기능 요구사항](#3-4-비기능-요구사항-개략) 표를 복사해 넣습니다
-2. 맨 위에 프로젝트 개요와 기술 스택을 몇 줄 적습니다
+1. `docs/requirements.md` 파일을 만들고 (바로 위 [마크다운 기본](#잠깐-마크다운-기본-5분)의 제목·표 문법으로) [3-3. 기능 요구사항](#3-3-기능-요구사항-개략)과 [3-4. 비기능 요구사항](#3-4-비기능-요구사항-개략) 표를 **각각 다른 절에** 복사해 넣습니다
+2. 맨 위에 개요와 기술 스택을, 맨 아래에 "결정 사항" 절을 비워 둡니다 (Step 11에서 채웁니다)
 
 ```markdown
 # EduHub 요구사항
 
 ## 개요
 임직원이 사내 교육과정을 조회·신청하고, 정원이 차면 대기자로 등록되는 시스템.
+- 사용자: 임직원(수강생), 교육 담당자(관리자)
 
 ## 기술 스택
 - 백엔드: Java 21, Spring Boot 3, Spring Data JPA, Flyway, springdoc-openapi, PostgreSQL
 - 프론트엔드: React 18 + TypeScript, Module Federation(shell, course-mfe, enrollment-mfe), MUI, Axios
 - 빌드: Gradle(Kotlin DSL), npm workspaces
 
-## 기능 요구사항
-(3-3 표 붙여넣기)
+## 기능 요구사항 (무엇을 하는가)
+(3-3 표 붙여넣기: FR-01 ~ FR-09)
 
-## 비기능 요구사항
-(3-4 표 붙여넣기)
+## 비기능 요구사항 (얼마나 잘, 어떤 제약 아래서)
+(3-4 표 붙여넣기: NFR-01 ~ NFR-08)
+
+## 결정 사항
+(Step 11에서 Claude의 질문에 답하며 채운다)
 ```
+
+| 구분 | 기능 요구사항 (FR) | 비기능 요구사항 (NFR) |
+|---|---|---|
+| 질문 | 시스템이 **무엇을** 하는가? | **얼마나 잘**, 어떤 **제약** 아래서 하는가? |
+| 예 | "회차에 수강 신청한다", "정원이 차면 대기자로 등록한다" | "100명이 동시에 신청해도 정원을 넘지 않는다", "응답 300ms 이내" |
+| 확인 방법 | 기능 테스트 (되는가/안 되는가) | 측정·부하 테스트·리뷰 (숫자와 기준) |
+| 놓치면 | 기능이 빠진다 → 추가하면 된다 | **구조를 다시 만들어야** 할 수 있다 (동시성, 보안, 환경 분리) |
 
 > 💡 이 파일은 **직접 만드는 것**을 권합니다. 표를 복사하는 일은 Claude에게 설명하는 것보다 빠릅니다 (토큰 습관 8번).
 
 ---
 
-## Step 8. 첫 요구사항 전달: Plan 모드로 계획부터
+## Step 11. 요구사항을 순서대로 전달하기: 기능 → 비기능 → 범위
 
-**먼저 작업 브랜치를 만듭니다** ([3-8-2](#3-8-2-브랜치--개발--병합-github-flow)의 ③). `main`에서 바로 작업하지 않는 습관을 첫날부터 들입니다.
+권한 모드를 **Plan**으로 바꿉니다. 한 번에 "다 만들어줘"라고 하지 않고, **세 번에 나눠** 전달합니다. 각 단계에서 Claude가 **이해한 내용을 사람이 확인**한 뒤 다음으로 넘어갑니다.
 
-```bash
-git switch -c feature/week1-skeleton
-git branch --show-current     # feature/week1-skeleton 이 보이면 OK
+```mermaid
+flowchart LR
+    A["11-1 기능 요구사항<br/>무엇을 만드나<br/>→ 요약·질문"] --> B["사람: 답변을<br/>결정 사항에 기록"]
+    B --> C["11-2 비기능 요구사항<br/>얼마나 잘, 어떤 제약<br/>→ 설계 영향 정리"]
+    C --> D["사람: 지금 반영할 것<br/>vs 나중 할 것 결정"]
+    D --> E["11-3 이번 주 범위<br/>→ 파일 목록·계획"]
+    E --> F["사람: 계획 승인<br/>→ Step 12 구현"]
 ```
 
-> 💡 Claude에게 "작업 전에 feature/week1-skeleton 브랜치를 만들어줘"라고 맡겨도 됩니다. 데스크톱 앱 화면이나 `git branch --show-current`로 지금 브랜치를 꼭 확인합니다.
+| 순서 | 전달하는 것 | 왜 이 순서인가 |
+|---|---|---|
+| ① 기능 | 개요와 FR | **무엇을 만드는지**와 도메인 용어(과정, 회차, 신청, 대기)를 먼저 맞춰야 이후 대화가 정확해진다 |
+| ② 비기능 | NFR | 기능을 알아야 "어디에 동시성·보안·성능 제약이 걸리는지" 판단할 수 있다. 비기능은 **구조를 결정**하므로 구현 전에 반영 |
+| ③ 범위 | 이번 주에 할 것과 하지 않을 것 | 전체를 이해시킨 뒤 **작게 잘라** 구현해야 결과를 검토할 수 있다 |
 
-그다음 권한 모드를 **Plan**으로 바꾸고 다음처럼 지시합니다.
+> 💡 세 단계는 **같은 작업의 연속이므로 같은 세션**에서 진행합니다. 구현까지 끝나고 다음 작업으로 넘어갈 때 `/clear`합니다 (토큰 습관 1번).
+
+### 11-1. 기능 요구사항 전달: "무엇을" 이해시키기
 
 ```text
-@docs/requirements.md 를 읽고 EduHub 프로젝트의 1주차 작업을 계획해줘.
+@docs/requirements.md 의 "개요"와 "기능 요구사항"을 읽어줘.
+1. 이 시스템이 하는 일을 사용자(임직원, 교육 담당자)별로 5줄 이내로 요약해줘
+2. 도메인 용어(과정, 회차, 신청, 대기, 수료)와 상태 변화를 표로 정리해줘
+3. FR-01~09 중 정의가 애매하거나 서로 부딪히는 부분을 질문 목록으로 만들어줘 (최대 5개)
+코드는 쓰지 말고, 파일도 수정하지 마.
+```
+
+**사람이 할 일**
+- 요약이 내 이해와 같은지 봅니다. 다르면 그 자리에서 바로잡습니다: `신청 취소는 임직원 본인만 할 수 있어`
+- 질문에 답하고, **답을 `docs/requirements.md`의 "결정 사항"에 직접 기록**합니다 (대화는 사라지지만 파일은 남습니다)
+
+```markdown
+## 결정 사항
+- D-01: 신청 취소는 회차 시작 1일 전까지 가능하다 (FR-06)
+- D-02: 대기 인원은 정원의 50%까지 받는다 (FR-05)
+- D-03: 수료 처리는 관리자만 한다 (FR-08)
+```
+
+> 💬 **강사 노트:** Claude가 던지는 질문이 곧 **요구사항의 빈틈**입니다. 팀마다 결정이 달라도 괜찮습니다. 결정을 문서에 남기는 것이 핵심입니다.
+
+### 11-2. 비기능 요구사항 전달: "얼마나 잘"과 설계 제약 이해시키기
+
+```text
+이번에는 @docs/requirements.md 의 "비기능 요구사항"과 "결정 사항"을 읽어줘.
+NFR-01~08 각각에 대해 표로 정리해줘:
+- 어떤 설계 결정이 필요한가 (예: 동시성 → 락 방식, 성능 → 인덱스·페이지)
+- 1주차 뼈대에서 미리 반영해야 하는가, 나중에 해도 되는가, 그 이유
+- 어떻게 검증할 수 있는가
+코드는 쓰지 마.
+```
+
+**사람이 할 일**: "지금 반영할 것"을 확정합니다. 1주차 뼈대에 보통 들어가는 것은 다음과 같습니다.
+
+| NFR | 1주차 뼈대에 반영 | 나중에 (주차) |
+|---|---|---|
+| NFR-03 보안 | 비밀 정보는 `.env`와 환경 변수로만, `.gitignore` | 인증·인가 (4~5주차) |
+| NFR-04 API 계약 | springdoc-openapi 의존성, Swagger UI 동작 | API별 문서화 (매주) |
+| NFR-05 품질 | 테스트 실행 구조, 포맷 도구(Spotless) | 커버리지 70%, CI (6주차) |
+| NFR-06 운영성 | 프로필 분리 (`dev`, `test`) | 스테이징·운영, 런북 (6주차) |
+| NFR-07 유지보수성 | 도메인별 패키지(`course`, `enrollment`, `common`) | 아키텍처 테스트 (6주차) |
+| NFR-01 정합성, NFR-02 성능 | — | 수강 신청 구현 시 (3주차), 성능 점검 (7주차) |
+
+> 💡 비기능 요구사항을 구현 전에 짚는 이유: 예를 들어 "패키지를 계층별(`controller`, `service`)로 만들까, 도메인별(`course`, `enrollment`)로 만들까"는 NFR-07을 보고 **처음에** 정해야 합니다. 나중에 바꾸면 모든 파일을 옮겨야 합니다.
+
+### 11-3. 이번 주 범위 전달: 계획 받기
+
+```text
+지금까지 정리한 기능·비기능 요구사항과 결정 사항을 바탕으로 1주차 작업을 계획해줘.
 
 [이번 범위]
 - backend: Spring Boot 프로젝트 뼈대 (Gradle Kotlin DSL, Java 21)
   - 패키지: com.example.eduhub, 도메인 패키지 course, enrollment, common
   - GET /api/health 하나와 그 테스트
-  - 프로필: application.yml, application-dev.yml(로컬 PostgreSQL), application-test.yml
-- 루트 .gitignore (Java, Node, IDE, .env)와 .env.example
+  - springdoc-openapi, Spotless 설정
+  - 프로필: application.yml, application-dev.yml(로컬 PostgreSQL, 접속 정보는 환경 변수), application-test.yml
+- .env.example에 필요한 환경 변수 이름 추가 (값 없이)
 
 [이번에 하지 않는 것]
 - 프론트엔드, 엔티티, 실제 API (다음 주에 한다)
@@ -868,28 +1105,29 @@ git branch --show-current     # feature/week1-skeleton 이 보이면 OK
 - backend 폴더에서 ./gradlew test 통과
 
 [진행 방식]
-- 먼저 만들 파일 목록과 각 파일의 역할을 보여줘. 요구사항에서 애매한 점이 있으면 질문해줘.
+- 먼저 만들 파일 목록과 각 파일의 역할을 보여줘. 11-2에서 "지금 반영"으로 정한 NFR이 어디에 반영되는지도 표시해줘.
 ```
 
 **이 지시에서 볼 점**
 
 | 요소 | 왜 넣었나 |
 |---|---|
-| `@docs/requirements.md` | 요구사항 전체를 붙여넣지 않고 파일로 참조 |
+| "지금까지 정리한 … 바탕으로" | 11-1, 11-2의 합의를 계획에 이어 가게 한다 |
 | 이번 범위 / 하지 않는 것 | 범위를 좁혀야 결과를 검토할 수 있다. "다 만들어줘"는 검토 불가능한 거대한 diff가 된다 |
 | 완료 기준 | Claude가 스스로 테스트를 돌려 확인한다 |
-| 질문해줘 | 애매한 부분을 Claude가 마음대로 정하지 않게 한다 |
+| NFR 반영 위치 표시 | 비기능 요구사항이 계획에서 빠지지 않았는지 사람이 확인할 수 있다 |
 
 **계획을 받으면 이렇게 검토합니다**
 - 패키지 구조가 내가 생각한 것과 같은가? (원칙 ① 구조는 개발자가 통제)
 - 필요 없는 라이브러리를 넣지 않았는가?
+- 11-2에서 정한 NFR이 모두 반영되었는가?
 - 바꾸고 싶은 점은 그대로 말합니다: `Lombok은 쓰지 말고, 테스트는 JUnit 5만 써줘`
 
 > 💬 **강사 노트:** 수강생마다 계획이 조금씩 다르게 나옵니다. 두세 명의 계획을 화면에 띄워 비교하며 "어느 쪽이 우리 요구사항에 맞나"를 짧게 토론합니다.
 
 ---
 
-## Step 9. 구현하고 diff 검토하기
+## Step 12. 구현하고 diff 검토하기
 
 1. 계획에 합의했으면 권한 모드를 **Accept edits**로 바꾸고 `좋아, 이 계획대로 구현해줘`라고 지시합니다
    - Manual 모드를 유지하면 수정마다 승인 창이 뜹니다. 무엇을 하는지 보고 싶으면 Manual도 좋습니다
@@ -910,7 +1148,7 @@ git branch --show-current     # feature/week1-skeleton 이 보이면 OK
 
 ---
 
-## Step 10. CLAUDE.md 만들기
+## Step 13. CLAUDE.md 만들기
 
 뼈대가 생겼으니 Claude가 프로젝트를 분석할 수 있습니다. 입력창에 `/init`을 입력합니다.
 
@@ -919,7 +1157,7 @@ git branch --show-current     # feature/week1-skeleton 이 보이면 OK
 
 ```markdown
 ## 팀 규칙
-- 요구사항은 docs/requirements.md를 기준으로 한다
+- 요구사항은 docs/requirements.md를 기준으로 한다 (결정 사항 D-xx 포함)
 - 백엔드 빌드·테스트: cd backend && ./gradlew test
 - 계층 규칙: Controller → Service → Repository. Controller에서 Repository 직접 호출 금지
 - 엔티티를 API 응답으로 그대로 반환하지 않는다 (DTO 사용)
@@ -930,7 +1168,7 @@ git branch --show-current     # feature/week1-skeleton 이 보이면 OK
 
 ---
 
-## Step 11. 커밋, 푸시, 그리고 PR
+## Step 14. 커밋, 푸시, 그리고 PR
 
 **방법 A: Claude에게 맡기기**
 
@@ -975,12 +1213,16 @@ git branch -d feature/week1-skeleton
 
 ---
 
-## 4-11. 자주 겪는 문제
+## 4-15. 자주 겪는 문제
 
 | 증상 | 원인과 해결 |
 |---|---|
 | "Git is required" | Git 미설치. Git(윈도우는 Git for Windows)을 설치하고 앱을 다시 시작 |
-| 푸시할 때 인증 실패 | 브라우저 로그인 창이 떴는지 확인. `gh auth login` 또는 Git Credential Manager로 다시 로그인 |
+| `git push`에서 `src refspec main does not match any` | 아직 커밋이 없음. Step 5의 첫 커밋을 먼저 한다 (`git log`로 확인) |
+| `error: remote origin already exists` | 이미 연결되어 있음. 주소가 틀렸다면 `git remote set-url origin <올바른 주소>` |
+| 첫 푸시가 `rejected (fetch first)` 또는 `non-fast-forward`로 거절됨 | GitHub 저장소를 만들 때 README 등을 추가해 이력이 둘로 나뉨. `git pull --rebase origin main`으로 GitHub 커밋 위에 내 커밋을 다시 쌓고 `git push -u origin main`. README가 양쪽에 있어 충돌하면 내용을 정리한 뒤 `git add README.md && git rebase --continue` |
+| 푸시할 때 인증 실패, 비밀번호를 물음 | GitHub는 비밀번호 로그인을 받지 않음. 브라우저 로그인 창(Git Credential Manager)이나 `gh auth login`으로 로그인 |
+| 다른 저장소에 푸시한 것 같음 | `git remote -v`로 주소 확인. 7주 내내 처음 한 번은 꼭 확인 |
 | `./gradlew` 권한 오류 (Mac/Linux) | `chmod +x gradlew` (Claude에게 맡겨도 되지만 직접 하는 편이 빠르다) |
 | `java -version`이 21이 아님 | JDK 21 설치 후 `JAVA_HOME` 확인 |
 | Claude가 범위 밖 작업까지 함 | `Esc`로 멈추고 "이번 범위는 X까지만"이라고 다시 지시. 이미 진행됐으면 `/rewind` |
@@ -1187,7 +1429,7 @@ git branch -d feature/week1-skeleton
 2. **AI는 How, 개발자는 What·Why·Where**: 테스트가 통과해도 아키텍처 지식이 있어야 문제가 보인다
 3. **환경 분리**: Claude Code는 개발·테스트까지. 운영은 사람 승인과 파이프라인으로만
 4. **EduHub 7주**: 매주 배운 기능을 바로 적용, 모든 변경은 PR, 매주 "AI 없이 설명하기"
-5. **요구사항은 파일로, 지시는 범위·완료 기준과 함께, 결과는 diff와 직접 실행으로 확인**
+5. **프로젝트는 폴더 하나에서 시작 → 빈 GitHub 저장소와 동기화 → 요구사항은 파일로 정리해 기능 → 비기능 → 범위 순서로 전달.** 지시는 범위·완료 기준과 함께, 결과는 diff와 직접 실행으로 확인
 6. **Git은 2단계 커밋(add → commit) 후 push**, 작업은 **브랜치 → 개발 → PR → 병합**. `main`은 항상 동작하는 상태로
 
 ---
@@ -1203,6 +1445,8 @@ git branch -d feature/week1-skeleton
 7. `/rewind`로 되돌릴 수 없는 변경은? 그래서 무엇을 함께 써야 하나?
 8. Git의 "2단계 커밋"에서 두 단계는 무엇이고, 나눠 두면 무엇이 좋은가? 커밋만 하고 푸시하지 않으면 팀원에게 보일까?
 9. EduHub에서 기능 하나를 개발해 `main`에 반영하기까지의 순서는?
+10. 로컬에서 시작한 프로젝트를 올릴 GitHub 저장소를 만들 때 README를 추가하지 않는 이유는?
+11. 요구사항을 기능 → 비기능 → 범위 순서로 나눠 전달하는 이유는? 비기능 요구사항을 구현 뒤로 미루면 어떤 문제가 생길까?
 
 <details>
 <summary>정답 보기</summary>
@@ -1216,6 +1460,8 @@ git branch -d feature/week1-skeleton
 7. 셸 명령(`rm`, `mv`, 빌드 스크립트 등)으로 바뀐 파일, 외부에서 바꾼 파일. 그래서 의미 있는 단위마다 **Git 커밋**을 함께 쓴다
 8. 1단계 `git add`(스테이징에 골라 담기), 2단계 `git commit`(로컬 저장소에 기록). 일부만 골라 의미 있는 단위로 커밋하고, `git diff --staged`로 커밋 전에 검토할 수 있다. 커밋은 내 PC에만 있으므로 `git push` 전에는 팀원에게 보이지 않는다
 9. main 최신화 → 브랜치 생성 → 개발·테스트 → 2단계 커밋(반복) → 푸시 → PR → 리뷰·CI → Squash merge → 브랜치 삭제와 main pull
+10. 내 PC에 이미 첫 커밋이 있으므로, GitHub에서도 README 커밋을 만들면 서로 다른 두 이력이 생겨 첫 푸시가 거절된다. 로컬에서 시작한 프로젝트는 빈 저장소에 올린다
+11. 기능으로 "무엇을"과 도메인 용어를 먼저 맞춰야 제약이 걸리는 곳을 판단할 수 있고, 비기능은 패키지 구조·보안·환경 분리처럼 구조를 결정하므로 구현 전에 반영해야 한다. 범위는 마지막에 작게 잘라야 결과를 검토할 수 있다. 비기능을 미루면 구조를 다시 만드는 재작업이 생긴다
 
 </details>
 
