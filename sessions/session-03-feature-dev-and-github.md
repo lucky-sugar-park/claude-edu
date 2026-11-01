@@ -13,6 +13,7 @@
 >
 > **관련 모듈**: 6(기능 개발 & 버그 수정), 7(GitHub 연결과 버전관리), 8(프로젝트·세션·컨텍스트 관리 & CLAUDE.md)
 > **사전 준비**: 2회차 PR 병합 완료, Docker Desktop 실행 확인(`docker --version`), 팀 저장소에 팀원 전원을 Collaborator로 초대, (선택) GitHub CLI `gh` 로그인(`gh auth login`)
+> 🖥️ **슬라이드 덱(33장, 발표자 노트 포함)**: https://claude.ai/artifact/DWfY43TsWijoHiRL3u9jHU — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
