@@ -11,6 +11,7 @@
 > 4. 과정 전체를 회고하고, **우리 팀에 도입하는 로드맵**을 정한다
 >
 > **관련 자료**: [2회차 EduHub 요구사항과 7주 계획](./session-02-hands-on-kickoff.md#3-toy-프로젝트-eduhub-소개와-7주-진행-계획), [캡스톤 주제 예시](../examples/05-automation-and-capstone.md#-캡스톤-프로젝트-주제-예시), [개발자의 책임](../examples/27-developer-responsibility.md)
+> 🖥️ **슬라이드 덱(27장, 발표자 노트 포함)**: https://claude.ai/artifact/2zKKhNKCjPqGAEMtocrt4K — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
