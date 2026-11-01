@@ -18,6 +18,7 @@
 > - Docker Desktop 실행, EduHub 개발 DB(PostgreSQL) 컨테이너가 뜨는지 확인
 > - Node.js LTS (`npx`로 MCP 서버 실행)
 > - (선택) GitHub CLI `gh` 로그인 (`gh auth status`)
+> 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
