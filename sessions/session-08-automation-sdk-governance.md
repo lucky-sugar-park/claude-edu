@@ -18,6 +18,7 @@
 > - 과정 데이터 1만 건 시드 스크립트 (7회차 과제) 또는 강사가 배포한 `seed-10k.sql`
 > - [k6](https://k6.io/) 설치 (`k6 version`으로 확인). 설치가 어려우면 강사 PC의 결과를 함께 봅니다
 > - 저장소 Settings → Secrets에 `ANTHROPIC_API_KEY` 등록 권한 (팀장 1명)
+> 🖥️ **슬라이드 덱(31장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
