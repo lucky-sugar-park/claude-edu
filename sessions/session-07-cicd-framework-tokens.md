@@ -17,6 +17,7 @@
 > - GitHub 저장소의 **Settings에 접근할 수 있는 권한**(팀에서 한 명 이상, 보통 저장소 관리자)
 > - 로컬에서 `cd backend && ./gradlew test`, `cd frontend && npm test`가 통과하는 상태
 > - Docker Desktop 실행 (Testcontainers, 이미지 빌드 확인용)
+> 🖥️ **슬라이드 덱(32장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
