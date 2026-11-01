@@ -16,6 +16,7 @@
 > - 3회차 PR이 `main`에 병합되어 있고, 로컬 `main`이 최신 상태 (`git switch main && git pull`)
 > - **Docker Desktop 실행 중** (동시성 테스트에 Testcontainers PostgreSQL 사용)
 > - 미리 읽기: [권한](../examples/23-permissions.md), [에이전트](../examples/10-agents.md), [모델 가이드](../examples/29-models-guide.md)
+> 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/VwPCCC1uBCvv5zVuAygkSy — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
