@@ -17,6 +17,8 @@
 > - Node.js LTS, `frontend/` 의존성 설치(`npm install`) 완료
 > - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 안내를 봅니다
 > - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나
+>
+> 🖥️ **슬라이드 덱(31장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
