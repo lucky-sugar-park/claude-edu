@@ -141,7 +141,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    UI["course-mfe<br/>과정 목록 화면<br/>(MUI Table)"] -- "생성된 Axios 클라이언트<br/>courseApi.getCourses()" --> C["CourseController<br/>@Tag @Operation"]
+    UI["course-mfe<br/>CourseListPage<br/>(MUI Table)"] --> H["useCourses 훅<br/>data·loading·error"]
+    H -- "생성된 Axios 클라이언트<br/>courseApi.getCourses()" --> C["CourseController<br/>@Tag @Operation"]
     C --> S["CourseService<br/>@Transactional<br/>업무 규칙"]
     S --> R["CourseRepository<br/>Spring Data JPA"]
     R --> DB[("PostgreSQL<br/>course, course_session<br/>(Flyway V1)")]
@@ -421,7 +422,7 @@ git push -u origin chore/pr-template
 [범위]
 - 루트: 프로젝트 소개 2줄, 디렉터리 지도, 실행 명령, 공통 규칙(커밋 형식, 비밀 정보 금지, 브랜치 규칙)
 - backend/CLAUDE.md: 테스트 명령, 계층 규칙, JPA 규칙(LAZY, DTO 반환, open-in-view=false, Flyway로만 스키마 변경), OpenAPI 규칙
-- frontend/CLAUDE.md: 아직 코드가 없으니 MUI·Axios 생성 클라이언트 사용 규칙만 5줄 이내
+- frontend/CLAUDE.md: 아직 코드가 없으니 MUI·Axios 생성 클라이언트 사용 규칙과 "서버 데이터 조회는 커스텀 훅(`src/hooks/useXxx.ts`)으로 감싸고, 화면 컴포넌트는 API를 직접 부르지 않는다" 규칙만 5줄 이내
 [하지 않는 것] 코드 수정, 새 규칙 발명 (애매하면 나에게 물어봐)
 [완료 기준] 각 파일 60줄 이내, 명령과 경로는 백틱
 [진행 방식] 바뀐 세 파일의 diff를 보여줘
@@ -663,47 +664,250 @@ cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
 [범위]
 - api-client: openapi-generator(typescript-axios)로 http://localhost:8080/v3/api-docs 에서 생성하는 npm 스크립트 generate:api
 - course-mfe: React 18 + TypeScript + MUI, 단독 실행(npm run dev, 포트 3001)
-- 생성된 courseApi만 사용 (Axios 인스턴스 직접 생성 금지)
-- 로딩은 CircularProgress, 에러는 Alert
-- 테스트: React Testing Library로 목록 렌더링 1개 (API는 mock)
+- 생성된 CourseApi 인스턴스는 src/api/courseApi.ts 한 곳에서만 만든다 (Axios 인스턴스 직접 생성 금지)
+- 목록 조회는 커스텀 훅 src/hooks/useCourses.ts 로 분리: 입력 {keyword, category, page, size}, 출력 {data, loading, error}
+  - page는 0부터, 받은 값을 그대로 API에 전달 (백엔드 Pageable과 MUI TablePagination 모두 0부터)
+- 화면 src/pages/CourseListPage.tsx 는 useCourses만 쓰고 courseApi를 직접 부르지 않는다
+- 로딩은 CircularProgress, 에러는 Alert, 검색어가 바뀌면 첫 페이지로
+- 테스트 (API는 mock):
+  - src/hooks/useCourses.test.ts: 목록을 불러온다, 실패하면 error
+  - src/pages/CourseListPage.test.tsx: 목록 렌더링, 에러 메시지 (훅을 mock)
 [하지 않는 것] Module Federation 설정, shell, 상세·관리 화면, 인증
 [완료 기준] npm test -w apps/course-mfe 통과, 화면에서 목록이 보임
 [진행 방식] 폴더 구조와 package.json 스크립트 계획을 먼저 보여줘
 ```
 
-**완성되면 대략 이런 모양입니다**
+**왜 훅으로 나누나?** 화면 구조를 정하는 것은 개발자입니다 (원칙 ①). 지시에 적지 않으면 Claude는 조회 로직을 화면 컴포넌트 안에 바로 넣는 경우가 많습니다.
+
+| 나누면 좋은 점 | 설명 |
+|---|---|
+| 역할 분리 | 화면은 **그리기만**, 훅은 **데이터 가져오기만**. 파일을 열면 무엇이 어디 있는지 바로 안다 |
+| 테스트가 쉬움 | API 호출 방식(어떤 파라미터를 보내나)은 훅 테스트에서, 화면 모양은 화면 테스트에서 따로 검증 |
+| 재사용 | 6주차 MFE 분리, 상세 화면에서도 같은 훅을 쓴다 |
+| 버그 위치가 분명함 | 5장의 "첫 페이지 누락" 버그는 이 훅 한 곳만 보면 된다 |
+
+**완성되면 이런 구조입니다**
+
+```text
+frontend/apps/course-mfe/src/
+├── api/
+│   └── courseApi.ts              # 생성된 CourseApi 인스턴스 (한 곳에서만 생성)
+├── hooks/
+│   ├── useCourses.ts             # 과정 목록 조회 훅: {data, loading, error}
+│   └── useCourses.test.ts        # 훅 테스트 (courseApi를 mock)
+└── pages/
+    ├── CourseListPage.tsx        # 목록 화면: useCourses만 사용
+    └── CourseListPage.test.tsx   # 화면 테스트 (useCourses를 mock)
+```
+
+> ✅ 아래 코드는 React 18, MUI 6, Jest 29, React Testing Library 16 환경에서 테스트 4개와 타입 검사가 통과하는 것을 확인했습니다 (생성 클라이언트는 같은 모양의 스텁으로 대신함).
+> 테스트 도구는 Jest + React Testing Library입니다. 훅 테스트의 `renderHook`은 `@testing-library/react`(13.1 이상)에 들어 있습니다.
+
+```ts
+// frontend/apps/course-mfe/src/api/courseApi.ts
+import { Configuration, CourseApi } from '@eduhub/api-client';
+
+// 생성된 클라이언트의 인스턴스는 여기 한 곳에서만 만든다 (Axios를 직접 생성하지 않는다)
+// basePath: 개발 서버 프록시를 쓰면 '', 백엔드 CORS 설정을 쓰면 'http://localhost:8080'
+export const courseApi = new CourseApi(new Configuration({ basePath: '' }));
+```
+
+```ts
+// frontend/apps/course-mfe/src/hooks/useCourses.ts
+import { useEffect, useState } from 'react';
+import type { PageResponseCourseSummaryResponse } from '@eduhub/api-client';
+import { courseApi } from '../api/courseApi';
+
+export interface UseCoursesParams {
+  keyword?: string;
+  category?: string;
+  page: number; // 0부터 시작 (백엔드 Pageable, MUI TablePagination 모두 0부터)
+  size: number;
+}
+
+/** 과정 목록(FR-01)을 불러오는 훅. 화면은 이 훅의 data·loading·error만 쓴다. */
+export function useCourses({ keyword, category, page, size }: UseCoursesParams) {
+  const [data, setData] = useState<PageResponseCourseSummaryResponse>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>();
+
+  useEffect(() => {
+    let ignore = false; // 검색어를 빠르게 바꿀 때, 늦게 도착한 이전 요청의 응답은 버린다
+    setLoading(true);
+    setError(undefined);
+
+    courseApi
+      .getCourses(keyword || undefined, category || undefined, page, size)
+      .then((response) => {
+        if (!ignore) setData(response.data);
+      })
+      .catch((e: unknown) => {
+        if (!ignore) setError(e);
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [keyword, category, page, size]);
+
+  return { data, loading, error };
+}
+```
+
+> 💡 `courseApi.getCourses(keyword, category, page, size)`의 인자 순서는 openapi-generator(typescript-axios)가 OpenAPI 문서의 파라미터 순서대로 만든 것입니다. 생성된 `api.ts`에서 실제 순서를 **직접 확인**합니다. 메서드 이름 `getCourses`는 컨트롤러 메서드 이름(springdoc의 기본 operationId)에서 나옵니다.
+
 
 ```tsx
+// frontend/apps/course-mfe/src/pages/CourseListPage.tsx
+import { useState } from 'react';
+import {
+  Alert, CircularProgress, Stack, Table, TableBody, TableCell, TableHead, TablePagination, TableRow, TextField,
+} from '@mui/material';
+import { useCourses } from '../hooks/useCourses';
+
 export function CourseListPage() {
   const [keyword, setKeyword] = useState('');
-  const [page, setPage] = useState(0);   // MUI TablePagination도 0부터 시작
+  const [page, setPage] = useState(0); // MUI TablePagination도 0부터 시작
   const { data, loading, error } = useCourses({ keyword, page, size: 10 });
 
   if (error) return <Alert severity="error">과정 목록을 불러오지 못했습니다.</Alert>;
 
   return (
     <Stack spacing={2}>
-      <TextField label="과정명 검색" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+      <TextField
+        label="과정명 검색"
+        value={keyword}
+        onChange={(e) => {
+          setKeyword(e.target.value);
+          setPage(0); // 검색어가 바뀌면 첫 페이지부터
+        }}
+      />
       {loading ? (
         <CircularProgress />
       ) : (
         <Table>
           <TableHead>
-            <TableRow><TableCell>과정명</TableCell><TableCell>분류</TableCell><TableCell>회차 수</TableCell></TableRow>
+            <TableRow>
+              <TableCell>과정명</TableCell>
+              <TableCell>분류</TableCell>
+              <TableCell>회차 수</TableCell>
+            </TableRow>
           </TableHead>
           <TableBody>
             {data?.content.map((c) => (
-              <TableRow key={c.id}><TableCell>{c.title}</TableCell><TableCell>{c.category}</TableCell><TableCell>{c.sessionCount}</TableCell></TableRow>
+              <TableRow key={c.id}>
+                <TableCell>{c.title}</TableCell>
+                <TableCell>{c.category}</TableCell>
+                <TableCell>{c.sessionCount}</TableCell>
+              </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
-      <TablePagination component="div" count={data?.totalElements ?? 0} page={page}
-        rowsPerPage={10} rowsPerPageOptions={[10]} onPageChange={(_, p) => setPage(p)} />
+      <TablePagination
+        component="div"
+        count={data?.totalElements ?? 0}
+        page={page}
+        rowsPerPage={10}
+        rowsPerPageOptions={[10]}
+        onPageChange={(_, p) => setPage(p)}
+      />
     </Stack>
   );
 }
 ```
+
+```ts
+// frontend/apps/course-mfe/src/hooks/useCourses.test.ts
+import { renderHook, waitFor } from '@testing-library/react';
+import { courseApi } from '../api/courseApi';
+import { useCourses } from './useCourses';
+
+jest.mock('../api/courseApi', () => ({ courseApi: { getCourses: jest.fn() } }));
+const getCourses = courseApi.getCourses as jest.Mock;
+
+const pageOf = (titles: string[]) => ({
+  data: {
+    content: titles.map((title, i) => ({ id: i + 1, title, category: 'BACKEND', status: 'OPEN', sessionCount: 1 })),
+    page: 0,
+    size: 10,
+    totalElements: titles.length,
+  },
+});
+
+beforeEach(() => getCourses.mockReset());
+
+test('과정 목록을 불러와 data로 돌려준다', async () => {
+  getCourses.mockResolvedValue(pageOf(['Spring Boot 입문', 'JPA 실전']));
+
+  const { result } = renderHook(() => useCourses({ keyword: '', page: 0, size: 10 }));
+
+  expect(result.current.loading).toBe(true);
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.data?.content.map((c) => c.title)).toEqual(['Spring Boot 입문', 'JPA 실전']);
+  expect(result.current.error).toBeUndefined();
+});
+
+test('API 호출이 실패하면 error를 돌려준다', async () => {
+  getCourses.mockRejectedValue(new Error('Network Error'));
+
+  const { result } = renderHook(() => useCourses({ keyword: '', page: 0, size: 10 }));
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.error).toBeInstanceOf(Error);
+  expect(result.current.data).toBeUndefined();
+});
+```
+
+<details>
+<summary>화면 테스트: CourseListPage.test.tsx</summary>
+
+```tsx
+// frontend/apps/course-mfe/src/pages/CourseListPage.test.tsx
+import { render, screen } from '@testing-library/react';
+import { useCourses } from '../hooks/useCourses';
+import { CourseListPage } from './CourseListPage';
+
+// 화면 테스트는 훅을 mock한다. API 호출 방식은 useCourses.test.ts가 따로 검증한다
+jest.mock('../hooks/useCourses');
+const mockUseCourses = useCourses as jest.Mock;
+
+test('과정 목록을 표로 보여 준다', () => {
+  mockUseCourses.mockReturnValue({
+    data: {
+      content: [{ id: 1, title: 'Spring Boot 입문', category: 'BACKEND', status: 'OPEN', sessionCount: 2 }],
+      page: 0, size: 10, totalElements: 1,
+    },
+    loading: false,
+    error: undefined,
+  });
+
+  render(<CourseListPage />);
+
+  expect(screen.getByText('Spring Boot 입문')).toBeInTheDocument();
+  expect(screen.getByText('BACKEND')).toBeInTheDocument();
+});
+
+test('불러오기에 실패하면 에러 메시지를 보여 준다', () => {
+  mockUseCourses.mockReturnValue({ data: undefined, loading: false, error: new Error('fail') });
+
+  render(<CourseListPage />);
+
+  expect(screen.getByRole('alert')).toHaveTextContent('과정 목록을 불러오지 못했습니다.');
+});
+```
+
+</details>
+
+**diff 검토 체크리스트**
+- [ ] `src/hooks/useCourses.ts`가 있고, `CourseListPage`가 `courseApi`를 **직접 부르지 않는가**?
+- [ ] `page`를 **바꾸지 않고 그대로** API에 넘기는가? (0부터)
+- [ ] `new CourseApi(...)`가 `src/api/courseApi.ts` 한 곳에만 있는가? `axios.create`를 쓰지 않았는가?
+- [ ] 검색어를 바꾸면 첫 페이지로 돌아가는가?
+
 
 > 💡 개발 서버(3001)에서 백엔드(8080)를 부르면 **CORS** 오류가 날 수 있습니다. 해결 방법(개발 서버 프록시 vs 백엔드 CORS 설정)을 Claude에게 **장단점과 함께** 묻고, 어느 쪽을 쓸지는 직접 결정합니다. 2회차 2-2의 "HTTP·웹" 지식이 필요한 지점입니다.
 
@@ -745,6 +949,7 @@ git branch -d feature/fr-01-course-list
 | Testcontainers가 Docker를 못 찾음 | Docker Desktop 실행 여부 확인 |
 | 프론트에서 CORS 오류 | Step 7의 💡 참고 |
 | 생성된 api-client가 옛날 API | 백엔드를 띄운 상태에서 `npm run generate:api` 다시 실행 |
+| `src/hooks/useCourses.ts`가 없다 (조회 로직이 화면 안에 있음) | Step 7 지시에 훅 분리가 빠졌던 경우. 5장 Step 1의 "먼저 확인"에 있는 리팩터링 지시로 분리 |
 | 두 사람이 같은 파일을 고쳐 충돌 | 5장 따라하기 ②의 Step 3 |
 | Claude가 범위 밖 파일까지 고침 | `Esc` → "이번 범위는 X까지만" → 이미 진행됐으면 `/rewind` |
 
@@ -756,13 +961,48 @@ git branch -d feature/fr-01-course-list
 
 ## Step 1. 심어 둔 버그: "첫 페이지가 안 보여요" (강사가 제공)
 
-강사가 다음 변경을 각 팀 저장소에 PR로 넣습니다 (또는 수강생이 직접 넣습니다).
+**먼저 확인: `useCourses` 훅이 있나요?**
 
-```ts
-// frontend/apps/course-mfe/src/hooks/useCourses.ts (버그가 있는 버전)
-// "화면의 페이지는 1부터 보여 주자"며 누군가 바꾼 코드
-const response = await courseApi.getCourses(keyword, category, page + 1, size);
+```bash
+ls frontend/apps/course-mfe/src/hooks     # useCourses.ts, useCourses.test.ts 가 보이면 OK
 ```
+
+훅이 없고 조회 로직이 화면 컴포넌트 안에 있다면(Step 7을 훅 분리 지시 없이 진행한 경우), 버그를 넣기 전에 **리팩터링부터** 합니다. 새 브랜치와 새 세션에서:
+
+```bash
+git switch main && git pull
+git switch -c refactor/course-mfe-use-courses
+```
+
+```text
+[목표] 과정 목록 화면 안에 있는 API 조회 로직을 커스텀 훅 useCourses로 분리 (리팩터링, 동작 변경 없음)
+[위치] @frontend/apps/course-mfe/src (목록 화면 파일)
+[범위]
+- src/hooks/useCourses.ts: 입력 {keyword, category, page, size}, 출력 {data, loading, error}
+  page는 0부터, 받은 값을 그대로 courseApi.getCourses에 전달
+- 생성된 CourseApi 인스턴스는 src/api/courseApi.ts 한 곳에서만
+- 목록 화면은 useCourses만 쓰고 courseApi를 직접 부르지 않게
+- 테스트: src/hooks/useCourses.test.ts (목록을 불러온다, 실패하면 error), 화면 테스트는 훅을 mock하도록 수정
+[하지 않는 것] 화면 모양 변경, API 파라미터 변경
+[완료 기준] npm test -w apps/course-mfe 통과, 화면 동작이 이전과 같음
+[진행 방식] 바꿀 파일 목록을 먼저 보여줘
+```
+
+결과를 Step 7의 코드와 비교해 검토하고 `refactor(course-mfe): 과정 목록 조회를 useCourses 훅으로 분리` 커밋 → PR → 병합합니다.
+
+> 💡 **리팩터링은 동작을 바꾸지 않는 변경**입니다. 그래서 완료 기준이 "테스트 통과 + 화면 동작이 이전과 같음"입니다. 리팩터링 PR과 기능·버그 수정 PR은 섞지 않습니다.
+
+**심어 둔 버그**: 강사가 다음 변경을 각 팀 저장소에 PR로 넣습니다 (또는 수강생이 직접 넣고 커밋합니다).
+
+```diff
+ // frontend/apps/course-mfe/src/hooks/useCourses.ts
+ // "화면의 페이지는 1부터 보여 주자"며 누군가 바꾼 코드
+     courseApi
+-      .getCourses(keyword || undefined, category || undefined, page, size)
++      .getCourses(keyword || undefined, category || undefined, page + 1, size)
+```
+
+> 🔍 이 PR은 **기존 테스트를 모두 통과합니다.** `useCourses.test.ts`는 "목록을 불러온다"만 확인하고 **어떤 page를 보내는지는 확인하지 않기** 때문입니다. 테스트가 통과했다고 버그가 없는 것은 아니라는 예입니다.
 
 **증상**: 과정 목록 첫 화면에 1~10번 과정이 아니라 11번부터 나온다. 과정이 10개 이하면 목록이 비어 보인다.
 
@@ -793,11 +1033,35 @@ git switch -c fix/course-list-first-page
 테스트를 실행해서 실패하는 것을 보여줘.
 ```
 
+**추가될 테스트는 대략 이런 모양입니다** (`src/hooks/useCourses.test.ts` 맨 아래)
+
+```ts
+test('화면 페이지 0을 요청하면 API에 page=0을 그대로 보낸다 (첫 페이지 누락 버그 재현)', async () => {
+  getCourses.mockResolvedValue(pageOf(['Spring Boot 입문']));
+
+  const { result } = renderHook(() => useCourses({ keyword: '', page: 0, size: 10 }));
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(getCourses).toHaveBeenCalledWith(undefined, undefined, 0, 10);
+});
+```
+
+**버그가 있는 상태의 실행 결과** (실제로 실패해야 재현 테스트입니다)
+
+```text
+✕ 화면 페이지 0을 요청하면 API에 page=0을 그대로 보낸다 (첫 페이지 누락 버그 재현)
+    Expected: undefined, undefined, 0, 10
+    Received: undefined, undefined, 1, 10
+Tests:       1 failed, 2 passed, 3 total
+```
+
 **④ 수정은 직접**: 원인이 `page + 1` 한 줄이므로 IDE에서 **직접** 고치고 Claude에게 알립니다.
 
 ```text
 방금 useCourses.ts 의 page + 1 을 page 로 직접 고쳤어. 재현 테스트와 전체 프론트 테스트를 실행해줘.
 ```
+
+> ✅ 고친 뒤에는 `Tests: 5 passed`(훅 3개 + 화면 2개)가 나옵니다.
 
 **⑤⑥** 전체 테스트 통과 확인 → `fix(course-mfe): 과정 목록 첫 페이지 누락 수정` 커밋 → PR → 병합
 
