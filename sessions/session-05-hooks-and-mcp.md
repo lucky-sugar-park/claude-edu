@@ -832,7 +832,7 @@ git push -u origin chore/quality-hooks
 
 ## Step 7. 개발 DB에 읽기 전용 계정 만들기
 
-이 작업은 **사람이 직접** 합니다. DB 권한은 Claude에게 맡기지 않습니다.
+이 작업은 **사람이 직접** 합니다. DB 권한은 Claude에게 맡기지 않습니다. 개발 DB가 **MariaDB**라면 [MariaDB 버전](#개발-db가-mariadb인-팀-step-78의-mariadb-버전)을 따릅니다.
 
 ```bash
 # 개발 DB 컨테이너에 접속 (컨테이너 이름은 팀 설정에 맞게)
@@ -987,6 +987,115 @@ Postgres MCP Pro의 도구는 `list_schemas`, `list_objects`, `get_object_detail
 2. `/mcp`로 `eduhub-db`가 연결됨(connected) 상태인지 확인
 
 > ✅ **확인**: `eduhub-db로 테이블 목록만 보여줘`라고 했을 때 `course`, `course_session`, `enrollment`, `employee`(팀 스키마에 맞게)가 나오면 됩니다.
+
+### 개발 DB가 MariaDB인 팀 (Step 7~8의 MariaDB 버전)
+
+EduHub의 기준 DB는 PostgreSQL이지만, 회사 표준이 MariaDB라면 Step 7~8을 아래처럼 바꿉니다. **원칙은 같습니다: 개발 DB + 읽기 전용 계정 + 서버의 읽기 전용 설정, 비밀번호는 환경 변수로.**
+
+**MariaDB용 MCP 서버 선택** (2026년 11월 기준, 각 저장소 README로 확인)
+
+| 서버 | 실행 방법 | 읽기 전용 | 상태 | EduHub |
+|---|---|---|---|---|
+| **mcp-server-mysql** (`@benborla29/mcp-server-mysql`) | `npx` | ✅ 기본값이 읽기 전용: 쓰기 허용 옵션(`ALLOW_INSERT/UPDATE/DELETE/DDL_OPERATION`)이 모두 `false`, 읽기 전용 트랜잭션 강제 | 관리 중 | ⭐ **`.mcp.json` 예시 기준**. MySQL 서버이며 README에 MariaDB 지원은 명시되어 있지 않음 → **수업 전 연결 확인 필요** |
+| **MariaDB 공식 플러그인** (`mariadb/ai-plugins`의 `dev` 플러그인) | Claude Code 플러그인. MariaDB Shell에 들어 있는 MCP 서버를 실행 | 서버 설정이 아니라 **읽기 전용 전용 계정**으로 보장하라고 안내 | 관리 중 (MariaDB 공식) | 대안 (6회차 플러그인과 연결) |
+| `MariaDB/mcp` (이전 공식 서버) | git clone + `uv run` | `MCP_READ_ONLY` (기본 `true`, 화이트리스트 방식) | ❌ **2026년 11월 3일 지원 중단**, ai-plugins로 이동 | 쓰지 않음 |
+
+**① 읽기 전용 계정 만들기 (Step 7의 MariaDB 버전, 사람이 직접)**
+
+```bash
+# 개발 DB 컨테이너에 접속 (컨테이너 이름은 팀 설정에 맞게)
+docker exec -it eduhub-mariadb mariadb -u root -p
+```
+
+```sql
+-- 개발 DB에서만 실행. 비밀번호는 팀 공유 금지, 각자 정한다
+CREATE USER 'eduhub_readonly'@'%' IDENTIFIED BY '각자-정한-비밀번호';
+GRANT SELECT, SHOW VIEW ON eduhub.* TO 'eduhub_readonly'@'%';
+SHOW GRANTS FOR 'eduhub_readonly'@'%';   -- SELECT, SHOW VIEW만 있는지 확인
+```
+
+> 💡 PostgreSQL처럼 계정 단위로 "기본 읽기 전용 트랜잭션"을 거는 설정 대신, MariaDB에서는 **SELECT 권한만 주는 것**이 핵심 방어선입니다. `eduhub.*`처럼 **필요한 스키마에만** 권한을 줍니다.
+
+```bash
+# 셸 프로필(~/.zshrc, ~/.bashrc) 또는 Windows 사용자 환경 변수에 추가 (.env만으로는 Claude Code가 못 읽을 수 있음)
+export EDUHUB_DB_RO_USER="eduhub_readonly"
+export EDUHUB_DB_RO_PASSWORD="각자-정한-비밀번호"
+```
+
+`.env.example`에는 **변수 이름만** 추가합니다: `EDUHUB_DB_RO_USER=`, `EDUHUB_DB_RO_PASSWORD=`
+
+> ✅ **확인**: `mariadb -h 127.0.0.1 -u eduhub_readonly -p eduhub -e "DELETE FROM enrollment"`가 `DELETE command denied` 같은 **권한 오류**로 실패해야 합니다.
+
+**② `.mcp.json` (mcp-server-mysql)**
+
+```json
+{
+  "mcpServers": {
+    "eduhub-db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@benborla29/mcp-server-mysql"],
+      "env": {
+        "MYSQL_HOST": "127.0.0.1",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "${EDUHUB_DB_RO_USER}",
+        "MYSQL_PASS": "${EDUHUB_DB_RO_PASSWORD}",
+        "MYSQL_DB": "eduhub"
+      }
+    }
+  }
+}
+```
+
+| 항목 | 의미 |
+|---|---|
+| `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DB` | 개발 DB 주소와 스키마. 비밀이 아니므로 파일에 써도 된다 (운영 주소는 절대 금지) |
+| `MYSQL_USER`, `MYSQL_PASS` | **읽기 전용 계정**. 환경 변수로 넣는다. 변수 이름이 `MYSQL_PASSWORD`가 아니라 **`MYSQL_PASS`**인 점에 주의 (README 기준) |
+| `ALLOW_INSERT_OPERATION` 등 | **쓰지 않는다.** 기본값 `false`가 읽기 전용. `true`로 바꾸면 Claude가 데이터를 바꿀 수 있게 된다 |
+| `MYSQL_DISABLE_READ_ONLY_TRANSACTIONS` | **쓰지 않는다.** 기본값 `false`(읽기 전용 트랜잭션 강제) |
+
+조회 도구는 `mysql_query` 하나입니다 (README 기준). 권한 허용은 다음과 같습니다.
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__eduhub-db__mysql_query"]
+  }
+}
+```
+
+> ⚠️ README의 지원 대상은 "MySQL 5.7+"이고 MariaDB는 명시되어 있지 않습니다. MariaDB는 MySQL 프로토콜과 호환되어 보통 연결되지만, 이 교재에서는 직접 확인하지 못했습니다. **수업 전에 `/mcp` 연결과 `eduhub-db로 테이블 목록만 보여줘`를 한 번 확인**하고, 문제가 있으면 아래 공식 플러그인을 씁니다.
+
+<details>
+<summary>대안: MariaDB 공식 Claude Code 플러그인 (mariadb/ai-plugins)</summary>
+
+MariaDB가 직접 관리하는 방식입니다. `.mcp.json`에 서버를 적는 대신 **플러그인**을 설치하고, 접속 정보는 MariaDB Shell에 등록합니다 (README 기준).
+
+```text
+/plugin marketplace add mariadb/ai-plugins
+/plugin install dev@mariadb
+```
+
+```bash
+# 컴퓨터마다 한 번: MariaDB Shell에 접속(연결)을 등록. ①에서 만든 읽기 전용 계정을 쓴다
+mariadb-shell -- mcp setup
+```
+
+| 알아 둘 점 | 내용 |
+|---|---|
+| 첫 실행 | 플러그인이 MariaDB Shell을 내려받아 압축을 푼다. 30초 연결 제한을 넘기면 `~/.claude/settings.json`에 `{ "env": { "MCP_TIMEOUT": "120000" } }` |
+| 비밀번호 | `.mcp.json`이나 환경 변수가 아니라 MariaDB Shell의 비밀 저장소에 저장 |
+| 읽기 전용 | 서버 옵션이 아니라 **권한이 최소인 전용 계정**으로 보장하라고 안내한다 → ①의 계정 사용 |
+| 도구 | 43개(`db.*`, `util.*`, `sandbox.*` 등). 조회는 `db.execute_sql` 등. Claude Code에서의 실제 이름은 `/mcp`에서 확인 |
+| 함께 들어오는 훅 | Bash에서 `mariadb`/`mysql` CLI로 SQL을 실행하면 막는 PreToolUse 훅이 포함 (`MARIADB_PLUGIN_ALLOW_CLI=1`로 해제) |
+| 라이선스 | GPL-2.0 |
+
+> 💡 도구가 많은 플러그인은 그만큼 컨텍스트와 승인 관리 부담이 큽니다. 설치 전에 플러그인 내용(훅, MCP 설정)을 읽어 보는 것은 6회차 "플러그인 설치 전 검토"의 실습이기도 합니다.
+
+</details>
+
+> 💡 백엔드도 MariaDB를 쓴다면 JDBC 드라이버(`org.mariadb.jdbc:mariadb-java-client`), Flyway의 MariaDB 지원 모듈, 테스트의 `MariaDBContainer`(Testcontainers)를 함께 맞춰야 합니다. 이 부분은 Plan 모드로 Claude와 계획을 세워 진행합니다.
+
 
 ---
 
