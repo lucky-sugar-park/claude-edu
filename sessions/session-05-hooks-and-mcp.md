@@ -1413,7 +1413,7 @@ exit 0
 
 ## 6-4. 나만의 MCP 서버 만들기 (MariaDB 조회 도구)
 
-범용 SQL 서버 대신, **정해진 질문만 할 수 있는 전용 도구**를 직접 만들어 등록해 봅니다. SQL은 코드에 고정하고 Claude는 값(`sessionId` 등)만 보내므로 더 안전하고 결과도 작습니다. 도구 정의(이름·설명·입력 스키마·실행 함수), 빌드와 테스트, `.mcp.json` 등록, 권한 설정까지의 전체 과정은 [나만의 MCP 서버 만들기](../examples/32-custom-mcp-server-mariadb.md)를 따라 합니다.
+범용 SQL 서버 대신, **정해진 질문만 할 수 있는 전용 도구**를 직접 만들어 등록해 봅니다. SQL은 코드에 고정하고 Claude는 값(`sessionId` 등)만 보내므로 더 안전하고 결과도 작습니다. 도구 정의(이름·설명·입력 스키마·실행 함수), 빌드와 테스트, `.mcp.json` 등록, 권한 설정까지의 전체 과정은 [나만의 MCP 서버 만들기](../examples/32-custom-mcp-server-mariadb.md)(TypeScript) 또는 [Java 버전](../examples/33-custom-mcp-server-mariadb-java.md)(MCP Java SDK)을 따라 합니다.
 
 ---
 

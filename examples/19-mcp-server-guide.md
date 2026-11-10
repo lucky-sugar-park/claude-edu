@@ -373,7 +373,7 @@ if __name__ == "__main__":
 
 ### 6-4. Java(Spring) 팀이라면
 
-Spring 생태계에도 MCP 서버를 만들 수 있는 라이브러리(예: Spring AI의 MCP 지원)가 있습니다. 기존 Spring Boot 서비스에 MCP 엔드포인트를 추가하는 방식도 검토할 수 있습니다. 버전별 사용법은 해당 프로젝트 문서를 확인하세요.
+순수 Java로는 **MCP Java SDK**(`io.modelcontextprotocol.sdk:mcp`)로 만들 수 있습니다. MariaDB 조회 도구를 만들어 등록하는 실행 검증된 전체 예제는 [나만의 MCP 서버 만들기 (Java 버전)](./33-custom-mcp-server-mariadb-java.md)에 있습니다. Spring 생태계에도 MCP 서버를 만들 수 있는 라이브러리(예: Spring AI의 MCP 지원)가 있습니다. 기존 Spring Boot 서비스에 MCP 엔드포인트를 추가하는 방식도 검토할 수 있습니다. 버전별 사용법은 해당 프로젝트 문서를 확인하세요.
 
 ### 6-5. 좋은 MCP 서버 설계 원칙
 

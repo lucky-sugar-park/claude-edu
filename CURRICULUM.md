@@ -509,6 +509,7 @@
 | [30-markdown-guide.md](./examples/30-markdown-guide.md) | 마크다운 작성법: 제목, 글머리·번호 목록, 체크리스트, 표, 코드, 링크, 알림 상자, Mermaid, CLAUDE.md·프롬프트 작성 요령 | 3, 8 |
 | [31-course-service-test.md](./examples/31-course-service-test.md) | CourseServiceTest: FR-03 과정·회차 관리 서비스 단위 테스트(JUnit 5·Mockito·AssertJ), TDD 지시문, 참고 구현 | 6 |
 | [32-custom-mcp-server-mariadb.md](./examples/32-custom-mcp-server-mariadb.md) | 나만의 MCP 서버(TypeScript): MariaDB 읽기 전용 조회 도구 2개 만들기, 테스트, `.mcp.json` 등록, 권한, 보안 체크리스트 (실행 검증) | 13 |
+| [33-custom-mcp-server-mariadb-java.md](./examples/33-custom-mcp-server-mariadb-java.md) | 32번의 Java 버전: MCP Java SDK 2.1 + MariaDB JDBC로 같은 도구 만들기, 실행 JAR, Java 스모크 테스트, `.mcp.json` 등록, Spring AI 비교 (실행 검증) | 13, 16 |
 
 ---
 

@@ -1,6 +1,7 @@
 # 예제: 나만의 MCP 서버 만들기 — MariaDB에서 데이터를 가져오는 도구를 만들고 Claude Code에 등록하기
 
 > 관련 모듈: 13 (커넥터와 MCP) · 관련 회차: [5회차 훅과 MCP](../sessions/session-05-hooks-and-mcp.md)
+> ☕ **Java로 만들려면**: 같은 도구를 MCP Java SDK로 만든 [Java 버전](./33-custom-mcp-server-mariadb-java.md)을 봅니다.
 > **시나리오**: EduHub 개발 DB(MariaDB)에서 "회차 현황"과 "사원별 수강 신청 내역"을 가져오는 도구 2개를 직접 만들고, 내 MCP 서버(`eduhub-tools`)로 Claude Code에 등록해 대화에서 쓴다.
 >
 > ✅ **검증**: 이 문서의 코드는 Node.js 22, `@modelcontextprotocol/sdk` 1.32.2, `mariadb` 커넥터 3.5.5, `zod` 4.6.7로 빌드했습니다. 그리고 MariaDB 10.11에 EduHub 예제 스키마와 읽기 전용 계정을 만들어 실제로 실행했습니다 (2026년 11월). MCP 클라이언트로 도구 목록과 도구 호출을 확인했고, Claude Code 화면에서 등록하는 과정은 직접 확인하지 못했습니다.
