@@ -225,7 +225,7 @@ flowchart TB
 }
 ```
 
-> 관리 설정 파일은 운영체제별 시스템 경로(예: Linux `/etc/claude-code/managed-settings.json`)에 두거나, 관리 콘솔에서 배포합니다. 정확한 경로와 배포 방식은 공식 문서(Settings, Managed settings)로 확인합니다.
+> 관리 설정은 claude.ai 관리 화면(서버 관리 설정), MDM·OS 정책(macOS `com.anthropic.claudecode`, Windows `HKLM\SOFTWARE\Policies\ClaudeCode`), 또는 시스템 경로의 파일(macOS `/Library/Application Support/ClaudeCode/`, Linux·WSL `/etc/claude-code/`, Windows `C:\Program Files\ClaudeCode\`의 `managed-settings.json`)로 배포합니다. 위치별 예시와 우선순위, `/status`로 확인하는 법은 [4회차 1-2](./session-04-permissions-skills-subagents.md#관리-설정은-어디에-어떻게-두나)를 봅니다.
 
 > 💬 **강사 노트 (토론 3분):** "우리 회사에서 Claude Code를 도입한다면 **관리 설정으로 강제해야 할 것 3가지**는?" 조별로 한 줄씩. 흔한 답: 운영 비밀 deny, bypass 금지, 승인된 MCP만. "강제할 것"과 "팀 자율로 둘 것"을 나누는 것이 핵심입니다.
 

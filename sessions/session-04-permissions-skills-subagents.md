@@ -87,13 +87,115 @@ flowchart TD
 
 | 범위 | 파일 | 누가 관리 | EduHub에서 넣을 것 |
 |---|---|---|---|
-| **관리 설정** | 조직이 배포 | 보안·IT 담당 | 회사 공통 금지 (bypass 모드 금지 등) |
+| **관리 설정** | 조직이 배포 (아래 "관리 설정은 어디에, 어떻게 두나?") | 보안·IT 담당 | 회사 공통 금지 (bypass 모드 금지 등) |
 | **프로젝트 공유** | `.claude/settings.json` | 팀 (PR로 리뷰) | 테스트·빌드 허용, 비밀 파일·운영 명령 금지, 푸시는 확인 |
 | **프로젝트 개인** | `.claude/settings.local.json` | 나 | 내 기본 모드, 내 로컬 서버 실행 명령 |
 | **사용자** | `~/.claude/settings.json` | 나 | 모든 프로젝트 공통 개인 취향 |
 
 - 위에 있을수록 우선합니다 (관리 > CLI > 프로젝트 개인 > 프로젝트 공유 > 사용자)
 - **단, deny는 어느 단계에 있든 이깁니다.** 개인 설정의 allow로 팀 설정의 deny를 풀 수 없습니다
+
+### 관리 설정은 어디에, 어떻게 두나?
+
+관리 설정은 **개발자가 아니라 조직(보안·IT 담당)이 배포**하는 설정입니다. 개발자 PC의 프로젝트 폴더나 `~/.claude/`가 아니라 **관리자 권한이 필요한 위치**에 두기 때문에 개인이 고치거나 덮어쓸 수 없습니다. 배포 방법은 네 가지입니다 (2026년 11월, Claude Code 공식 문서 Settings · Managed settings · Server-managed settings 기준).
+
+| 배포 방법 | 어디에 | 누가 | 어울리는 조직 |
+|---|---|---|---|
+| **① 서버 관리 설정** (server-managed) | claude.ai 관리 화면 **Organization settings > Claude Code > Managed settings** | Owner 권한 관리자 | Claude for Teams·Enterprise. PC를 따로 관리하지 않아도 됨 (시작할 때와 1시간마다 내려받음) |
+| **② MDM·OS 정책** | macOS: 관리 환경설정 도메인 `com.anthropic.claudecode` (plist)<br>Windows: 레지스트리 `HKLM\SOFTWARE\Policies\ClaudeCode`의 `Settings` 값 | IT (Jamf, Intune, 그룹 정책 등) | 이미 MDM으로 PC를 관리하는 회사 |
+| **③ 관리 설정 파일** | 아래 표의 시스템 경로 `managed-settings.json` (+ `managed-settings.d/*.json`) | IT (배포 스크립트, 이미지) | 파일 배포가 쉬운 환경, 실습 PC |
+| ④ Windows 사용자 레지스트리 | `HKCU\SOFTWARE\Policies\ClaudeCode` | 사용자도 쓸 수 있음 | ①~③이 없을 때만 쓰이는 대체 수단 (강제력 약함) |
+
+**여러 방법이 함께 있으면**: 기본값(`"first-wins"`)은 ① → ② → ③ → ④ 순서로 보고, **정책 키를 하나라도 가진 가장 앞 순위 하나만** 씁니다 (합치지 않음). 합치려면 관리 설정에 `"managedSourcesBehavior": "merge"`를 둡니다 (v2.1.242 이상).
+
+**③ 관리 설정 파일의 위치**
+
+| 운영체제 | 경로 |
+|---|---|
+| macOS | `/Library/Application Support/ClaudeCode/managed-settings.json` |
+| Linux · WSL | `/etc/claude-code/managed-settings.json` |
+| Windows | `C:\Program Files\ClaudeCode\managed-settings.json` |
+
+- 같은 폴더의 **`managed-settings.d/`**에 `*.json`을 여러 개 둘 수 있습니다. `managed-settings.json`을 먼저 읽고, 그다음 폴더 안 파일을 **이름 순서**로 합칩니다
+  - 단일 값은 뒤 파일이 이김, **목록(`permissions.deny` 등)은 합쳐짐**(중복 제거), 중첩 블록(`env` 등)은 키별로 합쳐짐
+  - 그래서 "보안팀 파일", "MCP 정책 파일"처럼 **담당별로 나눠 배포**할 수 있습니다 (`10-security.json`, `20-mcp.json`)
+- 예전 Windows 경로 `C:\ProgramData\ClaudeCode\managed-settings.json`은 **더 이상 읽지 않습니다**
+
+**예시: EduHub 회사의 관리 설정** (`managed-settings.json` 또는 서버 관리 설정 화면에 같은 JSON)
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(~/.ssh/**)",
+      "Bash(git push --force *)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}
+```
+
+| 항목 | 효과 |
+|---|---|
+| `permissions.deny` | 회사 전체 공통 금지. 관리 설정의 deny는 어떤 프로젝트·개인 설정으로도 풀 수 없다 |
+| `permissions.disableBypassPermissionsMode: "disable"` | 누구도 bypass(모든 승인 생략) 모드로 들어갈 수 없게 한다 |
+
+**담당별로 나눈 예** (`managed-settings.d/20-mcp.json`)
+
+```json
+{
+  "deniedMcpServers": [
+    { "serverName": "prod-db" }
+  ]
+}
+```
+
+**관리 설정에서만 의미가 있는 주요 키** (공식 문서 기준, 자세한 동작은 Settings reference 확인)
+
+| 키 | 효과 | 주의 |
+|---|---|---|
+| `allowManagedPermissionRulesOnly: true` | **권한 규칙을 관리 설정에서만** 받는다. 사용자·프로젝트·개인 설정의 allow/ask/deny는 무시 | 켜면 4회차에 만드는 팀의 `.claude/settings.json` 권한 규칙도 무시된다. 아주 엄격한 조직용 |
+| `allowManagedHooksOnly: true` | 조직이 배포한 훅만 실행 | 5회차의 팀 훅도 실행되지 않는다 |
+| `allowManagedMcpServersOnly: true` | MCP 허용 목록을 관리 설정에서만 받는다 (거부 목록은 모든 범위에서 합쳐짐) | |
+| `allowedMcpServers` / `deniedMcpServers` | 쓸 수 있는/없는 MCP 서버 (`serverName`, `serverCommand`, `serverUrl`로 지정) | 강제는 관리 설정에서 둘 때 |
+| `strictKnownMarketplaces` | 플러그인 마켓플레이스 허용 목록 | 6회차 플러그인과 연결 |
+| `forceLoginMethod`, `forceLoginOrgUUID` | 로그인 방식·조직 강제 (회사 계정으로만) | |
+| `claudeMd` | 조직 공통 CLAUDE.md 지침을 넣는다 | |
+
+> 💡 MCP 서버 목록 자체를 회사가 정하려면 같은 시스템 폴더에 **`managed-mcp.json`**을 둡니다 (macOS `/Library/Application Support/ClaudeCode/`, Linux·WSL `/etc/claude-code/`, Windows `C:\Program Files\ClaudeCode\`). 이 파일이 있으면 사용자가 MCP 서버를 추가할 수 없고, 서버 관리 설정(①)으로는 배포할 수 없습니다.
+
+**파일로 배포해 보기** (실습 PC·개인 Linux에서만. 회사 PC는 IT 담당과 협의)
+
+```bash
+# Linux · WSL (관리자 권한 필요)
+sudo mkdir -p /etc/claude-code
+sudo cp managed-settings.json /etc/claude-code/managed-settings.json
+
+# macOS
+sudo mkdir -p "/Library/Application Support/ClaudeCode"
+sudo cp managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```powershell
+# Windows (관리자 권한 PowerShell)
+New-Item -ItemType Directory -Force "C:\Program Files\ClaudeCode" | Out-Null
+Copy-Item .\managed-settings.json "C:\Program Files\ClaudeCode\managed-settings.json"
+```
+
+**적용 확인**
+
+| 방법 | 보이는 것 |
+|---|---|
+| `/status`의 **Setting sources** | 어디서 왔는지: `Enterprise managed settings (remote)`(①), `(plist)`·`(HKLM)`(②), `(file)`·`(drop-ins)`·`(file + drop-ins)`(③), `(HKCU)`(④). 찾았지만 적용하지 않은 것은 `Skipped sources` |
+| `/permissions` | 지금 적용 중인 권한 규칙 |
+| `claude doctor` | 서버 관리 설정 상태, 잘못되어 버려진 항목 |
+
+> ✅ **확인**: 관리 설정에 `"disableBypassPermissionsMode": "disable"`을 둔 뒤 `claude --permission-mode bypassPermissions`로 시작해 보면 bypass 모드로 들어가지지 않아야 합니다. 확인 후 실습 PC에서는 파일을 지웁니다 (`sudo rm /etc/claude-code/managed-settings.json`).
+
+> 💬 **강사 노트:** 수강생 대부분은 관리 설정을 **만드는 사람이 아니라 적용받는 사람**입니다. "내 설정이 왜 안 먹지?"의 원인이 관리 설정일 수 있으니 `/status`의 Setting sources를 보는 법을 꼭 알려 줍니다. 조직 운영 관점(누가 어떤 정책을 정하나)은 8회차 거버넌스에서 다룹니다.
 
 ---
 
