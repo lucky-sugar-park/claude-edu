@@ -328,7 +328,9 @@ sequenceDiagram
 
 ### 6-2. TypeScript 예시 (EduHub API)
 
-전체 예시는 [MCP 실전 예제](./04-mcp-plugins-artifacts.md#13-3-직접-만드는-mcp-서버-eduhub-api-래핑)를 참고하세요.
+전체 예시는 [MCP 실전 예제](./04-mcp-plugins-artifacts.md#13-3-직접-만드는-mcp-서버-eduhub-api-래핑)를 참고하세요. DB(MariaDB)에서 데이터를 가져오는 도구를 만들어 등록하는 **실행 검증된 전체 과정**은 [나만의 MCP 서버 만들기](./32-custom-mcp-server-mariadb.md)에 있습니다.
+
+> 💡 아래의 `server.tool(…)`은 현재 SDK에서 사용 중단(deprecated) 표시가 있습니다. 새로 만들 때는 `server.registerTool(이름, { title, description, inputSchema, annotations }, 함수)`를 씁니다.
 
 ```ts
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";

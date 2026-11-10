@@ -508,6 +508,7 @@
 | [29-models-guide.md](./examples/29-models-guide.md) | Claude Code의 모델(Fable·Opus·Sonnet·Haiku, opusplan)과 GPT 모델 활용, 토큰 사용, 작업별 모델 선택 모범 사례 | 1, 11, 19 |
 | [30-markdown-guide.md](./examples/30-markdown-guide.md) | 마크다운 작성법: 제목, 글머리·번호 목록, 체크리스트, 표, 코드, 링크, 알림 상자, Mermaid, CLAUDE.md·프롬프트 작성 요령 | 3, 8 |
 | [31-course-service-test.md](./examples/31-course-service-test.md) | CourseServiceTest: FR-03 과정·회차 관리 서비스 단위 테스트(JUnit 5·Mockito·AssertJ), TDD 지시문, 참고 구현 | 6 |
+| [32-custom-mcp-server-mariadb.md](./examples/32-custom-mcp-server-mariadb.md) | 나만의 MCP 서버(TypeScript): MariaDB 읽기 전용 조회 도구 2개 만들기, 테스트, `.mcp.json` 등록, 권한, 보안 체크리스트 (실행 검증) | 13 |
 
 ---
 
