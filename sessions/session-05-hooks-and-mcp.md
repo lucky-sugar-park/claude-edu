@@ -143,6 +143,78 @@ flowchart LR
 | `$CLAUDE_PROJECT_DIR` | 세션을 시작한 프로젝트 루트. 어느 폴더에서 실행돼도 스크립트를 찾게 한다 |
 | `timeout` | 초 단위 제한 시간 |
 
+**Windows에서의 설정 모양**
+
+Windows(WSL이 아닌 네이티브)에서는 훅 명령을 실행하는 셸이 다릅니다. 공식 문서 기준으로 `command` 문자열은 macOS·Linux에서는 `sh -c`, **Windows에서는 Git Bash**, Git Bash가 없으면 PowerShell로 실행됩니다.
+
+| 상황 | 권장 방식 | 스크립트 |
+|---|---|---|
+| **Git for Windows 설치** (2회차 준비물, ⭐ 교육 기본) | 위 설정을 **그대로** 사용 (Git Bash가 `bash "…/format.sh"`를 실행) | 팀 공용 `.sh` 하나로 macOS·Linux·Windows 모두 사용 |
+| Git Bash 없이 PowerShell만 사용 | `powershell.exe`를 직접 실행하는 형식(exec form) | `.ps1` 스크립트 |
+| PowerShell 스크립트를 셸 문자열로 실행 | 훅에 `"shell": "powershell"` 지정 | `.ps1` 스크립트 |
+
+**① Git for Windows가 있을 때 (권장)**: JSON은 위와 같습니다. Windows에서 추가로 챙길 것만 있습니다.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh\"", "timeout": 60 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- `jq` 설치: `winget install jqlang.jq` (설치 후 Git Bash에서 `jq --version`으로 확인)
+- 스크립트 줄바꿈은 **LF**로 저장: `.gitattributes`에 `*.sh text eol=lf`
+- **경로는 `\`로 들어옵니다.** Git Bash에서 실행돼도 `tool_input.file_path`는 `C:\work\eduhub\.env`처럼 역슬래시입니다. 경로 패턴을 검사하는 스크립트는 맨 앞에서 `/`로 바꿉니다: `FILE="${FILE//\\//}"` (Step 3, 1-4의 스크립트에 넣어 두었습니다)
+- Claude Code가 Git Bash를 못 찾으면 `settings.json`의 `env`에 `"CLAUDE_CODE_GIT_BASH_PATH": "C:\\Program Files\\Git\\bin\\bash.exe"`
+
+**② PowerShell 스크립트를 직접 실행 (exec form, `args` 사용)**: `args`가 있으면 셸 없이 `command`를 실행 파일로 바로 실행하고, `${CLAUDE_PROJECT_DIR}` 자리 표시자는 `command`와 `args` 안에서 그대로 바뀝니다.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.ps1"],
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**③ 셸 문자열을 PowerShell로 실행 (`shell: "powershell"`)**
+
+```json
+{ "type": "command", "shell": "powershell", "command": "& \"$env:CLAUDE_PROJECT_DIR\\.claude\\hooks\\format.ps1\"" }
+```
+
+| 주의 | 설명 |
+|---|---|
+| PowerShell에서 `$CLAUDE_PROJECT_DIR` 금지 | PowerShell은 이것을 정의되지 않은 변수로 보고 빈 값이 된다. `$env:CLAUDE_PROJECT_DIR` 또는 `${CLAUDE_PROJECT_DIR}`로 쓴다 |
+| `.ps1`은 앞에 `&` | 셸 형식에서 경로에 변수가 들어간 스크립트를 실행하려면 `& "경로"` |
+| `-ExecutionPolicy Bypass` | 로컬 `.ps1` 실행을 막는 실행 정책을 이 실행에만 풀어 준다 |
+| 종료 코드 | 계약은 같다: stdin으로 JSON, `exit 2`면 차단하고 stderr를 전달. Git Bash가 없을 때는 **0과 2 외의 종료 코드는 실패**로 처리된다 |
+| 한글 메시지 | Windows PowerShell 5.1은 인코딩 때문에 한글이 깨질 수 있다. PowerShell 7(`pwsh`) 사용, 스크립트는 UTF-8로 저장 |
+
+> 💡 **팀 설정이 섞일 때**: `.claude/settings.json`은 팀 전체가 같이 씁니다. macOS·Linux 팀원이 있으면 **모두 Git Bash + `.sh`**로 통일하는 것이 가장 단순합니다. Windows 전용 PowerShell 훅이 꼭 필요하면 개인 설정 `.claude/settings.local.json`에 둡니다.
+
+> 출처: Claude Code 공식 문서 Hooks reference, Hooks guide, Setup (2026년 11월 확인). ②③의 PowerShell 형식은 문서 예시를 따른 것으로, 이 교재에서는 Windows에서 직접 실행해 보지 못했습니다. 수업 전에 한 번 확인하세요.
+
 **입력과 출력**
 
 ```mermaid
@@ -174,9 +246,102 @@ sequenceDiagram
 
 ## 1-4. 시연: 훅이 막고, Claude가 길을 바꾼다 (강사 시연 3분)
 
-1. 미리 만들어 둔 보호 훅이 있는 상태에서 Claude에게 `application-prod.yml의 DB URL을 localhost로 바꿔줘`라고 지시합니다
+**시연에 쓰는 훅 코드** (Step 3의 `protect-files.sh`에서 운영 설정 부분만 떼어 낸 최소 버전)
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/protect-prod-config.sh — PreToolUse(Edit|Write): 운영 설정 파일 수정 차단 (1-4 시연용)
+FILE=$(jq -r '.tool_input.file_path // empty')
+FILE="${FILE//\\//}"   # Windows 경로의 \ 를 / 로 바꿔 아래 패턴이 맞게 한다
+
+if [[ "$FILE" == *application-prod.yml ]]; then
+  echo "운영 설정(application-prod.yml)은 사람이 PR로만 수정합니다. 로컬 개발용 변경이면 backend/src/main/resources/application-dev.yml을 수정하세요." >&2
+  exit 2
+fi
+exit 0
+```
+
+`.claude/settings.json` (macOS·Linux, Windows + Git Bash)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-prod-config.sh\"" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+<details>
+<summary>Windows PowerShell 버전 (Git Bash를 쓰지 않을 때)</summary>
+
+```powershell
+# .claude/hooks/protect-prod-config.ps1 — PreToolUse(Edit|Write): 운영 설정 파일 수정 차단 (1-4 시연용)
+$hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
+$file = [string]$hookInput.tool_input.file_path
+
+if ($file -match 'application-prod\.yml$') {
+  [Console]::Error.WriteLine('운영 설정(application-prod.yml)은 사람이 PR로만 수정합니다. 로컬 개발용 변경이면 backend/src/main/resources/application-dev.yml을 수정하세요.')
+  exit 2
+}
+exit 0
+```
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-prod-config.ps1"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+> PowerShell 버전은 공식 문서의 PowerShell 훅 예시 형식을 따랐고, Windows에서 직접 실행해 보지는 못했습니다. 한글이 깨지면 PowerShell 7(`pwsh.exe`)을 쓰고 스크립트를 UTF-8로 저장합니다.
+
+</details>
+
+**시연 전에 직접 테스트** (Claude 없이 훅만 실행)
+
+```bash
+# macOS·Linux·Git Bash
+echo '{"tool_input":{"file_path":"/x/backend/src/main/resources/application-prod.yml"}}' \
+  | bash .claude/hooks/protect-prod-config.sh; echo "exit=$?"     # 메시지 출력 + exit=2
+echo '{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' \
+  | bash .claude/hooks/protect-prod-config.sh; echo "exit=$?"     # Windows 경로도 exit=2
+echo '{"tool_input":{"file_path":"/x/backend/src/main/resources/application-dev.yml"}}' \
+  | bash .claude/hooks/protect-prod-config.sh; echo "exit=$?"     # exit=0
+```
+
+```powershell
+# Windows PowerShell 버전
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' |
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude\hooks\protect-prod-config.ps1; "exit=$LASTEXITCODE"   # exit=2
+```
+
+> ✅ bash 버전은 위 세 테스트(Linux 경로 차단, Windows 경로 차단, 개발 설정 통과)를 실행해 결과를 확인했습니다.
+
+**시연 순서**
+
+1. 위 보호 훅이 등록된 상태에서 Claude에게 `application-prod.yml의 DB URL을 localhost로 바꿔줘`라고 지시합니다
 2. `PreToolUse` 훅이 수정을 막고 이유를 전달합니다
 3. Claude가 "운영 설정은 수정할 수 없으니 `application-dev.yml`을 바꾸겠다"고 **스스로 방향을 바꾸는** 모습을 보여 줍니다
+4. `/hooks`로 등록된 훅과 그 출처(`.claude/settings.json`)를 보여 줍니다
 
 > 💬 **강사 노트:** 훅은 Claude를 "혼내는" 장치가 아니라 **즉각적인 피드백**입니다. 이유를 친절하게 적어 주면 Claude가 올바른 대안을 찾습니다. 메시지를 "금지"로만 쓰지 말고 **"대신 무엇을 하라"**까지 쓰게 합니다.
 
@@ -448,6 +613,7 @@ exit 0
 #!/usr/bin/env bash
 # .claude/hooks/protect-files.sh — PreToolUse(Edit|Write): 보호 파일 수정 차단
 FILE=$(jq -r '.tool_input.file_path // empty')
+FILE="${FILE//\\//}"   # Windows 경로의 \ 를 / 로 (Git Bash에서 실행돼도 경로는 \ 로 들어온다)
 block() { echo "$1" >&2; exit 2; }
 
 case "$FILE" in
@@ -640,6 +806,8 @@ git push -u origin chore/quality-hooks
 | 작업이 눈에 띄게 느려짐 | PostToolUse에서 전체 빌드를 돌리고 있지 않은지 확인. 무거운 작업은 Stop으로 |
 | Stop 훅이 계속 반복됨 | `stop_hook_active` 확인 누락. 테스트가 환경 문제로 계속 실패하면 사람이 개입 |
 | 윈도우에서 줄바꿈 오류(`\r`) | 스크립트를 LF로 저장. `.gitattributes`에 `*.sh text eol=lf` |
+| 윈도우에서 보호 파일이 막히지 않음 | 경로가 `C:\...\.env`처럼 `\`로 들어와 `*/.env` 패턴이 맞지 않음. 스크립트 앞에서 `FILE="${FILE//\\//}"`로 바꾼다 |
+| 윈도우 PowerShell 훅에서 경로가 비어 있음 | `$CLAUDE_PROJECT_DIR` 대신 `$env:CLAUDE_PROJECT_DIR` 또는 `${CLAUDE_PROJECT_DIR}` (1-3 Windows 설정) |
 
 ---
 
