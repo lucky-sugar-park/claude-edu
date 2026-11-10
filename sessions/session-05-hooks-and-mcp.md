@@ -981,6 +981,93 @@ Postgres MCP Pro의 도구는 `list_schemas`, `list_objects`, `get_object_detail
 
 > 💡 `execute_sql`을 묻지 않고 허용해도 되는 이유: **서버의 restricted 모드 + DB 계정의 읽기 전용 권한**이라는 두 겹의 보호가 있기 때문입니다. 둘 중 하나라도 빠졌다면 허용 목록에 넣지 않습니다. 실제 도구 이름은 연결 후 `/mcp`에서 확인하고 다르면 맞춰 고칩니다.
 
+**MCP 도구 이름은 어디서 오나?**
+
+권한 규칙에 쓰는 `mcp__eduhub-db__execute_sql` 같은 이름은 **세 부분을 Claude Code가 합친 것**입니다. 우리 저장소 어디에도 도구가 "정의"되어 있지 않습니다.
+
+```text
+mcp__eduhub-db__execute_sql
+│    │          └ ③ 도구 이름: MCP 서버 프로그램(패키지 코드)이 정의
+│    └ ② 서버 이름: 내가 .mcp.json의 mcpServers 아래에 붙인 키 이름
+└ ① 접두사: Claude Code의 명명 규칙 (MCP 도구라는 표시)
+```
+
+| 부분 | 정의된 곳 | 바꿀 수 있나 |
+|---|---|---|
+| ① `mcp__` | Claude Code 규칙 | ✕ |
+| ② `eduhub-db` | `.mcp.json`의 `"eduhub-db": { … }` 키 | ○ 바꾸면 도구 이름도 바뀐다 (권한 규칙도 같이 고칠 것) |
+| ③ `execute_sql`, `mysql_query` 등 | **MCP 서버 패키지의 소스 코드** | ✕ 서버 작성자가 정한다 |
+
+③은 **서버가 실행된 뒤에** Claude Code에 전달됩니다.
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant S as MCP 서버 (예: mcp-server-mysql)
+    participant DB as 개발 DB
+    CC->>S: .mcp.json의 command 실행 (npx/uvx …)
+    S->>DB: 시작하면서 접속 확인
+    CC->>S: tools/list (도구 목록 요청)
+    S-->>CC: [{ name: "mysql_query", description, inputSchema }]
+    Note over CC: 이름 앞에 mcp__eduhub-db__ 를 붙여 Claude에게 제공
+```
+
+예를 들어 MariaDB 예시의 `@benborla29/mcp-server-mysql`은 소스 코드(`index.ts`)에 `mysql_query` **하나만** 고정으로 등록합니다. 환경 변수로 이름이나 개수가 바뀌지 않고, 쓰기 허용 옵션을 켜면 설명 문구만 바뀝니다 (2026년 11월, GitHub 소스 확인).
+
+> 💡 **권한 규칙은 도구를 만들지 않습니다.** `permissions.allow`에 이름을 적어도 도구가 생기지 않습니다. 서버가 실행되어 도구 목록을 보내야 도구가 있고, 권한 규칙은 그 도구를 "묻지 않고 써도 된다"고 정할 뿐입니다.
+
+**⚠️ 자주 하는 오타: 오류 없이 무시됩니다**
+
+```json
+{ "permission": { "allow": ["mcp_eduhub-db_mysql_query"] } }
+```
+
+| 잘못된 곳 | 올바른 형태 | 틀리면 |
+|---|---|---|
+| `"permission"` | **`"permissions"`** (s) | 설정 항목 전체가 무시됨 |
+| `mcp_eduhub-db_mysql_query` (밑줄 1개) | **`mcp__eduhub-db__mysql_query`** (밑줄 **2개**씩) | 어떤 도구와도 맞지 않음 |
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__eduhub-db__mysql_query"]
+  }
+}
+```
+
+틀려도 오류가 나지 않고 **매번 승인을 묻는 상태로 남아서** 알아차리기 어렵습니다. 고친 뒤 `/permissions`에서 규칙이 보이는지 확인합니다.
+
+**도구가 안 보일 때 점검 순서**
+
+```mermaid
+flowchart TD
+    A["/mcp 를 연다"] --> B{"eduhub-db가<br/>목록에 있나?"}
+    B -- "없음" --> B1["① 서버가 등록되지 않음<br/>.mcp.json이 프로젝트 루트에 있나?<br/>승인 질문을 거부했나? → claude mcp reset-project-choices<br/>Claude Code를 그 폴더에서 다시 시작"]
+    B -- "있음" --> C{"상태가<br/>connected?"}
+    C -- "failed / 연결 중" --> C1["② 서버가 시작 직후 종료됨<br/>대부분 DB 접속 실패 (아래 직접 실행으로 확인)"]
+    C -- "connected" --> D["③ eduhub-db 선택 → 도구 목록 보기<br/>여기 보이는 이름이 정답"]
+```
+
+| 단계 | 확인 | 해결 |
+|---|---|---|
+| ① 서버가 목록에 없음 | `.mcp.json` 위치(프로젝트 루트), JSON 문법(`jq . .mcp.json`), 승인 여부 | `claude mcp reset-project-choices` 후 다시 시작하고 승인 |
+| ② failed | 서버는 **시작하면서 DB 접속을 시험하고, 실패하면 종료**한다 (mcp-server-mysql 소스 기준). 서버가 꺼지면 도구 목록도 없다 | DB 컨테이너 실행, 호스트·포트, 환경 변수(`EDUHUB_DB_RO_USER`, `EDUHUB_DB_RO_PASSWORD`)가 **Claude Code를 실행한 셸**에 있는지, 변수 이름 `MYSQL_PASS` 확인 |
+| ② failed (첫 실행) | `npx`/`uvx`가 패키지를 내려받느라 연결 제한 시간을 넘김 | `/mcp`에서 다시 연결, 또는 `MCP_TIMEOUT`을 늘림 |
+| ③ connected인데 Claude가 도구를 모른다고 함 | 도구 검색이 켜져 있으면 도구 정의는 필요할 때 불러온다 | "eduhub-db의 도구 목록을 알려줘"라고 물어본다 |
+
+**서버를 직접 실행해 원인 보기** (Claude Code 없이, 내 터미널에서)
+
+```bash
+# MariaDB 예시 (mcp-server-mysql). 접속에 성공하면 "Database connection test successful",
+# 실패하면 "Fatal error during server startup"과 원인이 출력된다. 확인 후 Ctrl+C
+MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_DB=eduhub \
+MYSQL_USER="$EDUHUB_DB_RO_USER" MYSQL_PASS="$EDUHUB_DB_RO_PASSWORD" \
+  npx -y @benborla29/mcp-server-mysql
+```
+
+> 💡 MySQL 8 계열에서 인증 방식 오류가 나면 이 패키지의 문서(docs/TROUBLESHOOTING.md)는 `caching_sha2_password` 지원 확인이나 `mysql_native_password` 계정 사용을 안내합니다. MariaDB에서의 동작은 이 문서에 따로 적혀 있지 않습니다.
+
+
 **④ 연결하고 확인하기**
 
 1. Claude Code를 다시 시작하면 `.mcp.json`의 서버를 쓸지 묻는 질문이 나옵니다 → 내용을 확인하고 승인
@@ -1054,7 +1141,7 @@ export EDUHUB_DB_RO_PASSWORD="각자-정한-비밀번호"
 | `ALLOW_INSERT_OPERATION` 등 | **쓰지 않는다.** 기본값 `false`가 읽기 전용. `true`로 바꾸면 Claude가 데이터를 바꿀 수 있게 된다 |
 | `MYSQL_DISABLE_READ_ONLY_TRANSACTIONS` | **쓰지 않는다.** 기본값 `false`(읽기 전용 트랜잭션 강제) |
 
-조회 도구는 `mysql_query` 하나입니다 (README 기준). 권한 허용은 다음과 같습니다.
+조회 도구는 `mysql_query` 하나입니다 (소스 코드 기준, 이름이 어디서 오는지는 위의 [MCP 도구 이름은 어디서 오나?](#step-8-mcpjson에-db-mcp-연결하기) 참고). 권한 허용은 다음과 같습니다.
 
 ```json
 {
@@ -1248,6 +1335,8 @@ Claude는 `gh pr list --author @me --json …` 같은 명령을 씁니다. 같�
 
 | 증상 | 원인과 해결 |
 |---|---|
+| `/mcp`에 서버는 있는데 도구가 안 보임 | 서버가 failed 상태(대부분 DB 접속 실패로 시작 직후 종료). Step 8의 "도구가 안 보일 때 점검 순서"와 서버 직접 실행으로 원인 확인 |
+| `permissions.allow`에 적었는데 계속 승인을 물음 | `"permissions"`(s), `mcp__서버__도구`(밑줄 2개) 오타 확인. `/permissions`에서 규칙 확인 |
 | `uvx: command not found` | uv 미설치. Step 8의 ① 준비. 설치 후 터미널·Claude Code를 다시 시작 |
 | `/mcp`에 서버가 failed로 보임 | `uvx --version`, `EDUHUB_DB_READONLY_URL`이 **Claude Code를 실행한 셸**에 있는지(`echo $EDUHUB_DB_READONLY_URL`), DB 컨테이너 실행 여부 확인. 첫 실행은 패키지를 받느라 오래 걸릴 수 있으니 `/mcp`에서 다시 연결 |
 | `${EDUHUB_DB_READONLY_URL}`이 글자 그대로 남음 | 환경 변수가 없음. 셸 프로필에 넣고 터미널·앱을 다시 시작 |
