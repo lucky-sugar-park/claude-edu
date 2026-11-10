@@ -16,7 +16,7 @@
 > - 4회차 과제 PR 병합 완료, `main` 최신화
 > - `jq` 설치 확인(`jq --version`). 윈도우는 Git Bash에서 실행되는지 확인 (`winget install jqlang.jq` 등)
 > - Docker Desktop 실행, EduHub 개발 DB(PostgreSQL) 컨테이너가 뜨는지 확인
-> - Node.js LTS (`npx`로 MCP 서버 실행)
+> - `uv` 설치 (`uvx --version`): DB MCP 서버(Postgres MCP Pro) 실행용. 설치 방법은 Step 8 ①
 > - (선택) GitHub CLI `gh` 로그인 (`gh auth status`)
 > 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
@@ -406,19 +406,23 @@ flowchart LR
   "mcpServers": {
     "eduhub-db": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "<PostgreSQL MCP 서버 패키지>", "${EDUHUB_DB_READONLY_URL}"]
+      "command": "uvx",
+      "args": ["postgres-mcp", "--access-mode=restricted"],
+      "env": {
+        "DATABASE_URI": "${EDUHUB_DB_READONLY_URL}"
+      }
     }
   }
 }
 ```
 
+- 위 예시는 **Postgres MCP Pro**(`postgres-mcp`)를 씁니다. 고른 이유와 다른 선택지는 [Step 8](#step-8-mcpjson에-db-mcp-연결하기)에 있습니다
 - `${VAR}`, `${VAR:-기본값}`으로 **환경 변수**를 넣습니다. `.mcp.json`은 커밋되므로 **비밀번호를 파일에 쓰지 않습니다**
 - 팀원이 `.mcp.json`의 서버를 처음 쓸 때 **사용 승인 질문**이 나옵니다 (모르는 서버가 몰래 실행되지 않게 하는 장치)
 - 대화 중 `/mcp`로 연결 상태 확인, 인증, 재연결, 끄기·켜기를 합니다
 - 터미널에서는 `claude mcp add --scope project …`, `claude mcp list`, `claude mcp get <이름>`으로 관리합니다
 
-> ⚠️ PostgreSQL MCP 서버는 여러 구현이 있고, 초기의 공식 참조 서버처럼 **관리가 중단된 패키지**도 있습니다. 출처와 유지보수 상태를 확인하고 팀이 고른 패키지 이름으로 바꿔 씁니다 (공식 문서 확인 필요).
+> ⚠️ PostgreSQL MCP 서버는 여러 구현이 있고, 초기의 공식 참조 서버 `@modelcontextprotocol/server-postgres`는 **2025년 5월에 보관(archived)되어 관리가 끝났습니다.** 예전 자료에 많이 나오지만 새로 쓰지 않습니다. 어떤 서버를 쓰든 출처와 유지보수 상태(최근 릴리스, 이슈)를 확인하고 고릅니다.
 
 ---
 
@@ -867,7 +871,78 @@ git switch main && git pull                  # 훅 PR이 병합된 main
 git switch -c feature/fr-07-my-enrollments
 ```
 
-프로젝트 루트에 `.mcp.json`을 만듭니다 (터미널에서는 `claude mcp add --scope project …`로도 만들 수 있습니다).
+**어떤 PostgreSQL MCP 서버를 쓰나?** (2026년 11월 기준, 각 저장소 README로 확인)
+
+| 서버 | 실행 방법 | 읽기 전용 | 상태 | EduHub |
+|---|---|---|---|---|
+| **Postgres MCP Pro** (`postgres-mcp`, crystaldba) | `uvx` · `pipx` · Docker | ✅ `--access-mode=restricted`: 읽기 전용 트랜잭션 + 실행 시간 제한 | 관리 중 (최신 v0.3.0) | ⭐ **이 교재의 기준** |
+| Google MCP Toolbox (`@toolbox-sdk/server`) | `npx` | 서버 자체 보장은 README에 없음 → DB 계정 권한에 의존 | 관리 중 | 대안 (아래 참고) |
+| `@modelcontextprotocol/server-postgres` | `npx` | 읽기 전용 트랜잭션 | ❌ **2025년 5월 보관, 관리 종료** | 쓰지 않음 |
+
+Postgres MCP Pro를 고른 이유: **서버가 스스로 읽기 전용을 보장하는 모드**가 있어 Step 7의 읽기 전용 계정과 **이중으로** 막을 수 있고, 테이블 구조 조회·실행 계획(`explain_query`)·인덱스 분석 도구가 있어 FR-07의 인덱스 확인(NFR-02)에도 쓸 수 있습니다.
+
+**① 준비: `uv` 설치** (`uvx`가 `postgres-mcp`를 내려받아 실행합니다. Python은 uv가 알아서 준비합니다)
+
+```bash
+# macOS
+brew install uv
+# Windows (PowerShell)
+winget install --id=astral-sh.uv -e
+# Linux·WSL (설치 스크립트는 https://docs.astral.sh/uv/ 의 안내를 따릅니다)
+
+uvx --version     # 설치 확인
+```
+
+**② 프로젝트 루트에 `.mcp.json` 만들기** (터미널에서는 `claude mcp add --scope project …`로도 만들 수 있습니다)
+
+```json
+{
+  "mcpServers": {
+    "eduhub-db": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["postgres-mcp", "--access-mode=restricted"],
+      "env": {
+        "DATABASE_URI": "${EDUHUB_DB_READONLY_URL}"
+      }
+    }
+  }
+}
+```
+
+| 항목 | 의미 |
+|---|---|
+| `"command": "uvx"`, `"args": ["postgres-mcp", …]` | PyPI의 `postgres-mcp` 패키지를 받아 MCP 서버로 실행 |
+| `--access-mode=restricted` | ⭐ **읽기 전용 트랜잭션**으로만 SQL 실행, 실행 시간 제한. README 예시는 `unrestricted`로 되어 있으니 **반드시 바꿔서** 씁니다 |
+| `"DATABASE_URI"` | 이 서버가 읽는 접속 문자열 환경 변수 이름 (README 기준) |
+| `"${EDUHUB_DB_READONLY_URL}"` | Step 7에서 각자 `.env`·셸에 둔 **읽기 전용 계정** URL을 넣는다. 비밀번호는 파일에 쓰지 않는다 |
+
+> 💡 `${EDUHUB_DB_READONLY_URL}`은 **Claude Code를 실행한 셸의 환경 변수**에서 읽습니다. `.env` 파일에만 적어 두면 Claude Code가 읽지 못할 수 있으니, 셸 프로필(`~/.zshrc`, `~/.bashrc`, Windows는 사용자 환경 변수)에 넣거나 Claude Code를 시작하기 전에 `export`합니다.
+
+<details>
+<summary>다른 실행 방법: Docker로 실행 (uv를 설치하고 싶지 않을 때)</summary>
+
+```json
+{
+  "mcpServers": {
+    "eduhub-db": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "DATABASE_URI", "crystaldba/postgres-mcp", "--access-mode=restricted"],
+      "env": {
+        "DATABASE_URI": "${EDUHUB_DB_READONLY_URL}"
+      }
+    }
+  }
+}
+```
+
+- README에 따르면 이 이미지는 접속 주소의 `localhost`를 컨테이너 밖의 호스트 주소(macOS·Windows는 `host.docker.internal`, Linux는 `172.17.0.1`)로 자동으로 바꿔 줍니다. 그래서 `EDUHUB_DB_READONLY_URL`은 그대로 `localhost`로 둡니다
+
+</details>
+
+<details>
+<summary>대안: Google MCP Toolbox (npx로 실행)</summary>
 
 ```json
 {
@@ -875,21 +950,38 @@ git switch -c feature/fr-07-my-enrollments
     "eduhub-db": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "<팀이 고른 PostgreSQL MCP 서버 패키지>", "${EDUHUB_DB_READONLY_URL}"]
+      "args": ["-y", "@toolbox-sdk/server", "--prebuilt=postgres", "--stdio"]
     }
   }
 }
 ```
 
-조회 도구는 매번 묻지 않게 허용합니다 (`.claude/settings.json`의 `permissions.allow`에 추가, 도구 이름은 `/mcp`에서 확인한 실제 이름으로).
+- README는 접속 정보를 환경 변수로 넣으라고만 안내하며, 변수 이름(`POSTGRES_HOST`, `POSTGRES_USER` 등)은 Prebuilt Tools Reference 문서에서 확인해야 합니다 (이 교재에서는 확인하지 못함)
+- 서버가 읽기 전용을 따로 보장한다는 설명이 README에 없으므로, **Step 7의 읽기 전용 계정이 유일한 방어선**입니다
+
+</details>
+
+**③ 조회 도구는 매번 묻지 않게 허용** (`.claude/settings.json`의 `permissions.allow`에 추가)
+
+Postgres MCP Pro의 도구는 `list_schemas`, `list_objects`, `get_object_details`, `execute_sql`, `explain_query`, `get_top_queries`, `analyze_workload_indexes`, `analyze_query_indexes`, `analyze_db_health`입니다 (README 기준). Claude Code에서는 `mcp__<서버 이름>__<도구 이름>`으로 부릅니다. 조회에 쓰는 것만 허용합니다.
 
 ```json
 {
   "permissions": {
-    "allow": ["mcp__eduhub-db__query"]
+    "allow": [
+      "mcp__eduhub-db__list_schemas",
+      "mcp__eduhub-db__list_objects",
+      "mcp__eduhub-db__get_object_details",
+      "mcp__eduhub-db__execute_sql",
+      "mcp__eduhub-db__explain_query"
+    ]
   }
 }
 ```
+
+> 💡 `execute_sql`을 묻지 않고 허용해도 되는 이유: **서버의 restricted 모드 + DB 계정의 읽기 전용 권한**이라는 두 겹의 보호가 있기 때문입니다. 둘 중 하나라도 빠졌다면 허용 목록에 넣지 않습니다. 실제 도구 이름은 연결 후 `/mcp`에서 확인하고 다르면 맞춰 고칩니다.
+
+**④ 연결하고 확인하기**
 
 1. Claude Code를 다시 시작하면 `.mcp.json`의 서버를 쓸지 묻는 질문이 나옵니다 → 내용을 확인하고 승인
 2. `/mcp`로 `eduhub-db`가 연결됨(connected) 상태인지 확인
@@ -1047,10 +1139,11 @@ Claude는 `gh pr list --author @me --json …` 같은 명령을 씁니다. 같�
 
 | 증상 | 원인과 해결 |
 |---|---|
-| `/mcp`에 서버가 failed로 보임 | Node.js 설치, 패키지 이름, `EDUHUB_DB_READONLY_URL`이 **Claude Code를 실행한 셸**에 있는지 확인. 앱을 다시 시작 |
+| `uvx: command not found` | uv 미설치. Step 8의 ① 준비. 설치 후 터미널·Claude Code를 다시 시작 |
+| `/mcp`에 서버가 failed로 보임 | `uvx --version`, `EDUHUB_DB_READONLY_URL`이 **Claude Code를 실행한 셸**에 있는지(`echo $EDUHUB_DB_READONLY_URL`), DB 컨테이너 실행 여부 확인. 첫 실행은 패키지를 받느라 오래 걸릴 수 있으니 `/mcp`에서 다시 연결 |
 | `${EDUHUB_DB_READONLY_URL}`이 글자 그대로 남음 | 환경 변수가 없음. 셸 프로필에 넣고 터미널·앱을 다시 시작 |
 | 승인 질문 없이 서버가 안 보임 | 이전에 거부했을 수 있음. `claude mcp reset-project-choices`로 선택 초기화 |
-| 윈도우에서 `npx` 서버가 실행되지 않음 | `cmd /c npx …` 형태로 감싸기 ([MCP 가이드 5-2](../examples/19-mcp-server-guide.md#5-2-운영체제별-주의)) |
+| 윈도우에서 `npx` 서버(Google MCP Toolbox 대안 등)가 실행되지 않음 | `cmd /c npx …` 형태로 감싸기 ([MCP 가이드 5-2](../examples/19-mcp-server-guide.md#5-2-운영체제별-주의)) |
 | DB 연결 거부 | Docker DB 컨테이너가 실행 중인지, 포트(5432) 확인 |
 | 결과가 너무 커서 경고 | 조회 범위를 좁힌다 ("건수만", "5건만") |
 | Claude가 MCP로 데이터를 고치려 함 | 읽기 전용 계정이라 실패해야 정상. 실패하지 않았다면 Step 7 권한을 다시 확인 |
