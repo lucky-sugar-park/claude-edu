@@ -96,7 +96,7 @@ sequenceDiagram
 | 경로 | 도구 이름 형식 | 예 |
 |---|---|---|
 | **내장** | `Read`, `Bash` … | |
-| **MCP 서버** | `mcp__서버__도구` | `mcp__github__create_issue`, `mcp__eduhub-db__query` ([MCP 가이드](./19-mcp-server-guide.md)) |
+| **MCP 서버** | `mcp__서버__도구` | `mcp__github__create_issue`, `mcp__eduhub-db__execute_sql` ([MCP 가이드](./19-mcp-server-guide.md)) |
 | **Agent SDK의 커스텀 도구** | 내 코드에서 정의 | `get_session_status` ([SDK 예제](./05-automation-and-capstone.md#모듈-18-claude-agent-sdk)) |
 | **Claude API 직접 사용** | 요청에 도구 정의를 넣음 | 아래 6장 |
 
@@ -112,7 +112,7 @@ sequenceDiagram
     "allow": [
       "Bash(./gradlew test *)",
       "Bash(npm run lint)",
-      "mcp__eduhub-db__query"
+      "mcp__eduhub-db__execute_sql"
     ],
     "ask": [
       "Bash(git push *)"

@@ -118,8 +118,8 @@ claude mcp add --transport http company-api https://mcp.example.com/mcp \
 
 # ② 로컬 stdio 서버: -- 뒤가 서버 실행 명령
 claude mcp add [옵션] <이름> -- <명령> [인자...]
-claude mcp add --env DB_URL=postgresql://readonly@localhost:5432/eduhub --transport stdio eduhub-db \
-  -- npx -y <PostgreSQL MCP 서버 패키지> 
+claude mcp add --transport stdio --env DATABASE_URI="$EDUHUB_DB_READONLY_URL" eduhub-db \
+  -- uvx postgres-mcp --access-mode=restricted
 
 # ③ JSON으로 한 번에 추가
 claude mcp add-json weather '{"type":"http","url":"https://api.weather.example/mcp"}'
@@ -157,8 +157,9 @@ claude mcp add-json weather '{"type":"http","url":"https://api.weather.example/m
     },
     "eduhub-db": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "<PostgreSQL MCP 서버 패키지>", "${EDUHUB_DB_READONLY_URL}"]
+      "command": "uvx",
+      "args": ["postgres-mcp", "--access-mode=restricted"],
+      "env": { "DATABASE_URI": "${EDUHUB_DB_READONLY_URL}" }
     },
     "playwright": {
       "type": "stdio",
@@ -173,6 +174,8 @@ claude mcp add-json weather '{"type":"http","url":"https://api.weather.example/m
   }
 }
 ```
+
+> 💡 `eduhub-db`는 **Postgres MCP Pro**(PyPI `postgres-mcp`)입니다. `--access-mode=restricted`로 서버가 읽기 전용 트랜잭션만 실행하고, DB 쪽도 읽기 전용 계정으로 연결해 두 겹으로 막습니다. 예전 공식 참조 서버 `@modelcontextprotocol/server-postgres`는 2025년 5월에 보관(archived)되어 쓰지 않습니다. Docker 실행, 다른 선택지, 개발 DB가 **MariaDB**일 때(`@benborla29/mcp-server-mysql` 또는 MariaDB 공식 플러그인)는 [5회차 Step 8](../sessions/session-05-hooks-and-mcp.md#step-8-mcpjson에-db-mcp-연결하기)와 [MariaDB 버전](../sessions/session-05-hooks-and-mcp.md#개발-db가-mariadb인-팀-step-78의-mariadb-버전)를 봅니다.
 
 **환경 변수 치환 규칙**
 - `${VAR}`: 환경 변수 값으로 바뀜
@@ -287,7 +290,7 @@ sequenceDiagram
 // .claude/settings.json (일부)
 {
   "permissions": {
-    "allow": ["mcp__eduhub-db__query"],
+    "allow": ["mcp__eduhub-db__list_objects", "mcp__eduhub-db__get_object_details", "mcp__eduhub-db__execute_sql"],
     "deny":  ["mcp__github__merge_pull_request"]
   }
 }

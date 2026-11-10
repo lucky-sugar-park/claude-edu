@@ -66,14 +66,18 @@ MCP와 훅은 모두 "에이전트 바깥"과 연결하는 장치지만 방향�
 ### 3-1. Claude Code에서 연결
 
 ```bash
-# 로컬 서버 (stdio): -- 뒤가 실행 명령
-claude mcp add eduhub-db -- npx -y @modelcontextprotocol/server-postgres "$EDUHUB_DB_READONLY_URL"
+# 로컬 서버 (stdio): -- 뒤가 실행 명령. --env(-e)로 서버에 환경 변수를 넘긴다
+# (Postgres MCP Pro: 접속 문자열은 DATABASE_URI, restricted = 읽기 전용)
+claude mcp add --transport stdio --env DATABASE_URI="$EDUHUB_DB_READONLY_URL" eduhub-db \
+  -- uvx postgres-mcp --access-mode=restricted
 
 # 원격 서버 (HTTP)
 claude mcp add --transport http github https://api.githubcopilot.com/mcp/
 
 # 팀과 공유하려면 project 범위로 → .mcp.json에 저장됨
-claude mcp add --scope project eduhub-db -- npx -y @modelcontextprotocol/server-postgres "\${EDUHUB_DB_READONLY_URL}"
+# 작은따옴표로 감싸 ${...}를 글자 그대로 저장한다 (비밀번호가 파일에 들어가지 않게)
+claude mcp add --scope project --transport stdio --env 'DATABASE_URI=${EDUHUB_DB_READONLY_URL}' eduhub-db \
+  -- uvx postgres-mcp --access-mode=restricted
 
 # 확인과 관리
 claude mcp list
@@ -88,6 +92,8 @@ claude mcp list
 | user | 내 설정 (모든 프로젝트) | 개인적으로 늘 쓰는 서버 |
 
 > 명령 옵션은 버전에 따라 다를 수 있으므로 `claude mcp --help`와 공식 문서로 확인하세요.
+
+> 💡 첫 번째 예시(local 범위)는 셸이 `$EDUHUB_DB_READONLY_URL`을 **실제 값으로 바꿔서** 내 설정(`~/.claude.json`)에 저장합니다. 팀과 공유하는 project 범위에서는 두 번째처럼 `${...}`를 글자 그대로 남겨야 비밀번호가 `.mcp.json`에 들어가지 않습니다. DB MCP 서버로 예전에 쓰던 `@modelcontextprotocol/server-postgres`는 보관(archived)되어 관리가 끝났습니다. 서버 선택 이유와 MariaDB 설정은 [5회차 Step 8](../sessions/session-05-hooks-and-mcp.md#step-8-mcpjson에-db-mcp-연결하기)를 봅니다.
 
 ### 3-2. Claude 앱에서 연결 (커넥터)
 

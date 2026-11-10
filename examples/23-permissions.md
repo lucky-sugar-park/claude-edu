@@ -143,7 +143,7 @@ Claude Code는 **내 컴퓨터에서 내 권한으로** 파일을 고치고 명�
       "Bash(git commit *)",
       "WebFetch(domain:docs.spring.io)",
       "WebFetch(domain:mui.com)",
-      "mcp__eduhub-db__query"
+      "mcp__eduhub-db__execute_sql"
     ],
     "ask": [
       "Bash(git push *)",

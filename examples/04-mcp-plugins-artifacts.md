@@ -13,8 +13,10 @@
 {
   "mcpServers": {
     "eduhub-db": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "${EDUHUB_DB_READONLY_URL}"]
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["postgres-mcp", "--access-mode=restricted"],
+      "env": { "DATABASE_URI": "${EDUHUB_DB_READONLY_URL}" }
     },
     "github": {
       "type": "http",
@@ -24,7 +26,7 @@
 }
 ```
 
-> 서버 패키지와 URL은 예시입니다. 실제 교육 전에 사용할 MCP 서버의 최신 설치 방법을 확인하세요.
+> `eduhub-db`는 **Postgres MCP Pro**(PyPI `postgres-mcp`, `uv` 필요)를 `--access-mode=restricted`(읽기 전용)로 실행하는 예시입니다. 예전 예시에 쓰던 `@modelcontextprotocol/server-postgres`는 2025년 5월에 보관(archived)되어 관리가 끝났으므로 쓰지 않습니다. 고른 이유, Docker로 실행하는 방법, 개발 DB가 MariaDB일 때의 설정은 [5회차 Step 8](../sessions/session-05-hooks-and-mcp.md#step-8-mcpjson에-db-mcp-연결하기)와 [MariaDB 버전](../sessions/session-05-hooks-and-mcp.md#개발-db가-mariadb인-팀-step-78의-mariadb-버전)를 봅니다 (2026년 11월 기준, 수업 전 최신 설치 방법 확인).
 
 - DB 접속 정보는 환경 변수로 넣고 파일에 직접 쓰지 않는다
 - DB는 **읽기 전용 계정**으로 연결한다 (최소 권한)
