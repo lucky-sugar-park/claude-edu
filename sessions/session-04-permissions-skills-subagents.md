@@ -504,7 +504,7 @@ sequenceDiagram
 
 | 방법 | 어떻게 | 장점 | 단점 | EduHub 적용 |
 |---|---|---|---|---|
-| **비관적 락** | 회차 행을 `SELECT ... FOR UPDATE`로 잠그고 확인·저장 (`@Lock(PESSIMISTIC_WRITE)`) | 단순하고 확실. 충돌이 잦을 때 유리 | 같은 회차 신청이 줄 서서 처리됨 (대기 시간) | ⭐ **정원 확인** (인기 과정은 충돌이 잦음) |
+| **비관적 락** | 회차 행을 `SELECT ... FOR UPDATE`로 잠그고 확인·저장 (`@Lock(PESSIMISTIC_WRITE)`) | 단순하고 확실. 충돌이 잦을 때 유리 | 같은 회차 신청이 줄 서서 처리됨 (대기 시간) → [4-3-1](#4-3-1-비관적-락을-쓰면-처리량이-떨어지지-않나) | ⭐ **정원 확인** (인기 과정은 충돌이 잦음) |
 | **낙관적 락** | 엔티티에 `@Version`, 저장할 때 버전이 바뀌었으면 실패 → 재시도 | 잠금 없이 빠름. 충돌이 드물 때 유리 | 충돌이 많으면 재시도가 폭증, 재시도 로직 필요 | 과정 정보 수정(FR-03)처럼 충돌이 드문 곳 |
 | **DB 유일 제약** | `(session_id, employee_id)`에 유일 인덱스 | DB가 최종 보장. 코드 버그가 있어도 막힘 | 위반 시 예외를 409로 바꾸는 처리 필요 | ⭐ **중복 신청 방지** (FR-04) |
 | 애플리케이션 락 (`synchronized`) | 자바 코드에서 잠금 | 쉬워 보임 | **서버가 2대 이상이면 무용지물** | ✕ 쓰지 않음 |
@@ -545,6 +545,143 @@ CREATE UNIQUE INDEX ux_enrollment_active
 ```
 
 > ⚠️ `employeeId`는 요청 본문이 아니라 **로그인한 사용자 정보**에서 가져와야 합니다(NFR-03). 인증은 이후 회차에서 붙이므로, 오늘은 서비스 메서드의 인자로 받고 Controller에 `TODO(NFR-03)`를 남깁니다.
+
+### 4-3-1. 비관적 락을 쓰면 처리량이 떨어지지 않나?
+
+비관적 락은 같은 회차 신청을 **줄 세웁니다.** 인기 과정의 신청이 열리는 순간 수백 명이 한 회차에 몰리면, 뒤의 요청은 앞 요청이 커밋할 때까지 기다립니다. 실제로 얼마나 문제인지, 어떻게 줄이는지 **측정으로** 살펴봅니다.
+
+**측정 조건**: PostgreSQL 16 한 대(같은 PC), `pgbench`로 50개 연결이 10초 동안 계속 신청. 숫자는 환경에 따라 달라지므로 **방식 사이의 비교**로만 봅니다 (2026년 11월, 이 교재에서 직접 측정).
+
+| 상황 | 방식 | 처리량 (건/초) | 평균 응답 |
+|---|---|---|---|
+| ① 신청이 **회차 199개에 고르게** 분산 | 비관적 락 + `count(*)` | **6,044** | 8ms |
+| ② **한 회차에 몰림**, 자리가 남아 있는 동안 | 비관적 락 + `count(*)` | 557 | 90ms |
+| | 비관적 락 + **카운터 컬럼** | 733 | 68ms |
+| | **원자적 조건부 UPDATE** | 809 | 62ms |
+| ③ 한 회차에 몰림, **마감 후** 대기 신청 폭주 (정원 30) | 비관적 락 + `count(*)` | 711 | 70ms |
+| | **원자적 조건부 UPDATE** | **9,946** | 5ms |
+| ④ ②와 같지만 **잠금 안에서 왕복 지연 2ms**가 두 번 (앱↔DB 왕복, 다른 호출 흉내) | 비관적 락 + `count(*)` | **149** | 335ms |
+| ⑤ ④를 **150개 연결**로 | 비관적 락 + `count(*)` | — | **982ms** (대기 누적) |
+
+모든 경우에 확정 인원은 정원과 정확히 같았습니다 (정합성 유지).
+
+**측정에서 배우는 것**
+
+| 관찰 | 의미 |
+|---|---|
+| ① vs ② | 잠금은 **회차(행) 단위**다. 다른 회차 신청은 서로 기다리지 않는다. 문제는 **인기 회차 하나에 몰릴 때**뿐이다 |
+| ② 세 방식이 비슷 | **마지막 자리를 정하는 순간은 어떤 방법이든 한 줄로 처리된다.** 정원을 지키는 한 피할 수 없다. 처리량의 상한은 "잠금을 쥐고 있는 시간(커밋 포함)"이 정한다 |
+| ③ 차이 14배 | 큰 낭비는 **마감 후의 대기 신청까지 줄을 세우는 것**. 조건부 UPDATE는 자리가 없으면 행을 잠그지 않아 대기 신청이 줄을 서지 않는다 |
+| ④ 처리량 1/4 | 잠금을 쥔 채 다른 일을 하면 줄이 급격히 길어진다. **잠금 구간을 짧게 하는 것**이 가장 효과가 크다 |
+| ⑤ 1초 대기 | 기다리는 요청은 DB 연결과 서버 스레드를 붙잡는다. 오래 두면 **다른 기능까지 느려진다** |
+
+**해결 순서** (위에서부터 적용하고, 측정해서 충분하면 멈춘다)
+
+| 순서 | 방법 | 효과 | 비용 |
+|---|---|---|---|
+| ⓪ | **먼저 측정**: 4-4 동시성 테스트 + 부하 테스트(8회차 k6). NFR-01의 요구(100명 동시)를 이미 만족하면 더 할 필요 없음 | 과잉 설계 방지 | 낮음 |
+| ① | **잠금 구간을 짧게**: 트랜잭션 안에서 외부 API 호출·알림 발송·무거운 조회 금지. 알림은 **커밋 후**에(6회차 `@TransactionalEventListener(AFTER_COMMIT)`) | ④처럼 지연이 끼는 것을 막음 | 낮음 |
+| ② | **`count(*)` 대신 카운터 컬럼** `confirmed_count` | 잠금 안의 조회 비용 감소 (557 → 733) | 낮음 (카운터와 실제 행 일치 관리) |
+| ③ | **원자적 조건부 UPDATE**로 "자리 있으면 +1"을 한 문장에 | 마감 후 대기 신청이 줄을 서지 않음 (711 → 9,946) | 중간 (취소·승급 로직을 함께 바꿈) |
+| ④ | **오래 기다리지 않게**: 잠금 대기 제한(PostgreSQL `lock_timeout`), 커넥션 풀 크기·대기 시간 제한, 실패 시 "잠시 후 다시 시도"(503) | 대기가 쌓여 다른 기능까지 느려지는 것을 막음 | 낮음 |
+| ⑤ | **입구에서 줄이기**: 버튼 중복 클릭 방지(멱등 키), 사용자별 요청 횟수 제한, 오픈 시각 공지·분산 오픈 | 불필요한 요청 자체를 줄임 | 낮음~중간 |
+| ⑥ | 아주 큰 규모일 때만: **비동기 접수**(요청을 메시지 큐에 넣고 회차별로 순서대로 처리, 결과는 나중에 알림), 대기실(가상 대기열), Redis 카운터로 자리 선점 | 수만 명 동시 접속 대응 | **높음** (구조·운영 복잡, 결과를 바로 못 줌, 정합성 관리) |
+
+> ⭐ **EduHub 권장: ① + ② + ③ + ④**와 기존 유일 인덱스(중복 방지). 사내 교육 신청 규모에서 ⑥은 과한 설계입니다. 대학 수강신청이나 공연 예매처럼 오픈 순간 수만 명이 몰리는 서비스에서 검토합니다.
+
+**③ 원자적 조건부 UPDATE: 코드 모양** (교재용 예시, 빌드하지 않음. SQL 동작은 위 측정으로 확인)
+
+```sql
+-- V6__course_session_confirmed_count.sql
+ALTER TABLE course_session ADD COLUMN confirmed_count INT NOT NULL DEFAULT 0;
+UPDATE course_session s SET confirmed_count =
+    (SELECT count(*) FROM enrollment e WHERE e.session_id = s.id AND e.status = 'CONFIRMED');
+-- DB가 최종 보장: 어떤 코드 버그가 있어도 정원을 넘을 수 없다
+ALTER TABLE course_session ADD CONSTRAINT ck_confirmed_le_capacity CHECK (confirmed_count <= capacity);
+```
+
+```java
+// CourseSessionRepository.java — "자리가 있으면 +1"을 한 문장으로. 성공하면 1, 자리가 없으면 0
+@Modifying(clearAutomatically = true, flushAutomatically = true)
+@Query("update CourseSession s set s.confirmedCount = s.confirmedCount + 1 "
+     + "where s.id = :id and s.confirmedCount < s.capacity")
+int tryReserveSeat(@Param("id") Long id);
+
+@Modifying(clearAutomatically = true, flushAutomatically = true)
+@Query("update CourseSession s set s.confirmedCount = s.confirmedCount - 1 "
+     + "where s.id = :id and s.confirmedCount > 0")
+int releaseSeat(@Param("id") Long id);
+```
+
+```java
+// EnrollmentService.java — 잠금 조회(findByIdForUpdate) 없이
+@Transactional
+public EnrollmentResponse enroll(Long sessionId, Long employeeId) {
+    if (!sessionRepository.existsById(sessionId)) {
+        throw new SessionNotFoundException(sessionId);
+    }
+    if (enrollmentRepository.existsActive(sessionId, employeeId)) {
+        throw new DuplicateEnrollmentException(sessionId, employeeId);          // 409
+    }
+    boolean seatReserved = sessionRepository.tryReserveSeat(sessionId) == 1;   // 원자적 판단
+    CourseSession session = sessionRepository.getReferenceById(sessionId);
+    Enrollment enrollment = seatReserved
+            ? Enrollment.confirm(session, employeeId)
+            : Enrollment.waiting(session, employeeId);   // 대기 순서는 신청 시각·ID 순으로 계산
+    try {
+        return EnrollmentResponse.from(enrollmentRepository.saveAndFlush(enrollment));
+    } catch (DataIntegrityViolationException e) {
+        // 동시에 같은 사람이 두 번 신청 → 유일 인덱스 위반. 트랜잭션이 롤백되어 +1도 함께 취소된다
+        throw new DuplicateEnrollmentException(sessionId, employeeId);
+    }
+}
+
+// 취소(FR-06): 확정 신청을 취소하면 대기 1순위를 승급하고, 대기자가 없을 때만 자리를 반납한다
+@Transactional
+public void cancel(Long enrollmentId, Long employeeId) {
+    Enrollment enrollment = enrollmentRepository.findByIdAndEmployeeId(enrollmentId, employeeId)
+            .orElseThrow(() -> new EnrollmentNotFoundException(enrollmentId));
+    boolean wasConfirmed = enrollment.isConfirmed();
+    enrollment.cancel();
+    if (wasConfirmed) {
+        enrollmentRepository.findFirstWaitingForUpdate(enrollment.getSessionId())  // FOR UPDATE SKIP LOCKED
+                .ifPresentOrElse(Enrollment::promote,                              // 카운터는 그대로
+                                 () -> sessionRepository.releaseSeat(enrollment.getSessionId()));
+    }
+}
+```
+
+| 바꿀 때 꼭 챙길 것 | 이유 |
+|---|---|
+| **확정·취소·승급이 모두 카운터를 맞게 바꾸는가** | 카운터는 "중복 저장된 값"이라 한 곳만 빠져도 어긋난다 |
+| 대기 순번을 **저장하지 않고** 신청 시각·ID 순서로 계산 | 저장하는 순번(`max + 1`)은 그 자체가 또 다른 경쟁 조건이다 |
+| 대기자 승급은 `FOR UPDATE SKIP LOCKED` | 두 사람이 동시에 취소해도 서로 다른 대기자를 승급 |
+| `CHECK (confirmed_count <= capacity)` | 코드가 틀려도 DB가 최종으로 막는다 |
+| 4-4의 동시성 테스트를 **그대로 다시 통과** | "확정 수 = 정원"과 함께 "카운터 = 실제 확정 행 수"도 검증 |
+
+```sql
+-- 카운터 정합성 점검 (테스트·운영 점검용): 결과가 비어 있어야 정상
+SELECT s.id, s.confirmed_count,
+       count(e.id) FILTER (WHERE e.status = 'CONFIRMED') AS actual
+  FROM course_session s LEFT JOIN enrollment e ON e.session_id = s.id
+ GROUP BY s.id, s.confirmed_count
+HAVING s.confirmed_count <> count(e.id) FILTER (WHERE e.status = 'CONFIRMED');
+```
+
+**④ 오래 기다리지 않게 (비관적 락을 유지하는 경우)**
+
+```java
+// 잠금을 3초 넘게 기다리면 포기하고 "잠시 후 다시" 응답 (지원 방식은 DB·Hibernate 버전에 따라 다르므로 확인)
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+@Query("select s from CourseSession s where s.id = :id")
+Optional<CourseSession> findByIdForUpdate(@Param("id") Long id);
+```
+
+- PostgreSQL에서는 트랜잭션 안에서 `SET LOCAL lock_timeout = '3s'`로도 같은 효과를 냅니다. 측정에서 150개 연결에 `lock_timeout = '500ms'`를 주자, 기다리던 요청이 `canceling statement due to lock timeout`으로 **빨리 실패**했습니다 (무한정 쌓이지 않음)
+- 실패는 사용자에게 503 "신청이 몰려 있습니다. 잠시 후 다시 시도해 주세요"로 돌려주고, 커넥션 풀(HikariCP `maximumPoolSize`, `connectionTimeout`)도 함께 점검합니다
+
+> 💬 **강사 노트:** "비관적 락은 느리다"가 아니라 **"어디서, 얼마나 기다리는지 측정하고, 잠금을 쥐는 시간과 대상을 줄인다"**가 핵심입니다. 이 판단도 Claude에게 선택지와 근거를 요청하되 **측정 결과를 보고 고르는 것은 개발자**입니다. 따라하기에서는 먼저 비관적 락으로 정확성을 확보하고, ③은 "더 해 보기"나 8회차 성능 점검(NFR-02)에서 측정과 함께 적용해 봅니다.
 
 ---
 
