@@ -18,7 +18,7 @@
 > - Docker Desktop 실행, EduHub 개발 DB(PostgreSQL) 컨테이너가 뜨는지 확인
 > - `uv` 설치 (`uvx --version`): DB MCP 서버(Postgres MCP Pro) 실행용. 설치 방법은 Step 8 ①
 > - (선택) GitHub CLI `gh` 로그인 (`gh auth status`)
-> 🖥️ **슬라이드 덱(40장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(44장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -283,7 +283,13 @@ exit 0
 
 ```powershell
 # .claude/hooks/protect-prod-config.ps1 — PreToolUse(Edit|Write): 운영 설정 파일 수정 차단 (1-4 시연용)
-$hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8   # 한글 메시지가 깨지지 않게
+
+try {
+  $hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
+} catch {
+  exit 0   # 입력을 읽지 못하면 막지 않는다
+}
 $file = [string]$hookInput.tool_input.file_path
 
 if ($file -match 'application-prod\.yml$') {
@@ -743,7 +749,17 @@ jq --version                    # 없으면 winget install jqlang.jq 후 터미�
 New-Item -ItemType Directory -Force .claude\hooks | Out-Null
 ```
 
-> 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell만 쓴다면 1-4의 `protect-files.ps1`처럼 `.ps1`로 작성합니다.
+> 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell만 쓴다면 아래 `.ps1` 버전을 씁니다.
+
+**이 회차의 훅 스크립트: bash 버전과 Windows PowerShell 버전**
+
+| 훅 | bash (macOS·Linux·Git Bash) | Windows PowerShell | 실린 곳 |
+|---|---|---|---|
+| 운영 설정 보호 (시연용 최소 버전) | `protect-prod-config.sh` | `protect-prod-config.ps1` | 1-4 |
+| 자동 포맷 | `format.sh` | `format.ps1` | Step 2 (PowerShell 버전은 접힌 부분) |
+| 보호 파일 전체 | `protect-files.sh` | `protect-files.ps1` | Step 3 (bash), 1-4 (PowerShell) |
+
+PowerShell 버전은 모두 `"command": "powershell.exe"`, `"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.claude/hooks/<이름>.ps1"]` 형식으로 등록합니다 (1-3 Windows 설정 ②).
 
 **Windows에서 jq 설치하기**
 
@@ -843,6 +859,84 @@ exit 0
   }
 }
 ```
+
+> ✅ `format.sh`는 가짜 `gradlew`·`npx`로 바꿔 실행해 확인했습니다: `.java`면 `backend`에서 `spotlessApply`, `.tsx`면 `prettier --write <그 파일>`, 그 밖의 파일·경로 없는 입력은 아무것도 하지 않고 모두 `exit 0`.
+
+<details>
+<summary>Windows PowerShell 버전: <code>format.ps1</code> (Git Bash를 쓰지 않을 때)</summary>
+
+```powershell
+# .claude/hooks/format.ps1 — PostToolUse(Edit|Write): 수정한 파일만 포맷 (Windows PowerShell 버전)
+# Step 2의 format.sh와 같은 동작. 포맷 도구가 없거나 실패해도 작업이 멈추지 않도록 항상 exit 0
+
+# 1) stdin으로 들어온 훅 입력(JSON)에서 수정한 파일 경로를 꺼낸다
+try {
+    $hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
+} catch {
+    exit 0
+}
+$file = [string]$hookInput.tool_input.file_path
+$root = $env:CLAUDE_PROJECT_DIR
+if ([string]::IsNullOrEmpty($file) -or [string]::IsNullOrEmpty($root)) { exit 0 }
+
+# 2) 확장자에 따라 포맷 (출력은 모두 버린다: PostToolUse 출력이 컨텍스트를 채우지 않게)
+try {
+    if ($file -match '\.java$') {
+        # -p 로 backend 폴더를 프로젝트로 지정 → 현재 폴더를 바꿀 필요가 없다
+        $backend = Join-Path $root 'backend'
+        & (Join-Path $backend 'gradlew.bat') -p $backend spotlessApply -q *> $null
+    }
+    elseif ($file -match '\.tsx?$') {
+        # npx.ps1은 실행 정책에 막힐 수 있어 npx.cmd를 직접 부른다
+        & npx.cmd --prefix (Join-Path $root 'frontend') prettier --write $file *> $null
+    }
+} catch {
+    # gradlew.bat·npx.cmd가 없으면 여기로 온다. 포맷만 건너뛴다
+}
+exit 0
+```
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.ps1"],
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+| `format.sh`와 다른 점 | 설명 |
+|---|---|
+| 입력 읽기 | `jq` 대신 `ConvertFrom-Json` (jq 설치 불필요) |
+| Gradle 실행 | `./gradlew` 대신 `gradlew.bat`, `cd` 대신 `-p <backend 폴더>` |
+| npx 실행 | `npx.cmd`를 직접 호출 (`npx.ps1`이 실행 정책에 막히는 것을 피한다) |
+| 출력 버리기 | `>/dev/null 2>&1` 대신 `*> $null` |
+| 확장자 비교 | `-match '\.tsx?$'`는 대소문자를 구분하지 않는다 (`A.JAVA`도 포맷) |
+
+**PowerShell로 직접 테스트** (프로젝트 루트에서)
+
+```powershell
+$env:CLAUDE_PROJECT_DIR = (Get-Location).Path
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\java\\A.java"}}' |
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude\hooks\format.ps1; "exit=$LASTEXITCODE"   # exit=0, A.java 포맷
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\README.md"}}' |
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude\hooks\format.ps1; "exit=$LASTEXITCODE"   # exit=0, 아무것도 안 함
+```
+
+> ⚠️ 이 교재 환경에서는 PowerShell을 실행할 수 없어 `format.ps1`을 **직접 실행해 보지 못했습니다.** 수업 전에 Windows에서 위 테스트를 한 번 실행하고, 일부러 들여쓰기를 망친 `.java` 파일이 정리되는지 확인해 주세요.
+
+</details>
 
 > 💡 `spotlessApply`는 프로젝트 전체를 검사하므로 프로젝트가 커지면 느려질 수 있습니다. 느리면 Spotless의 파일 지정 옵션이나 google-java-format을 그 파일에만 실행하는 방식으로 바꿉니다 (공식 문서 확인 필요).
 
