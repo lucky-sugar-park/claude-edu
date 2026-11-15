@@ -697,9 +697,30 @@ which jq              # 어디에 설치됐는지
 echo '{"tool_input":{"file_path":"C:\\work\\a.java"}}' | jq -r '.tool_input.file_path'   # C:\work\a.java
 ```
 
+```powershell
+# PowerShell에서 확인 (which에 해당하는 명령)
+jq --version
+Get-Command jq            # Source 열에 jq.exe의 위치가 나온다
+where.exe jq              # 같은 결과를 경로만 출력. PowerShell에서는 where가 다른 명령(Where-Object)이라 반드시 .exe까지 쓴다
+```
+
+```bat
+:: 명령 프롬프트(cmd)에서 확인
+jq --version
+where jq
+```
+
+| 셸 | `which jq`에 해당하는 명령 |
+|---|---|
+| Git Bash | `which jq` (그대로) |
+| PowerShell | `Get-Command jq` 또는 `where.exe jq` |
+| 명령 프롬프트(cmd) | `where jq` |
+
+> 💡 PowerShell·cmd에서는 보이는데 Git Bash에서 안 보인다면, 훅이 실행되는 쪽은 **Git Bash**이므로 아래 표의 방법으로 Git Bash에서 보이게 만듭니다.
+
 | 증상 | 원인과 해결 |
 |---|---|
-| PowerShell에서는 되는데 Git Bash에서 `jq: command not found` | jq를 설치하기 **전부터** 열어 둔 Git Bash 창. 창을 새로 연다. 그래도 안 되면 `which jq`로 확인하고, 직접 받은 `jq.exe`를 `~/bin`에 둔다 |
+| PowerShell에서는 되는데 Git Bash에서 `jq: command not found` | jq를 설치하기 **전부터** 열어 둔 Git Bash 창. 창을 새로 연다. 그래도 안 되면 PowerShell의 `Get-Command jq`로 실제 위치를 보고 Git Bash의 `which jq`와 비교하고, 직접 받은 `jq.exe`를 `~/bin`에 둔다 |
 | 터미널에서는 되는데 훅에서만 `jq: command not found` | Claude Code(또는 데스크톱 앱)를 jq 설치 **전에** 실행했다. Claude Code를 다시 시작한다 |
 | 회사 PC라 winget·관리자 권한을 쓸 수 없음 | "직접 받기" 방법으로 `~/bin`에 둔다. 그래도 어렵다면 jq가 필요 없는 PowerShell 훅(1-4 `protect-files.ps1`의 `ConvertFrom-Json` 방식)을 쓴다 |
 
