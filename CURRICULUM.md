@@ -510,6 +510,7 @@
 | [31-course-service-test.md](./examples/31-course-service-test.md) | CourseServiceTest: FR-03 과정·회차 관리 서비스 단위 테스트(JUnit 5·Mockito·AssertJ), TDD 지시문, 참고 구현 | 6 |
 | [32-custom-mcp-server-mariadb.md](./examples/32-custom-mcp-server-mariadb.md) | 나만의 MCP 서버(TypeScript): MariaDB 읽기 전용 조회 도구 2개 만들기, 테스트, `.mcp.json` 등록, 권한, 보안 체크리스트 (실행 검증) | 13 |
 | [33-custom-mcp-server-mariadb-java.md](./examples/33-custom-mcp-server-mariadb-java.md) | 32번의 Java 버전: MCP Java SDK 2.1 + MariaDB JDBC로 같은 도구 만들기, 실행 JAR, Java 스모크 테스트, `.mcp.json` 등록, Spring AI 비교 (실행 검증) | 13, 16 |
+| [34-manufacturing-ai-agent-mcp.md](./examples/34-manufacturing-ai-agent-mcp.md) | 제조 현장 AI 에이전트와 MCP: MES·ERP·QMS 도구 카탈로그, 서비스 7가지, 아키텍처(IT·OT 분리, 읽기 전용), Java 구현(MES DB + ERP REST, 실행 검증) | 13, 18 |
 
 ---
 

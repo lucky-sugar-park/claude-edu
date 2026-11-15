@@ -50,3 +50,4 @@ Claude Code 개발자 교육과정 자료 저장소입니다.
   - [31 CourseServiceTest: 과정·회차 관리 서비스 단위 테스트 (3회차 TDD 실습)](./examples/31-course-service-test.md)
   - [32 나만의 MCP 서버 만들기: MariaDB 조회 도구를 만들고 Claude Code에 등록](./examples/32-custom-mcp-server-mariadb.md)
   - [33 나만의 MCP 서버 만들기 (Java 버전): MCP Java SDK로 MariaDB 조회 도구 만들기·등록](./examples/33-custom-mcp-server-mariadb-java.md)
+  - [34 제조 현장의 AI 에이전트와 MCP: MES·ERP 생산 정보 도구, 서비스, 아키텍처, Java 구현](./examples/34-manufacturing-ai-agent-mcp.md)

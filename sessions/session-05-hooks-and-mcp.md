@@ -28,7 +28,7 @@
 |---|---|---|
 | 0:00 – 0:05 | 지난 회차 복습 & 과제 리뷰 | 강의 |
 | 0:05 – 0:25 | 1. 훅: 부탁이 아닌 강제 | 강의 + 시연 |
-| 0:25 – 0:40 | 2. MCP: 외부 시스템과 연결하기 | 강의 |
+| 0:25 – 0:40 | 2. MCP: 외부 시스템과 연결하기 (2-5 제조 현장 사례 포함) | 강의 |
 | 0:40 – 0:45 | 3. 1회차 토론 다시 하기: "OpenAPI 문서 누락을 어떻게 막을까?" | 토론 |
 | 0:45 – 1:15 | 4. 따라하기 ①: EduHub 품질 자동화 훅 만들기 | 실습 |
 | 1:15 – 1:23 | ☕ 휴식 | — |
@@ -610,6 +610,72 @@ Claude Code는 Bash로 `gh`, `psql` 같은 CLI를 바로 쓸 수 있습니다. M
 | 화면 확인 (6주차) | Playwright MCP | 브라우저 조작은 CLI로 하기 어렵다 |
 
 > 💡 공식 비용 관리 문서도 **"가능하면 CLI, 쓰지 않는 MCP 서버는 `/mcp`에서 끄기"**를 권합니다 ([토큰 최적화](../examples/08-token-optimization.md)).
+
+---
+
+## 2-5. 사례: 제조 현장의 AI 에이전트와 MCP (MES·ERP 연결)
+
+MCP는 Claude만의 기능이 아니라 **공개 표준**입니다. 한 번 만든 MCP 서버는 Claude, 사내 챗봇, 자동화 작업 등 **MCP를 지원하는 여러 에이전트가 함께 씁니다.** 제조 현장에서 이것이 어떤 서비스가 되는지 봅니다. 자세한 아키텍처와 **Java 구현 코드(실행 검증)**는 [제조 현장의 AI 에이전트와 MCP](../examples/34-manufacturing-ai-agent-mcp.md)에 있습니다.
+
+**흩어진 현장 정보 → 도구 → 서비스**
+
+| 시스템 | 도구 예 (읽기 전용) | 이 도구로 만드는 서비스 |
+|---|---|---|
+| **MES** | `get_line_status`(라인 현황), `get_work_order_progress`(작업지시 진척·예상 완료·납기 위험), `get_defect_pareto`(불량 파레토), `list_work_orders_due`(납기 임박) | 생산 현황 질의 비서, 납기 위험 조기 경보, 불량 원인 분석 보조, 교대 인수인계 리포트 |
+| **ERP** | `get_material_availability`(가용 재고·부족분·입고 예정), `get_bom`, `get_sales_order_due` | 자재 결품 예측, 납기 위험의 자재 원인 확인 |
+| **QMS·CMMS** | `get_inspection_results`, `get_maintenance_history` | 품질 이상 해석, 설비 이상 대응 가이드 |
+| **문서** | `search_work_instructions` (작업표준서·매뉴얼 RAG) | 알람·불량 대응 절차 안내 |
+
+**아키텍처 한눈에**
+
+```mermaid
+flowchart LR
+    A["에이전트<br/>Claude·사내 챗봇·정기 자동화"] --> G["공통 관문<br/>인증·권한·감사 로그"]
+    G --> M1["mes-tools"] & M2["erp-tools"] & M3["qms·docs 도구"]
+    M1 -- "SELECT<br/>읽기 전용 계정" --> MES[("MES 복제본")]
+    M2 -- "GET<br/>조회 전용 토큰" --> ERP["ERP API"]
+    MES -. "집계 데이터만" .- OT["OT 영역: PLC·SCADA·Historian<br/>에이전트가 직접 접근·제어하지 않음"]
+```
+
+| 원칙 | 내용 |
+|---|---|
+| **읽기 전용부터** | MES는 운영 DB가 아니라 복제본과 읽기 전용 계정, ERP는 DB가 아니라 공식 API와 조회 전용 토큰 |
+| **업무 단위 도구, 계산은 서버에서** | "라인 현황", "납기 위험"처럼 현장 용어로. 진척률·불량률·예상 완료는 서버가 계산해 AI가 추측하지 않게 |
+| **OT는 건드리지 않는다** | 설비 제어·설정 변경 도구는 만들지 않는다. 설비 데이터는 이미 승인된 경로(Historian 집계)로만 |
+| **에이전트는 제안까지** | 작업지시 변경, 발주는 사람이 기존 시스템의 결재 흐름으로 실행 |
+| **개념 검증은 stdio, 확산은 원격 서버** | 여러 사람이 쓰면 중앙 원격 MCP 서버 + 사용자별 권한·감사 로그 |
+
+**예: 납기 위험 조기 경보** — `3일 안에 납기인 작업지시 중 위험한 건과 이유를 알려줘. 자재도 확인해줘`
+
+```text
+list_work_orders_due → WO-1001 (52.6%, 내일 납기), WO-1002 (60%)
+get_work_order_progress(WO-1001) → 시간당 79개, 남은 569개, 예상 완료 오늘 18:00
+get_material_availability(BRG-6201, 1200) → 가용 300, 입고 500 예정, 그래도 400 부족
+→ 에이전트: "생산 속도는 납기 안, 하지만 베어링 400개 부족 → 구매 담당과 입고 일정 조정 검토" (결정은 사람)
+```
+
+**Java 도구 구현 핵심** (전체 코드는 예제 문서 6장)
+
+```java
+// MES 도구 하나 = 이름 + 입력 스키마(JSON Schema) + 설명 + 읽기 전용 힌트 + 실행 함수
+Tool tool = Tool.builder("get_work_order_progress", json, """
+        {"type":"object",
+         "properties":{"woNo":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,30}$"}},
+         "required":["woNo"]}
+        """)
+        .description("작업지시 하나의 진척률, 최근 시간당 생산량, 예상 완료 시각과 납기 위험 여부를 조회한다. "
+                + "납기를 맞출 수 있는지 물을 때 사용. 읽기 전용.")
+        .annotations(READ_ONLY)
+        .build();
+
+SyncToolSpecification.builder().tool(tool).callHandler((ex, req) -> handle(() -> {
+    var wo = db.select("SELECT … FROM work_order w LEFT JOIN production_result r … WHERE w.wo_no = ?", str(req, "woNo"));
+    // 진척률·시간당 생산량·예상 완료·atRisk를 서버에서 계산해 JSON으로 돌려준다
+    return ok(result);
+})).build();
+```
+
+> 💬 **강사 노트:** 시간이 부족하면 서비스 표와 아키텍처 그림만 5분 안에 보여 주고, Java 코드는 예제 문서로 안내합니다. 제조업 수강생에게는 "우리 공장에서 가장 먼저 만들고 싶은 읽기 전용 도구 3개"를 과제로 내면 좋습니다. 6회차 플러그인(도구 묶음 배포), 8회차 Agent SDK(매일 아침 자동 리포트)와 이어집니다.
 
 ---
 
