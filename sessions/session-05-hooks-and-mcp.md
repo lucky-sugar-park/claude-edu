@@ -679,6 +679,30 @@ New-Item -ItemType Directory -Force .claude\hooks | Out-Null
 
 > 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell만 쓴다면 1-4의 `protect-files.ps1`처럼 `.ps1`로 작성합니다.
 
+**Windows에서 jq 설치하기**
+
+훅 스크립트(`.sh`)는 Claude Code가 **Git Bash**로 실행하므로, jq는 "Git Bash에서 `jq`가 실행되는 상태"여야 합니다.
+
+| 방법 | 명령 | 비고 |
+|---|---|---|
+| ⭐ **winget** (Windows 10·11 기본 포함) | `winget install jqlang.jq` | 사용자 PATH에 등록된다. 설치 후 **터미널·Claude Code·데스크톱 앱을 다시 시작** |
+| Scoop | `scoop install jq` | Scoop을 쓰는 사람 |
+| Chocolatey | `choco install jq` | 관리자 PowerShell 필요 |
+| 직접 받기 (설치 도구를 쓸 수 없을 때) | jq 공식 사이트(jqlang.org)의 Windows용 실행 파일(`jq-windows-amd64.exe`)을 받아 이름을 `jq.exe`로 바꾸고 PATH에 있는 폴더에 둔다 | Git Bash에서는 `~/bin` 폴더(`C:\Users\<나>\bin`)에 두면 PATH에 잡힌다 (없으면 만든다) |
+
+```bash
+# 설치 후 "Git Bash"를 새로 열어 확인
+jq --version          # jq-1.7.1 처럼 나오면 OK
+which jq              # 어디에 설치됐는지
+echo '{"tool_input":{"file_path":"C:\\work\\a.java"}}' | jq -r '.tool_input.file_path'   # C:\work\a.java
+```
+
+| 증상 | 원인과 해결 |
+|---|---|
+| PowerShell에서는 되는데 Git Bash에서 `jq: command not found` | jq를 설치하기 **전부터** 열어 둔 Git Bash 창. 창을 새로 연다. 그래도 안 되면 `which jq`로 확인하고, 직접 받은 `jq.exe`를 `~/bin`에 둔다 |
+| 터미널에서는 되는데 훅에서만 `jq: command not found` | Claude Code(또는 데스크톱 앱)를 jq 설치 **전에** 실행했다. Claude Code를 다시 시작한다 |
+| 회사 PC라 winget·관리자 권한을 쓸 수 없음 | "직접 받기" 방법으로 `~/bin`에 둔다. 그래도 어렵다면 jq가 필요 없는 PowerShell 훅(1-4 `protect-files.ps1`의 `ConvertFrom-Json` 방식)을 쓴다 |
+
 > ✅ **확인**: `git branch --show-current`가 `chore/quality-hooks`이고, `jq --version`이 버전을 출력하면 됩니다. 윈도우에서는 훅이 Git Bash로 실행되는지 강사와 함께 확인합니다.
 
 ---
@@ -957,7 +981,7 @@ git push -u origin chore/quality-hooks
 | 증상 | 원인과 해결 |
 |---|---|
 | 훅이 전혀 실행되지 않음 | `/hooks`에서 등록 여부 확인. JSON 문법 오류(`jq . .claude/settings.json`), 이벤트 이름 철자(`PostToolUse`) 확인 |
-| `jq: command not found` | jq 설치. 윈도우는 Git Bash의 PATH에 jq가 있는지 확인 |
+| `jq: command not found` | jq 설치. 윈도우는 Step 1의 "Windows에서 jq 설치하기"와 Git Bash에서 `which jq`로 확인. 설치 후 Claude Code를 다시 시작 |
 | 스크립트를 찾지 못함 | 상대 경로 대신 `"$CLAUDE_PROJECT_DIR/.claude/hooks/…"` 사용 |
 | 차단했는데 Claude가 같은 시도를 반복 | 메시지에 **대안**을 쓴다. "금지"만 쓰면 다른 우회 방법을 찾으려 한다 |
 | 작업이 눈에 띄게 느려짐 | PostToolUse에서 전체 빌드를 돌리고 있지 않은지 확인. 무거운 작업은 Stop으로 |
