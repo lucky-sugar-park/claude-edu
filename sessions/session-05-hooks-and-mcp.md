@@ -669,6 +669,16 @@ jq --version                    # 1.6 이상이면 OK
 mkdir -p .claude/hooks
 ```
 
+```powershell
+# Windows PowerShell (5.1은 &&를 지원하지 않으므로 ; 로 잇는다)
+git switch main; git pull
+git switch -c chore/quality-hooks
+jq --version                    # 없으면 winget install jqlang.jq 후 터미널을 새로 연다
+New-Item -ItemType Directory -Force .claude\hooks | Out-Null
+```
+
+> 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell만 쓴다면 1-4의 `protect-files.ps1`처럼 `.ps1`로 작성합니다.
+
 > ✅ **확인**: `git branch --show-current`가 `chore/quality-hooks`이고, `jq --version`이 버전을 출력하면 됩니다. 윈도우에서는 훅이 Git Bash로 실행되는지 강사와 함께 확인합니다.
 
 ---
@@ -936,6 +946,8 @@ git commit -m "chore(claude): 자동 포맷·보호 파일·위험 명령·마�
 git push -u origin chore/quality-hooks
 ```
 
+> 💡 **Windows**: `chmod +x`는 필요 없습니다(Git Bash에서는 실행해도 무해). 설정에서 `bash "…/format.sh"`처럼 **bash로 직접 실행**하므로 실행 권한이 없어도 동작합니다. 대신 `.gitattributes`에 `*.sh text eol=lf`를 두어 줄바꿈이 CRLF로 바뀌지 않게 합니다.
+
 > ✅ **확인**: PR 본문에 "Claude에게 맡긴 것 / 직접 한 것"을 쓰고, 리뷰어는 **스크립트를 직접 읽고** 승인합니다. 훅은 팀원 모두의 PC에서 실행되기 때문입니다.
 
 ---
@@ -991,9 +1003,24 @@ ALTER ROLE eduhub_readonly SET default_transaction_read_only = on;
 ```
 
 ```bash
-# .env (커밋 금지) 또는 셸 프로필에 추가
+# macOS·Linux·WSL: 셸 프로필(~/.zshrc, ~/.bashrc)에 추가 (.env로 관리하려면 아래 "접속 정보를 .env로 관리하려면")
 export EDUHUB_DB_READONLY_URL="postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub"
 ```
+
+```powershell
+# Windows PowerShell
+# ① 지금 열린 창에서만 (창을 닫으면 사라짐)
+$env:EDUHUB_DB_READONLY_URL = "postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub"
+
+# ② 내 계정에 영구 저장 (새로 여는 터미널과 앱부터 적용 → Claude Code·데스크톱 앱을 다시 시작)
+[Environment]::SetEnvironmentVariable("EDUHUB_DB_READONLY_URL",
+  "postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub", "User")
+
+# 확인
+$env:EDUHUB_DB_READONLY_URL
+```
+
+> 💡 Windows에서는 화면으로도 설정할 수 있습니다: 시작 메뉴에서 "환경 변수" 검색 → **계정의 환경 변수 편집** → 사용자 변수 **새로 만들기**. 어떤 방법이든 **이미 실행 중인 Claude Code·데스크톱 앱은 새 값을 모르므로** 다시 시작합니다.
 
 `.env.example`에는 **변수 이름만** 추가합니다.
 
@@ -1002,6 +1029,61 @@ EDUHUB_DB_READONLY_URL=
 ```
 
 > ✅ **확인**: `psql "$EDUHUB_DB_READONLY_URL" -c "DELETE FROM enrollment"`가 **권한 오류**로 실패해야 합니다. 쓰기가 막혀 있어야 MCP를 연결합니다.
+>
+> Windows에 `psql`이 없다면 DB 컨테이너 안의 `psql`로 확인합니다 (PowerShell·Git Bash 모두 같은 명령):
+> ```powershell
+> docker exec -it eduhub-postgres psql "postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub" -c "DELETE FROM enrollment"
+> ```
+> 컨테이너 안에서의 `localhost`는 컨테이너 자신이라 그대로 접속됩니다. PowerShell에 설정한 값을 쓰려면 `psql $env:EDUHUB_DB_READONLY_URL -c "…"`(로컬에 psql이 있을 때).
+
+### 접속 정보를 `.env`로 관리하려면
+
+`.mcp.json`의 `${EDUHUB_DB_READONLY_URL}`은 **Claude Code를 실행한 프로세스의 환경 변수**에서 값을 가져옵니다. 프로젝트의 `.env` 파일을 자동으로 읽지는 않으므로, `.env`를 쓰려면 **`.env`를 환경 변수로 올려 주는 단계**가 필요합니다.
+
+```bash
+# .env (프로젝트 루트, .gitignore에 반드시 포함. 저장소에는 값 없는 .env.example만)
+EDUHUB_DB_READONLY_URL=postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub
+# MariaDB 팀이라면
+EDUHUB_DB_RO_USER=eduhub_readonly
+EDUHUB_DB_RO_PASSWORD=각자-정한-비밀번호
+```
+
+**방법 1. Claude Code를 시작할 때 `.env`를 올리기**
+
+```bash
+# macOS·Linux·WSL·Git Bash: .env의 KEY=VALUE를 모두 환경 변수로 올린 뒤 실행
+set -a; source .env; set +a
+claude
+```
+
+```powershell
+# Windows PowerShell: 이 창(프로세스)에만 올린 뒤 실행. 빈 줄과 # 주석은 건너뛰고, 값의 따옴표는 벗긴다
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^\s*([^#=\s][^=]*)=(.*)$') {
+    $value = $matches[2].Trim().Trim('"').Trim("'")
+    [Environment]::SetEnvironmentVariable($matches[1].Trim(), $value, 'Process')
+  }
+}
+claude
+```
+
+> 💡 자주 쓴다면 위 PowerShell 코드를 `scripts\load-env.ps1`로 저장하고 `. .\scripts\load-env.ps1; claude`처럼 실행합니다 (앞의 `. `은 "현재 창에 적용"하는 dot-sourcing).
+
+**방법 2. 폴더에 들어가면 자동으로: direnv** (macOS·Linux·WSL)
+- `direnv`를 설치하고 프로젝트 루트의 `.envrc`에 `dotenv` 한 줄을 쓴 뒤 `direnv allow` → 그 폴더에서 실행하는 `claude`가 `.env` 값을 받습니다
+- 네이티브 Windows에서는 방법 1이나 사용자 환경 변수를 씁니다
+
+**방법 3. MCP 서버가 `.env`를 직접 읽기**
+- `mcp-server-mysql`(MariaDB 예시)은 시작할 때 `dotenv`로 **자기가 실행된 폴더의 `.env`**를 읽습니다 (v2.0.9 코드 확인). 이 경우 `.env`에 `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`를 직접 쓰면 됩니다. 단, Claude Code가 서버를 어느 폴더에서 실행하는지는 확인이 필요하고, `.env`에 `ALLOW_INSERT_OPERATION=true` 같은 값이 섞이면 **쓰기가 허용될 수 있으니** 주의합니다
+- 직접 만든 Node 서버([나만의 MCP 서버](../examples/32-custom-mcp-server-mariadb.md))는 Node 20.6 이상의 `node --env-file=.env dist/index.js`로 읽을 수 있습니다
+
+| 실행 방법 | 권장 |
+|---|---|
+| 터미널(macOS·Linux·WSL)에서 `claude` | `.env` + direnv, 또는 `set -a; source .env; set +a` |
+| 터미널(Windows PowerShell)에서 `claude` | `.env` + 방법 1의 PowerShell 코드 |
+| **데스크톱 앱** (터미널 없이 실행) | **사용자 환경 변수**(Step 7의 Windows ②, macOS는 셸 프로필) 후 앱 다시 시작 |
+
+> ⚠️ `.env`도 셸 프로필도 **디스크에 평문으로 저장**됩니다. `.env`는 `.gitignore`와 4회차 `deny: Read(./.env)`로 커밋·읽기를 막고, 셸 환경 변수는 Claude의 Bash가 `echo`로 볼 수 있다는 점을 기억합니다. 어느 쪽이든 **개발 DB의 읽기 전용 계정**만 두고 운영 접속 정보는 두지 않는 것이 핵심입니다.
 
 ---
 
@@ -1058,7 +1140,7 @@ uvx --version     # 설치 확인
 | `"DATABASE_URI"` | 이 서버가 읽는 접속 문자열 환경 변수 이름 (README 기준) |
 | `"${EDUHUB_DB_READONLY_URL}"` | Step 7에서 각자 `.env`·셸에 둔 **읽기 전용 계정** URL을 넣는다. 비밀번호는 파일에 쓰지 않는다 |
 
-> 💡 `${EDUHUB_DB_READONLY_URL}`은 **Claude Code를 실행한 셸의 환경 변수**에서 읽습니다. `.env` 파일에만 적어 두면 Claude Code가 읽지 못할 수 있으니, 셸 프로필(`~/.zshrc`, `~/.bashrc`, Windows는 사용자 환경 변수)에 넣거나 Claude Code를 시작하기 전에 `export`합니다.
+> 💡 `${EDUHUB_DB_READONLY_URL}`은 **Claude Code를 실행한 셸의 환경 변수**에서 읽습니다. `.env` 파일에만 적어 두면 Claude Code가 읽지 못할 수 있으니, 셸 프로필(`~/.zshrc`, `~/.bashrc`, Windows는 사용자 환경 변수)에 넣거나 Claude Code를 시작하기 전에 `export`합니다. Windows 명령과 `.env`로 관리하는 방법은 Step 7의 Windows 예시와 [접속 정보를 .env로 관리하려면](#접속-정보를-env로-관리하려면)을 봅니다.
 
 <details>
 <summary>다른 실행 방법: Docker로 실행 (uv를 설치하고 싶지 않을 때)</summary>
@@ -1206,6 +1288,13 @@ MYSQL_USER="$EDUHUB_DB_RO_USER" MYSQL_PASS="$EDUHUB_DB_RO_PASSWORD" \
   npx -y @benborla29/mcp-server-mysql
 ```
 
+```powershell
+# Windows PowerShell: 이 창에만 설정하고 실행 (확인 후 Ctrl+C)
+$env:MYSQL_HOST = "127.0.0.1"; $env:MYSQL_PORT = "3306"; $env:MYSQL_DB = "eduhub"
+$env:MYSQL_USER = $env:EDUHUB_DB_RO_USER; $env:MYSQL_PASS = $env:EDUHUB_DB_RO_PASSWORD
+npx -y @benborla29/mcp-server-mysql
+```
+
 > 💡 MySQL 8 계열에서 인증 방식 오류가 나면 이 패키지의 문서(docs/TROUBLESHOOTING.md)는 `caching_sha2_password` 지원 확인이나 `mysql_native_password` 계정 사용을 안내합니다. MariaDB에서의 동작은 이 문서에 따로 적혀 있지 않습니다.
 
 
@@ -1245,14 +1334,26 @@ SHOW GRANTS FOR 'eduhub_readonly'@'%';   -- SELECT, SHOW VIEW만 있는지 확�
 > 💡 PostgreSQL처럼 계정 단위로 "기본 읽기 전용 트랜잭션"을 거는 설정 대신, MariaDB에서는 **SELECT 권한만 주는 것**이 핵심 방어선입니다. `eduhub.*`처럼 **필요한 스키마에만** 권한을 줍니다.
 
 ```bash
-# 셸 프로필(~/.zshrc, ~/.bashrc) 또는 Windows 사용자 환경 변수에 추가 (.env만으로는 Claude Code가 못 읽을 수 있음)
+# macOS·Linux·WSL: 셸 프로필(~/.zshrc, ~/.bashrc)에 추가 (.env로 관리하려면 "접속 정보를 .env로 관리하려면")
 export EDUHUB_DB_RO_USER="eduhub_readonly"
 export EDUHUB_DB_RO_PASSWORD="각자-정한-비밀번호"
+```
+
+```powershell
+# Windows PowerShell: 내 계정에 영구 저장 → Claude Code·데스크톱 앱 다시 시작
+[Environment]::SetEnvironmentVariable("EDUHUB_DB_RO_USER", "eduhub_readonly", "User")
+[Environment]::SetEnvironmentVariable("EDUHUB_DB_RO_PASSWORD", "각자-정한-비밀번호", "User")
+# 지금 창에서 바로 쓰려면: $env:EDUHUB_DB_RO_USER = "eduhub_readonly"; $env:EDUHUB_DB_RO_PASSWORD = "각자-정한-비밀번호"
 ```
 
 `.env.example`에는 **변수 이름만** 추가합니다: `EDUHUB_DB_RO_USER=`, `EDUHUB_DB_RO_PASSWORD=`
 
 > ✅ **확인**: `mariadb -h 127.0.0.1 -u eduhub_readonly -p eduhub -e "DELETE FROM enrollment"`가 `DELETE command denied` 같은 **권한 오류**로 실패해야 합니다.
+>
+> Windows에 `mariadb` 클라이언트가 없다면 DB 컨테이너 안에서 확인합니다 (PowerShell·Git Bash 모두 같은 명령):
+> ```powershell
+> docker exec -it eduhub-mariadb mariadb -u eduhub_readonly -p eduhub -e "DELETE FROM enrollment"
+> ```
 
 **② `.mcp.json` (mcp-server-mysql)**
 
