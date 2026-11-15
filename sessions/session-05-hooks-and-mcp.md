@@ -514,6 +514,48 @@ flowchart LR
 ```
 
 - 위 예시는 **Postgres MCP Pro**(`postgres-mcp`)를 씁니다. 고른 이유와 다른 선택지는 [Step 8](#step-8-mcpjson에-db-mcp-연결하기)에 있습니다
+
+**`DATABASE_URI`에 들어가는 값의 예** (`.mcp.json`은 JSON이라 주석을 쓸 수 없으므로, 값은 셸 환경 변수에 두고 설명은 여기에 적습니다)
+
+```bash
+# ~/.zshrc, ~/.bashrc 또는 Windows 사용자 환경 변수 (.mcp.json에는 ${EDUHUB_DB_READONLY_URL} 글자만 둔다)
+
+# ① PostgreSQL — 위 예시 서버(postgres-mcp)가 읽는 형식
+#    postgresql://<읽기 전용 계정>:<비밀번호>@<호스트>:<포트>/<DB 이름>
+export EDUHUB_DB_READONLY_URL="postgresql://eduhub_readonly:각자-정한-비밀번호@localhost:5432/eduhub"
+
+# ② 개발 DB가 MariaDB라면
+#    - postgres-mcp는 PostgreSQL 전용이라 MariaDB 주소를 넣어도 연결되지 않는다 → MariaDB용 서버(mcp-server-mysql)를 쓴다
+#    - MariaDB 주소를 URI로 쓰면 이런 모양이다 (다른 도구·문서에서 참고용):
+#        mariadb://eduhub_readonly:각자-정한-비밀번호@127.0.0.1:3306/eduhub
+#        JDBC(Spring): jdbc:mariadb://127.0.0.1:3306/eduhub  (계정·비밀번호는 따로)
+#    - 하지만 mcp-server-mysql의 MYSQL_CONNECTION_STRING은 URI가 아니라 "mysql 명령줄 형식"이다
+export EDUHUB_MARIADB_CONN="--host=127.0.0.1 --port=3306 --user=eduhub_readonly --password=각자-정한-비밀번호 eduhub"
+#    같은 뜻의 짧은 형식: -h 127.0.0.1 -P 3306 -u eduhub_readonly -p각자-정한-비밀번호 eduhub
+#    비밀번호에 공백·특수문자가 있으면 작은따옴표로: --password='p w#1'
+```
+
+MariaDB일 때의 `.mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "eduhub-db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@benborla29/mcp-server-mysql"],
+      "env": {
+        "MYSQL_CONNECTION_STRING": "${EDUHUB_MARIADB_CONN}"
+      }
+    }
+  }
+}
+```
+
+> ⚠️ **MariaDB URI를 `MYSQL_CONNECTION_STRING`에 넣으면 오류 없이 잘못 연결됩니다.** 이 서버(v2.0.9)의 해석 코드를 직접 실행해 보니, `mariadb://eduhub_readonly:…@127.0.0.1:3306/eduhub`를 넣으면 **문자열 전체를 DB 이름으로** 읽고 호스트·계정은 기본값(`127.0.0.1`, **`root`**)을 씁니다. 읽기 전용 계정이 아니라 root로 접속을 시도하게 되므로 반드시 위의 명령줄 형식을 씁니다. 명령줄 형식은 `--host`, `--port`, `--user`, `--password`, `--socket`과 짧은 형식 `-h -P -u -p -S`, 마지막의 DB 이름을 읽습니다.
+
+> 💡 접속 문자열 하나 대신 `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASS`, `MYSQL_DB`로 나눠 넣는 방법은 [Step 8의 MariaDB 버전](#개발-db가-mariadb인-팀-step-78의-mariadb-버전)에 있습니다. 둘 다 있으면 접속 문자열 쪽 값이 우선합니다.
+
 - `${VAR}`, `${VAR:-기본값}`으로 **환경 변수**를 넣습니다. `.mcp.json`은 커밋되므로 **비밀번호를 파일에 쓰지 않습니다**
 - 팀원이 `.mcp.json`의 서버를 처음 쓸 때 **사용 승인 질문**이 나옵니다 (모르는 서버가 몰래 실행되지 않게 하는 장치)
 - 대화 중 `/mcp`로 연결 상태 확인, 인증, 재연결, 끄기·켜기를 합니다
