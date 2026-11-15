@@ -316,6 +316,103 @@ exit 0
 
 </details>
 
+**Windows 시연용 전체 보호 훅: `protect-files.ps1`**
+
+시연을 Step 3의 **전체 보호 규칙**(운영 설정, `.env`, 생성 코드, 기존 마이그레이션)으로 하려면 아래 PowerShell 스크립트를 씁니다. Step 3의 `protect-files.sh`와 **같은 규칙, 같은 메시지**입니다. Git Bash가 있는 Windows라면 `.sh`를 그대로 써도 됩니다 (1-3 Windows 설정 ①).
+
+```powershell
+# .claude/hooks/protect-files.ps1 — PreToolUse(Edit|Write): 보호 파일 수정 차단 (Windows PowerShell 버전)
+# Step 3의 protect-files.sh와 같은 규칙. 막을 때는 "이유 + 대신 할 일"을 stderr로 쓰고 exit 2
+
+# 한글 메시지가 깨지지 않도록 콘솔 출력 인코딩을 UTF-8로
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+function Block([string]$message) {
+    [Console]::Error.WriteLine($message)
+    exit 2
+}
+
+# 1) stdin으로 들어온 훅 입력(JSON)에서 수정하려는 파일 경로를 꺼낸다
+try {
+    $hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
+} catch {
+    exit 0   # 입력을 읽지 못하면 막지 않는다 (훅 오류로 모든 작업이 멈추지 않게)
+}
+$file = [string]$hookInput.tool_input.file_path
+if ([string]::IsNullOrEmpty($file)) { exit 0 }
+
+# 2) 경로 구분자를 / 로 통일 (C:\work\eduhub\.env → C:/work/eduhub/.env)
+$path = $file -replace '\\', '/'
+
+# 3) 보호 규칙 (위에서부터 검사. -match는 대소문자를 구분하지 않는다)
+if ($path -match 'application-prod\.yml$') {
+    Block '운영 설정은 사람이 PR로만 수정합니다. 개발 설정은 application-dev.yml을 수정하세요.'
+}
+if ($path -match '(^|/)\.env\.example$') {
+    exit 0   # .env.example은 변수 이름만 적는 파일이라 허용
+}
+if ($path -match '(^|/)\.env(\..+)?$') {
+    Block '비밀 파일은 수정하지 않습니다. 필요한 변수 이름은 .env.example에 추가하세요.'
+}
+if ($path -match '/api-client/src/generated/') {
+    Block "자동 생성 코드입니다. 'npm run generate:api'로 다시 생성하세요."
+}
+if ($path -match '/db/migration/V[^/]*\.sql$' -and (Test-Path -LiteralPath $file)) {
+    Block '기존 Flyway 마이그레이션은 수정할 수 없습니다. 다음 버전 번호로 새 파일을 추가하세요.'
+}
+exit 0
+```
+
+`.claude/settings.json` (또는 Windows 전용이면 `.claude/settings.local.json`)
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-files.ps1"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+| `protect-files.sh`와 다른 점 | 설명 |
+|---|---|
+| 입력 읽기 | `jq` 대신 `[Console]::In.ReadToEnd() \| ConvertFrom-Json` (jq 설치 불필요) |
+| 경로 구분자 | `$file -replace '\\', '/'`로 `\`를 `/`로 바꾼 뒤 검사 |
+| 대소문자 | `-match`는 대소문자를 구분하지 않는다 (Windows 파일 시스템과 같음). bash 버전은 구분한다 |
+| 입력이 깨졌을 때 | 막지 않고 `exit 0` (훅 오류 때문에 모든 수정이 멈추지 않게) |
+| 한글 | `[Console]::OutputEncoding`을 UTF-8로. **Windows PowerShell 5.1은 스크립트 파일을 "UTF-8 (BOM)"으로 저장**해야 한글 문자열을 바르게 읽는다 (VS Code 오른쪽 아래 인코딩 → "Save with Encoding" → UTF-8 with BOM). PowerShell 7(`pwsh.exe`)은 BOM 없이도 된다 |
+
+**PowerShell로 직접 테스트** (프로젝트 루트에서, Claude 없이)
+
+```powershell
+$hook = ".claude\hooks\protect-files.ps1"
+function Test-Hook($path) {
+  $json = @{ tool_input = @{ file_path = $path } } | ConvertTo-Json -Compress
+  $json | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $hook
+  "exit=$LASTEXITCODE  ($path)"
+}
+Test-Hook "C:\work\eduhub\backend\src\main\resources\application-prod.yml"   # 메시지 + exit=2
+Test-Hook "C:\work\eduhub\.env"                                                   # 메시지 + exit=2
+Test-Hook "C:\work\eduhub\.env.example"                                           # exit=0
+Test-Hook "C:\work\eduhub\frontend\packages\api-client\src\generated\api.ts"     # 메시지 + exit=2
+Test-Hook "C:\work\eduhub\backend\src\main\java\A.java"                           # exit=0
+```
+
+- 마이그레이션 규칙은 **실제로 있는 파일**일 때만 막습니다(`Test-Path`). 저장소의 기존 `V1__…sql` 경로로 시험해 exit=2를 확인합니다
+- `ConvertTo-Json`으로 입력을 만들면 경로의 `\`가 JSON에 맞게 자동으로 바뀌어 손으로 이스케이프할 필요가 없습니다
+
+> ⚠️ 이 교재 환경에는 PowerShell이 없어 **스크립트를 직접 실행해 보지 못했습니다.** 규칙 판별(정규식 5개)만 같은 규칙으로 10가지 경로(Windows·Linux 경로, `.env`/`.env.local`/`.env.example`, 생성 코드, 기존·새 마이그레이션, 일반 파일)에 대해 검증했습니다. 시연 전에 위 테스트를 Windows에서 한 번 실행해 주세요.
+
 **시연 전에 직접 테스트** (Claude 없이 훅만 실행)
 
 ```bash
@@ -635,6 +732,8 @@ if [[ "$FILE" == */db/migration/V*.sql && -f "$FILE" ]]; then
 fi
 exit 0
 ```
+
+> 💡 Windows PowerShell 버전(`protect-files.ps1`) 전체와 테스트 방법은 [1-4](#1-4-시연-훅이-막고-claude가-길을-바꾼다-강사-시연-3분)에 있습니다.
 
 **직접 테스트해 보기** (훅은 프로그램이므로 Claude 없이도 테스트할 수 있습니다)
 
