@@ -1275,7 +1275,7 @@ git push -u origin chore/quality-hooks
 
 ## Step 7. 개발 DB에 읽기 전용 계정 만들기
 
-이 작업은 **사람이 직접** 합니다. DB 권한은 Claude에게 맡기지 않습니다. 개발 DB가 **MariaDB**라면 [MariaDB 버전](#개발-db가-mariadb인-팀-step-78의-mariadb-버전)을 따릅니다.
+이 작업은 **사람이 직접** 합니다. DB 권한은 Claude에게 맡기지 않습니다. 개발 DB가 **MariaDB**라면 계정은 아래 [MariaDB용 SQL](#mariadb용-읽기-전용-계정-sql)로 만들고, 환경 변수와 `.mcp.json`은 [MariaDB 버전](#개발-db가-mariadb인-팀-step-78의-mariadb-버전)을 따릅니다.
 
 ```bash
 # 개발 DB 컨테이너에 접속 (컨테이너 이름은 팀 설정에 맞게)
@@ -1291,6 +1291,62 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO eduhub_readonly;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO eduhub_readonly;
 ALTER ROLE eduhub_readonly SET default_transaction_read_only = on;
 ```
+
+#### MariaDB용 읽기 전용 계정 SQL
+
+```bash
+# 개발 DB 컨테이너에 root로 접속 (컨테이너 이름은 팀 설정에 맞게)
+docker exec -it eduhub-mariadb mariadb -u root -p
+```
+
+```sql
+-- 개발 DB에서만 실행. 비밀번호는 팀 공유 금지, 각자 정한다
+-- ① 계정 만들기 + 안전 제한 (동시 접속 5개, 쿼리 하나당 최대 10초)
+CREATE USER 'eduhub_readonly'@'%' IDENTIFIED BY '각자-정한-비밀번호'
+  WITH MAX_USER_CONNECTIONS 5
+       MAX_STATEMENT_TIME 10;
+
+-- ② eduhub 스키마에만 읽기 권한 (앞으로 만들 테이블에도 자동 적용)
+GRANT SELECT, SHOW VIEW ON eduhub.* TO 'eduhub_readonly'@'%';
+
+-- ③ 확인: USAGE(접속만)와 eduhub의 SELECT, SHOW VIEW만 보여야 한다
+SHOW GRANTS FOR 'eduhub_readonly'@'%';
+```
+
+**PostgreSQL SQL과 무엇이 대응하나**
+
+| PostgreSQL | MariaDB | 설명 |
+|---|---|---|
+| `CREATE ROLE … LOGIN PASSWORD '…'` | `CREATE USER 'eduhub_readonly'@'%' IDENTIFIED BY '…'` | MariaDB 계정은 **'이름'@'접속 호스트'** 한 쌍이다. 내 PC에서 Docker 컨테이너로 접속하면 호스트가 컨테이너 네트워크 주소로 보이므로 `'%'`(어디서나)를 쓴다. **개발 DB에서만** |
+| `GRANT CONNECT …`, `GRANT USAGE ON SCHEMA …` | 필요 없음 | DB에 권한을 주면 접속할 수 있다 |
+| `GRANT SELECT ON ALL TABLES …` + `ALTER DEFAULT PRIVILEGES …` | `GRANT SELECT, SHOW VIEW ON eduhub.*` | **DB 단위 권한**이라 나중에 Flyway로 만든 테이블에도 그대로 적용된다. `SHOW VIEW`는 뷰 정의 조회용 |
+| `ALTER ROLE … SET default_transaction_read_only = on` | 계정 단위 설정 없음 | MariaDB는 **SELECT만 준 권한**이 핵심 방어선이다. 읽기 전용 트랜잭션은 MCP 서버가 건다 (`mcp-server-mysql` 기본값) |
+| (참고: `ALTER ROLE … SET statement_timeout`) | `WITH MAX_STATEMENT_TIME 10`, `MAX_USER_CONNECTIONS 5` | 큰 조인·전체 스캔 같은 무거운 쿼리와 접속 폭주를 막는 보조 장치. MariaDB 전용 문법 (MySQL에는 없음) |
+
+```bash
+# 확인: 쓰기는 권한 오류로 실패해야 한다 (macOS·Linux·Git Bash, mariadb 클라이언트가 있을 때)
+mariadb -h 127.0.0.1 -u eduhub_readonly -p eduhub -e "SELECT COUNT(*) FROM enrollment"   # 성공
+mariadb -h 127.0.0.1 -u eduhub_readonly -p eduhub -e "DELETE FROM enrollment"
+# ERROR 1142 (42000): DELETE command denied to user 'eduhub_readonly'@'…' for table `eduhub`.`enrollment`
+```
+
+```powershell
+# Windows PowerShell (mariadb 클라이언트가 없으면 컨테이너 안의 클라이언트로)
+docker exec -it eduhub-mariadb mariadb -u eduhub_readonly -p eduhub -e "SELECT COUNT(*) FROM enrollment"   # 성공
+docker exec -it eduhub-mariadb mariadb -u eduhub_readonly -p eduhub -e "DELETE FROM enrollment"           # ERROR 1142 … denied
+```
+
+**MariaDB에서 자주 막히는 곳**
+
+| 증상 | 원인 | 해결 (root로 실행) |
+|---|---|---|
+| 비밀번호가 맞는데 `ERROR 1045 Access denied for user 'eduhub_readonly'@'localhost'` | 기본 설치가 만든 **익명 사용자** `''@'localhost'`가 `'%'`보다 먼저 맞는다 | `SELECT user, host FROM mysql.user WHERE user = '';`로 확인하고, 나온 행마다 `DROP USER ''@'localhost';` (호스트 이름 행도 같은 방식) |
+| `SHOW DATABASES`에 `test`가 보이고, 읽기 전용 계정으로 `test`에 테이블을 만들 수 있다 | 기본 설치가 **모든 사용자(PUBLIC)**에게 `test` DB 권한을 준다. `SHOW GRANTS`에는 나오지 않는다 | ``REVOKE ALL PRIVILEGES ON `test`.* FROM PUBLIC;``, ``REVOKE ALL PRIVILEGES ON `test\_%`.* FROM PUBLIC;``, `DROP DATABASE IF EXISTS test;` |
+| `CREATE USER`에서 문법 오류 | MariaDB가 아니라 MySQL이다 | `WITH MAX_USER_CONNECTIONS …` 줄을 빼고 실행 (MySQL은 쿼리 시간 제한 방식이 다르다) |
+
+> 위 두 가지 기본 설정은 주로 **직접 설치한 MariaDB**(설치 프로그램, 패키지)에 남아 있습니다. 공식 Docker 이미지로 만든 개발 DB라도 `SHOW DATABASES`와 익명 사용자 확인은 한 번 해 봅니다.
+
+> ✅ MariaDB 10.11에서 위 SQL을 실행해 확인했습니다: `SELECT` 성공, `DELETE`·`UPDATE`·`CREATE`·`DROP`은 `ERROR 1142`로 거부, 다른 DB(`mysql`) 조회 거부, 계정을 만든 **뒤에** 생긴 테이블도 조회 가능, 제한 시간을 넘긴 쿼리는 `max_statement_time exceeded`로 중단. 익명 사용자와 `test` DB 문제도 실제로 재현한 뒤 위 해결 방법으로 풀리는 것을 확인했습니다.
 
 ```bash
 # macOS·Linux·WSL: 셸 프로필(~/.zshrc, ~/.bashrc)에 추가 (.env로 관리하려면 아래 "접속 정보를 .env로 관리하려면")
@@ -1609,19 +1665,7 @@ EduHub의 기준 DB는 PostgreSQL이지만, 회사 표준이 MariaDB라면 Step 
 
 **① 읽기 전용 계정 만들기 (Step 7의 MariaDB 버전, 사람이 직접)**
 
-```bash
-# 개발 DB 컨테이너에 접속 (컨테이너 이름은 팀 설정에 맞게)
-docker exec -it eduhub-mariadb mariadb -u root -p
-```
-
-```sql
--- 개발 DB에서만 실행. 비밀번호는 팀 공유 금지, 각자 정한다
-CREATE USER 'eduhub_readonly'@'%' IDENTIFIED BY '각자-정한-비밀번호';
-GRANT SELECT, SHOW VIEW ON eduhub.* TO 'eduhub_readonly'@'%';
-SHOW GRANTS FOR 'eduhub_readonly'@'%';   -- SELECT, SHOW VIEW만 있는지 확인
-```
-
-> 💡 PostgreSQL처럼 계정 단위로 "기본 읽기 전용 트랜잭션"을 거는 설정 대신, MariaDB에서는 **SELECT 권한만 주는 것**이 핵심 방어선입니다. `eduhub.*`처럼 **필요한 스키마에만** 권한을 줍니다.
+계정을 만드는 SQL, PostgreSQL과의 대응, 확인 방법, 자주 막히는 곳은 Step 7의 [MariaDB용 읽기 전용 계정 SQL](#mariadb용-읽기-전용-계정-sql)에 있습니다. 핵심은 **SELECT 권한만, `eduhub.*`처럼 필요한 스키마에만** 주는 것입니다.
 
 ```bash
 # macOS·Linux·WSL: 셸 프로필(~/.zshrc, ~/.bashrc)에 추가 (.env로 관리하려면 "접속 정보를 .env로 관리하려면")
