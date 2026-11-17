@@ -526,6 +526,38 @@ flowchart LR
 | `project` | 프로젝트 루트 **`.mcp.json`** | ○ (Git) | ⭐ **팀 공용 서버** |
 | `user` | `~/.claude.json` | ✕ | 모든 프로젝트에서 쓰는 개인 서버 |
 
+**`.mcp.json`은 어디에 두나요?** 저장소 루트, 즉 `CLAUDE.md`와 `.claude/` 폴더가 있는 **같은 위치**에 둡니다. `.claude/` 폴더 **안이 아닙니다.**
+
+```text
+eduhub/                       ← 저장소 루트 (Claude Code를 시작하는 폴더)
+├── .mcp.json                 ← ⭐ 여기 (project 범위 MCP 서버, Git에 커밋)
+├── CLAUDE.md
+├── .claude/
+│   ├── settings.json         ← 권한·훅 (MCP 서버 목록은 여기가 아니다)
+│   ├── settings.local.json
+│   └── hooks/
+├── backend/
+└── frontend/
+```
+
+| 확인할 것 | 설명 |
+|---|---|
+| 파일 이름 | 점으로 시작하는 `.mcp.json`. Windows 탐색기에서 만들면 `.mcp.json.txt`가 되기 쉬우니 VS Code나 `claude mcp add --scope project …`로 만든다 |
+| 잘못된 위치 | `.claude/.mcp.json`, `backend/.mcp.json`처럼 다른 폴더에 두면 서버가 등록되지 않는다 |
+| local·user 범위 | `.mcp.json`이 아니라 홈 폴더의 `~/.claude.json`에 저장된다 (Windows: `C:\Users\<사용자 이름>\.claude.json`) |
+| `claude mcp add` | 범위 옵션이 없으면 **local**로 저장된다. `.mcp.json`에 넣으려면 `--scope project` |
+| 반영 | 파일을 고친 뒤 Claude Code를 다시 시작하고 `/mcp`에서 확인. 처음 쓸 때 사용 승인 질문이 나온다 |
+
+```bash
+# 저장소 루트에서 위치 확인 (macOS·Linux·Git Bash)
+ls -a | grep mcp          # .mcp.json
+```
+
+```powershell
+# Windows PowerShell
+Get-ChildItem -Force -Filter .mcp.json   # 숨김 파일까지 표시
+```
+
 ```json
 {
   "mcpServers": {
@@ -1462,7 +1494,7 @@ winget install --id=astral-sh.uv -e
 uvx --version     # 설치 확인
 ```
 
-**② 프로젝트 루트에 `.mcp.json` 만들기** (터미널에서는 `claude mcp add --scope project …`로도 만들 수 있습니다)
+**② 프로젝트 루트에 `.mcp.json` 만들기**: 파일 위치는 저장소 루트의 `eduhub/.mcp.json`입니다 (`.claude/` 안이 아님, [2-2의 위치 그림](#2-2-연결-범위와-mcpjson)). 터미널에서는 `claude mcp add --scope project …`로도 만들 수 있습니다
 
 ```json
 {
