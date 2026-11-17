@@ -1,7 +1,7 @@
 # Claude Code 개발자 교육과정 커리큘럼
 
 > 대상: 실무 개발자
-> 기간: 9주(주 1회 3시간) 또는 5일 집중과정
+> 기간: 10주(주 1회 3시간) 또는 5일 집중과정
 > 구성: 5단계, 20개 모듈 + 선택 심화 모듈(RAG)과 캡스톤 프로젝트
 > 실습 예제: Java + Spring Boot + JPA/Hibernate + OpenAPI/Swagger + React + Microfrontend + MUI + Axios 기반 [EduHub 프로젝트](./examples/00-sample-project.md)
 
@@ -440,7 +440,7 @@
 
 ---
 
-## 🗓 일정 예시 (9주 과정)
+## 🗓 일정 예시 (10주 과정)
 
 | 주차 | 단계 | 모듈 |
 |---|---|---|
@@ -452,7 +452,8 @@
 | 6주 | 확장 | 14, 15 |
 | 7주 | 확장 · 조직 적용 | 16, 19 |
 | 8주 | 조직 적용 | 17, 18, 20 (+ 선택: 심화 A RAG) |
-| 9주 | 캡스톤 | 발표 및 피드백 |
+| 9주 | Wrap-up | 1~8주 전체 점검, 자가 진단, 캡스톤 리허설 |
+| 10주 | 캡스톤 | 발표 및 피드백 |
 
 ---
 
@@ -468,7 +469,8 @@
 | 6회차 | [session-06-plugins-artifacts-mfe.md](./sessions/session-06-plugins-artifacts-mfe.md) | 마이크로프론트엔드 분리와 병렬 작업, 팀 플러그인 패키징, 아티팩트 진행 리포트 / EduHub FR-09 알림 |
 | 7회차 | [session-07-cicd-framework-tokens.md](./sessions/session-07-cicd-framework-tokens.md) | GitHub Actions CI, 승인 기반 스테이징 배포, 환경 분리 완성과 런북, 사내 공통 모듈 적용, 토큰 사용량 측정·개선 / NFR-05, NFR-06 |
 | 8회차 | [session-08-automation-sdk-governance.md](./sessions/session-08-automation-sdk-governance.md) | 헤드리스·CI 자동 리뷰, Agent SDK, 거버넌스, 성능(N+1) 개선과 보안 점검, AI 없이 핫픽스 훈련 / NFR-02, NFR-03 |
-| 9회차 | [session-09-capstone.md](./sessions/session-09-capstone.md) | 캡스톤 발표(구조 설명, 직접 수정·빌드 시연), 평가 루브릭, 과정 회고, 팀 도입 로드맵 |
+| 9회차 | [session-09-wrap-up.md](./sessions/session-09-wrap-up.md) | Wrap-up: 1~8회차 핵심 다시 보기, 개인 자가 진단·종합 퀴즈, 팀 EduHub 점검(요구사항·구성·보안), 캡스톤 리허설 |
+| 10회차 | [session-10-capstone.md](./sessions/session-10-capstone.md) | 캡스톤 발표(구조 설명, 직접 수정·빌드 시연), 평가 루브릭, 과정 회고, 팀 도입 로드맵 |
 
 ---
 

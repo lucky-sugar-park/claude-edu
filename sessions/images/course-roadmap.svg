@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif">
   <rect width="960" height="360" fill="#ffffff"/>
-  <text x="480" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#1f2937">Claude Code 개발자 교육과정 로드맵 (9주)</text>
+  <text x="480" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#1f2937">Claude Code 개발자 교육과정 로드맵 (10주)</text>
   <defs>
     <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/></marker>
   </defs>
@@ -52,6 +52,6 @@
     <line x1="562" y1="175" x2="581" y2="175"/>
     <line x1="750" y1="175" x2="769" y2="175"/>
   </g>
-  <rect x="300" y="295" width="360" height="44" rx="22" fill="#1f2937"/>
-  <text x="480" y="323" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">🏁 9주차: 캡스톤 프로젝트 발표</text>
+  <rect x="200" y="295" width="560" height="44" rx="22" fill="#1f2937"/>
+  <text x="480" y="323" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">🔁 9주차: Wrap-up 점검 → 🏁 10주차: 캡스톤 프로젝트 발표</text>
 </svg>

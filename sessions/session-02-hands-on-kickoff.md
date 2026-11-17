@@ -372,7 +372,7 @@ erDiagram
 
 ## 3-6. 7주 진행 계획
 
-> 2주차(오늘)부터 8주차까지 7주 동안 진행하고, 9주차 캡스톤 발표에서 결과를 보여 줍니다. 매주 배우는 Claude Code 기능을 **그 주의 EduHub 작업에 바로 적용**하는 방식입니다.
+> 2주차(오늘)부터 8주차까지 7주 동안 진행하고, 9주차 Wrap-up에서 전체를 다시 점검한 뒤 10주차 캡스톤 발표에서 결과를 보여 줍니다. 매주 배우는 Claude Code 기능을 **그 주의 EduHub 작업에 바로 적용**하는 방식입니다.
 
 | 주 | 주차 | EduHub 목표 | 함께 배우는 Claude Code 기능 (모듈) | 주요 산출물 |
 |---|---|---|---|---|
@@ -383,9 +383,10 @@ erDiagram
 | **5주** | 6주차 | 마이크로프론트엔드 분리 완성, 알림(FR-09) | 플러그인, 아티팩트(진행 리포트) (14, 15) | 팀 플러그인, 진행 현황 아티팩트 |
 | **6주** | 7주차 | CI/CD, 스테이징 배포, 환경 분리 완성(NFR-06) | 사내 프레임워크 적용, 토큰 최적화 측정 (16, 19) | GitHub Actions, 런북, 사용량 리포트 |
 | **7주** | 8주차 | 성능 개선(NFR-02), 보안 점검, **AI 없이 핫픽스 훈련** | 헤드리스·CI 자동 리뷰, Agent SDK, 거버넌스 (17, 18, 20) | 성능 리포트, 핫픽스 훈련 기록 |
-| — | 9주차 | **캡스톤 발표** | — | 데모, 구조 설명, 직접 수정·빌드 시연 |
+| — | 9주차 | **Wrap-up**: 1~8회차 점검, 남은 일 정리 | 전체 복습, 자가 진단, 캡스톤 리허설 | `docs/wrap-up.md` (남은 일 목록) |
+| — | 10주차 | **캡스톤 발표** | — | 데모, 구조 설명, 직접 수정·빌드 시연 |
 
-> 📎 주차별 강의 자료: [3회차](./session-03-feature-dev-and-github.md) · [4회차](./session-04-permissions-skills-subagents.md) · [5회차](./session-05-hooks-and-mcp.md) · [6회차](./session-06-plugins-artifacts-mfe.md) · [7회차](./session-07-cicd-framework-tokens.md) · [8회차](./session-08-automation-sdk-governance.md) · [9회차](./session-09-capstone.md)
+> 📎 주차별 강의 자료: [3회차](./session-03-feature-dev-and-github.md) · [4회차](./session-04-permissions-skills-subagents.md) · [5회차](./session-05-hooks-and-mcp.md) · [6회차](./session-06-plugins-artifacts-mfe.md) · [7회차](./session-07-cicd-framework-tokens.md) · [8회차](./session-08-automation-sdk-governance.md) · [9회차](./session-09-wrap-up.md) · [10회차](./session-10-capstone.md)
 
 ---
 
@@ -415,7 +416,7 @@ flowchart LR
 | 주간 회고에 `/usage` 결과와 토큰을 아낀 방법 1개 기록 | 토큰 절약 습관을 숫자로 확인 |
 | 운영 비밀·운영 접속 정보는 어떤 경우에도 저장소와 대화에 넣지 않음 | 환경 분리 |
 
-**평가 (9주차 캡스톤과 함께)**
+**평가 (10주차 캡스톤과 함께)**
 
 | 항목 | 비중 | 보는 것 |
 |---|---|---|
