@@ -16,7 +16,7 @@
 | **구현** | `backend-dev` | Spring Boot 계층 구현, Flyway | ○ `backend/` | 기본 |
 | | `frontend-dev` | React 화면, 훅, MUI, API 클라이언트 연결 | ○ `frontend/` | 기본 |
 | **테스트** | `backend-test-writer` | JUnit 5, Mockito, `@DataJpaTest`, Testcontainers | ○ 테스트 폴더 | 기본 |
-| | `frontend-test-writer` | Jest/Vitest, React Testing Library, API 모킹 | ○ 테스트 파일 | 기본 |
+| | `frontend-test-writer` | Vitest(또는 Jest), React Testing Library, API 모킹 | ○ 테스트 파일 | 기본 |
 | | `e2e-tester` | Playwright로 화면 시나리오 검증 | ○ e2e 폴더 | 기본 |
 | **리뷰** | `jpa-reviewer` | N+1, fetch 전략, 트랜잭션, 락 | ✕ | 기본 |
 | | `spring-api-reviewer` | REST 설계, 검증, 예외 처리, OpenAPI 문서 | ✕ | 기본 |

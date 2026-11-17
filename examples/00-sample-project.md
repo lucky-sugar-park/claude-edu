@@ -36,7 +36,7 @@
 | 마이크로프론트엔드 | Vite + Module Federation (`@module-federation/vite`) | shell(host) + 2개 remote. Webpack 5 Module Federation으로도 같은 구조 |
 | UI 라이브러리 | MUI (Material UI) | 공통 테마는 shell에서 제공 |
 | HTTP 클라이언트 | Axios | OpenAPI 스펙으로 클라이언트 코드 자동 생성 |
-| 테스트 | JUnit 5, Mockito, `@DataJpaTest` / Jest, React Testing Library | |
+| 테스트 | JUnit 5, Mockito, `@DataJpaTest` / Vitest, React Testing Library | |
 
 ---
 

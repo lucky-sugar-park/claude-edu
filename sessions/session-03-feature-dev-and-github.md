@@ -326,6 +326,41 @@ git worktree list
 git worktree remove ../eduhub-fr-03   # 끝나면 정리
 ```
 
+### 데스크톱 앱에서 worktree 두 개로 작업하기
+
+**기본 방법: 세션마다 Worktree 켜기** (서로 독립된 세션 두 개)
+
+1. 사이드바의 **+ New**(Ctrl/Cmd+N)로 새 세션을 엽니다
+2. 프롬프트 입력창 아래 줄의 **Worktree**를 켠 뒤 첫 메시지를 보냅니다 (세션을 시작하기 **전에** 켜야 합니다. 기본값은 꺼짐)
+3. 같은 방법으로 두 번째 세션을 엽니다
+4. worktree는 `<프로젝트 루트>/.claude/worktrees/` 아래에 만들어집니다 (위치와 브랜치 접두사는 Settings → Claude Code의 "Worktree location"에서 바꿀 수 있음)
+
+> 이렇게 만든 두 세션은 사이드바에 **나란히(형제로)** 표시됩니다. main 세션 아래에 들어가지 않습니다. 사이드바의 세션 목록 제목에 마우스를 올리면 나오는 **Group and sort**로 정렬·묶음 방식을 바꿀 수 있지만, 세션을 다른 세션 아래로 직접 옮기는 기능은 공식 문서에 없습니다.
+
+**두 작업을 main 세션 "아래"에서 관리하고 싶다면**
+
+| 방법 | 어떻게 | 어디에 보이나 | 언제 쓰나 |
+|---|---|---|---|
+| ① main 세션 안의 **서브에이전트** (worktree 격리) | main 세션에서 아래처럼 지시한다 | 사이드바가 아니라 main 세션의 **Background tasks**(작업 창, 제목 표시줄 ⋮ 메뉴) | 두 작업을 한 대화에서 지휘하고 결과를 main에서 모아 보고 싶을 때 |
+| ② main 세션의 **제안 작업(Suggested tasks) → Start** | Claude가 제안한 작업 카드의 **Start**를 누른다 | 시작된 세션이 사이드바에서 **현재 세션 아래**에 표시된다 | Claude가 나눠서 할 일을 제안했을 때 |
+| ③ 독립 세션 두 개 (위 기본 방법) | **+ New** + **Worktree** | 사이드바에 나란히 | 각 작업과 직접 대화하며 진행할 때 (⭐ 오늘 실습) |
+
+**① 서브에이전트로 나누는 지시 예** (main 세션, Plan 모드)
+
+```text
+FR-01 목록 API와 FR-03 등록·수정 API를 서브에이전트 두 개로 병렬 진행해줘.
+각 서브에이전트는 자기 git worktree에서 작업하고(worktree 격리), 브랜치는
+feature/fr-01-course-list, feature/fr-03-course-admin 으로 해.
+각자 테스트를 통과시킨 뒤 커밋까지만 하고, 끝나면 바뀐 파일과 테스트 결과를 요약해서 알려줘.
+병합과 PR은 내가 결과를 본 뒤에 직접 한다.
+```
+
+- 서브에이전트를 매번 worktree에서 돌리려면, 팀의 서브에이전트 정의 파일(`.claude/agents/<이름>.md`) 머리에 `isolation: worktree`를 넣습니다 (서브에이전트 정의 파일은 4회차에서 다룸)
+- 서브에이전트는 **중간에 직접 대화하며 방향을 바꾸기 어렵고**, 결과도 요약으로 돌아옵니다. 그래서 diff를 직접 검토하는 연습을 하는 오늘은 ③을 씁니다. 6회차의 병렬 작업에서도 같은 이유로 독립 세션을 권합니다
+- 결과 확인: 각 worktree 브랜치의 diff를 직접 보고(데스크톱 앱의 diff 화면, 또는 `git diff main...feature/fr-01-course-list`) PR로 병합합니다
+
+> 출처: Claude Code 공식 문서 [Desktop](https://code.claude.com/docs/en/desktop), [Worktrees](https://code.claude.com/docs/en/worktrees) (2026년 11월 확인). 데스크톱 앱 화면은 자주 바뀌므로 메뉴 이름과 위치가 다를 수 있습니다. 이 교재 환경에서 데스크톱 앱 화면을 직접 확인하지는 못했습니다.
+
 > ⚠️ 병렬 세션 수는 **내가 리뷰할 수 있는 만큼만**. 혼자서 세 개를 돌리면 diff 세 개를 검토해야 합니다. 오늘은 두 개까지만 해 봅니다. 데스크톱 앱에서 worktree 세션을 보관(archive)하면 커밋하지 않은 변경이 사라질 수 있으니 먼저 커밋합니다.
 
 ---
@@ -663,7 +698,8 @@ cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
 [위치] frontend/apps/course-mfe (없으면 새로 만든다), frontend/packages/api-client
 [범위]
 - api-client: openapi-generator(typescript-axios)로 http://localhost:8080/v3/api-docs 에서 생성하는 npm 스크립트 generate:api
-- course-mfe: React 18 + TypeScript + MUI, 단독 실행(npm run dev, 포트 3001)
+- course-mfe: Vite + React 18 + TypeScript + MUI, 단독 실행(npm run dev, 포트 3001)
+- 테스트 도구: Vitest + React Testing Library + jsdom (npm test = vitest run)
 - 생성된 CourseApi 인스턴스는 src/api/courseApi.ts 한 곳에서만 만든다 (Axios 인스턴스 직접 생성 금지)
 - 목록 조회는 커스텀 훅 src/hooks/useCourses.ts 로 분리: 입력 {keyword, category, page, size}, 출력 {data, loading, error}
   - page는 0부터, 받은 값을 그대로 API에 전달 (백엔드 Pageable과 MUI TablePagination 모두 0부터)
@@ -700,8 +736,66 @@ frontend/apps/course-mfe/src/
     └── CourseListPage.test.tsx   # 화면 테스트 (useCourses를 mock)
 ```
 
-> ✅ 아래 코드는 React 18, MUI 6, Jest 29, React Testing Library 16 환경에서 테스트 4개와 타입 검사가 통과하는 것을 확인했습니다 (생성 클라이언트는 같은 모양의 스텁으로 대신함).
-> 테스트 도구는 Jest + React Testing Library입니다. 훅 테스트의 `renderHook`은 `@testing-library/react`(13.1 이상)에 들어 있습니다.
+> ✅ 아래 코드는 Vite 8.3, React 18.3, MUI 6.5, **Vitest 5.1**, React Testing Library 16.3, jsdom 31 환경에서 테스트 4개, 타입 검사(`tsc --noEmit`), `vite build`가 모두 통과하는 것을 확인했습니다 (생성 클라이언트는 같은 모양의 스텁으로 대신함).
+> 테스트 도구는 **Vitest + React Testing Library**입니다. Vite 프로젝트에서는 Vite 설정을 그대로 쓰는 Vitest가 자연스럽고, 6주차 Module Federation도 Vite 기준입니다 ([6회차 1-4](./session-06-plugins-artifacts-mfe.md#1-4-vite로-module-federation-구성하기-실습-기준)). 훅 테스트의 `renderHook`은 `@testing-library/react`(13.1 이상)에 들어 있습니다.
+
+**Vite 프로젝트와 테스트 환경** (Claude가 만든 설정을 이것과 비교합니다)
+
+```bash
+# frontend/ (npm workspaces)에서 설치
+npm install --workspace apps/course-mfe react@18 react-dom@18 @mui/material @emotion/react @emotion/styled
+npm install -D --workspace apps/course-mfe vite @vitejs/plugin-react typescript @types/react@18 @types/react-dom@18 \
+  vitest jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom
+```
+
+> 💡 `npm create vite@latest course-mfe -- --template react-ts`로 뼈대를 만들 수도 있지만, 이 템플릿은 **React 19**를 설치합니다. EduHub는 MUI·Module Federation 공유 설정을 React 18 기준으로 맞추므로 `react@18`, `react-dom@18`로 맞춥니다.
+
+```json
+// frontend/apps/course-mfe/package.json 의 scripts
+"scripts": {
+  "dev": "vite",
+  "build": "tsc --noEmit && vite build",
+  "preview": "vite preview",
+  "test": "vitest run",
+  "test:watch": "vitest"
+}
+```
+
+```ts
+/// <reference types="vitest/config" />
+// frontend/apps/course-mfe/vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: { port: 3001, strictPort: true },
+  preview: { port: 3001, strictPort: true },
+  test: {
+    environment: "jsdom",            // 브라우저 대신 jsdom에서 컴포넌트를 렌더링
+    setupFiles: ["./src/setupTests.ts"],
+  },
+});
+```
+
+```ts
+// frontend/apps/course-mfe/src/setupTests.ts
+// toBeInTheDocument, toHaveTextContent 같은 DOM 전용 검사를 Vitest의 expect에 추가
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+afterEach(() => cleanup()); // 테스트마다 렌더링한 화면을 정리
+```
+
+| Jest | Vitest | 설명 |
+|---|---|---|
+| `jest.mock('…')`, `jest.fn()` | `vi.mock('…')`, `vi.fn()` | 이름만 바뀐다. `vi.mock`도 파일 맨 위로 끌어올려진다 |
+| `x as jest.Mock` | `vi.mocked(x)` | 타입이 원래 함수 모양을 유지해 `mockResolvedValue` 인자도 타입 검사된다 |
+| 전역 `test`, `expect` | `import { test, expect, vi } from 'vitest'` | 전역으로 쓰려면 `test.globals: true` (이 교재는 import 방식) |
+| `jest.config.js`, Babel·ts-jest 설정 | `vite.config.ts`의 `test` 한 곳 | Vite의 변환 설정을 그대로 쓰므로 별도 변환 설정이 필요 없다 |
+| `@testing-library/jest-dom` | `@testing-library/jest-dom/vitest` | `toBeInTheDocument` 같은 DOM 검사 추가 |
+| `beforeEach(() => mock.mockReset())` | `beforeEach(() => { mock.mockReset(); })` | ⚠️ **Vitest는 `beforeEach`가 돌려준 함수를 테스트가 끝난 뒤 실행**한다. 중괄호 없이 쓰면 `mockReset()`이 돌려준 mock 자신이 테스트 뒤에 한 번 더 호출되어, 거부된 Promise로 테스트가 실패한다 (실제로 겪은 문제) |
 
 ```ts
 // frontend/apps/course-mfe/src/api/courseApi.ts
@@ -823,11 +917,12 @@ export function CourseListPage() {
 ```ts
 // frontend/apps/course-mfe/src/hooks/useCourses.test.ts
 import { renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { courseApi } from '../api/courseApi';
 import { useCourses } from './useCourses';
 
-jest.mock('../api/courseApi', () => ({ courseApi: { getCourses: jest.fn() } }));
-const getCourses = courseApi.getCourses as jest.Mock;
+vi.mock('../api/courseApi', () => ({ courseApi: { getCourses: vi.fn() } }));
+const getCourses = vi.mocked(courseApi.getCourses);
 
 const pageOf = (titles: string[]) => ({
   data: {
@@ -838,7 +933,9 @@ const pageOf = (titles: string[]) => ({
   },
 });
 
-beforeEach(() => getCourses.mockReset());
+beforeEach(() => {
+  getCourses.mockReset(); // 중괄호 필수: Vitest는 beforeEach가 돌려준 함수를 테스트 뒤에 실행한다
+});
 
 test('과정 목록을 불러와 data로 돌려준다', async () => {
   getCourses.mockResolvedValue(pageOf(['Spring Boot 입문', 'JPA 실전']));
@@ -868,12 +965,13 @@ test('API 호출이 실패하면 error를 돌려준다', async () => {
 ```tsx
 // frontend/apps/course-mfe/src/pages/CourseListPage.test.tsx
 import { render, screen } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
 import { useCourses } from '../hooks/useCourses';
 import { CourseListPage } from './CourseListPage';
 
 // 화면 테스트는 훅을 mock한다. API 호출 방식은 useCourses.test.ts가 따로 검증한다
-jest.mock('../hooks/useCourses');
-const mockUseCourses = useCourses as jest.Mock;
+vi.mock('../hooks/useCourses');
+const mockUseCourses = vi.mocked(useCourses);
 
 test('과정 목록을 표로 보여 준다', () => {
   mockUseCourses.mockReturnValue({
@@ -1049,11 +1147,26 @@ test('화면 페이지 0을 요청하면 API에 page=0을 그대로 보낸다 (�
 **버그가 있는 상태의 실행 결과** (실제로 실패해야 재현 테스트입니다)
 
 ```text
-✕ 화면 페이지 0을 요청하면 API에 page=0을 그대로 보낸다 (첫 페이지 누락 버그 재현)
-    Expected: undefined, undefined, 0, 10
-    Received: undefined, undefined, 1, 10
-Tests:       1 failed, 2 passed, 3 total
+ FAIL  src/hooks/useCourses.test.ts > 화면 페이지 0을 요청하면 API에 page=0을 그대로 보낸다 (첫 페이지 누락 버그 재현)
+AssertionError: expected "vi.fn()" to be called with arguments: [ undefined, undefined, +0, 10 ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    undefined,
+    undefined,
+-   0,
++   1,
+    10,
+  ]
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 4 passed (5)
 ```
+
+> `-`가 기대한 값(0), `+`가 실제로 보낸 값(1)입니다. Vitest는 0을 `+0`으로 표시합니다.
 
 **④ 수정은 직접**: 원인이 `page + 1` 한 줄이므로 IDE에서 **직접** 고치고 Claude에게 알립니다.
 
@@ -1061,7 +1174,7 @@ Tests:       1 failed, 2 passed, 3 total
 방금 useCourses.ts 의 page + 1 을 page 로 직접 고쳤어. 재현 테스트와 전체 프론트 테스트를 실행해줘.
 ```
 
-> ✅ 고친 뒤에는 `Tests: 5 passed`(훅 3개 + 화면 2개)가 나옵니다.
+> ✅ 고친 뒤에는 `Tests  5 passed (5)`(훅 3개 + 화면 2개)가 나옵니다. 위 실패 출력과 통과 결과는 이 교재 환경에서 버그를 실제로 넣고 빼며 확인한 것입니다.
 
 **⑤⑥** 전체 테스트 통과 확인 → `fix(course-mfe): 과정 목록 첫 페이지 누락 수정` 커밋 → PR → 병합
 
@@ -1106,6 +1219,8 @@ main을 병합하면서 ErrorCode.java 에 충돌이 생겼어.
 claude --worktree fr-02-detail-ui      # 터미널 1
 claude --worktree fr-03-admin-ui       # 터미널 2
 ```
+
+데스크톱 앱에서는 **+ New** → **Worktree** 켜기로 세션 두 개를 엽니다. 두 작업을 main 세션 아래에서 관리하는 방법은 [3-2의 데스크톱 앱 절](#데스크톱-앱에서-worktree-두-개로-작업하기)을 봅니다.
 
 **관찰할 점**: 두 세션이 서로의 파일을 건드리지 않는가? 두 diff를 모두 검토하는 데 얼마나 걸렸나? → "병렬 수는 리뷰 가능한 만큼"을 체감합니다. ([병렬 작업 비교](../examples/17-parallel-work-terminal-vs-desktop.md))
 
