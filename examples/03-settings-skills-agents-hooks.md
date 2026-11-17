@@ -200,9 +200,12 @@ exit 0
 ### 수정 금지 파일 보호 (PreToolUse)
 
 ```bash
-# .claude/hooks/protect-files.sh
 #!/usr/bin/env bash
+# .claude/hooks/protect-files.sh
+# jq가 없으면 검사할 수 없으므로 막는다 (그냥 두면 FILE이 비어 모든 수정이 통과된다)
+command -v jq >/dev/null 2>&1 || { echo "jq가 없어 보호 훅이 검사할 수 없습니다. 사람이 jq를 설치하세요." >&2; exit 2; }
 FILE=$(jq -r '.tool_input.file_path // empty')
+FILE="${FILE//\\//}"   # Windows 경로의 \ 를 / 로
 
 if [[ "$FILE" == *"/api-client/src/generated/"* ]]; then
   echo "자동 생성 코드는 직접 수정할 수 없습니다. npm run generate:api를 사용하세요." >&2

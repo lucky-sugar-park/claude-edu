@@ -251,6 +251,8 @@ sequenceDiagram
 ```bash
 #!/usr/bin/env bash
 # .claude/hooks/protect-prod-config.sh — PreToolUse(Edit|Write): 운영 설정 파일 수정 차단 (1-4 시연용)
+# jq가 없으면 검사할 수 없으므로 통과시키지 않고 막는다 (그냥 두면 보호가 조용히 꺼진다)
+command -v jq >/dev/null 2>&1 || { echo "jq가 없어 보호 훅이 검사할 수 없습니다. 사람이 jq를 설치하세요 (Windows: winget install jqlang.jq)." >&2; exit 2; }
 FILE=$(jq -r '.tool_input.file_path // empty')
 FILE="${FILE//\\//}"   # Windows 경로의 \ 를 / 로 바꿔 아래 패턴이 맞게 한다
 
@@ -431,13 +433,33 @@ echo '{"tool_input":{"file_path":"/x/backend/src/main/resources/application-dev.
   | bash .claude/hooks/protect-prod-config.sh; echo "exit=$?"     # exit=0
 ```
 
+**Windows PowerShell에서 테스트** (저장소 루트에서. 위 bash 명령은 줄 끝 `\`, `$?` 때문에 PowerShell·cmd에서는 문법 오류가 납니다)
+
 ```powershell
-# Windows PowerShell 버전
-'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' |
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude\hooks\protect-prod-config.ps1; "exit=$LASTEXITCODE"   # exit=2
+# ① bash 스크립트(.sh)를 Git Bash로 실행해서 테스트 (Git for Windows 설치 시, 교육 기본)
+$bash = "C:\Program Files\Git\bin\bash.exe"
+'{"tool_input":{"file_path":"/x/backend/src/main/resources/application-prod.yml"}}' | & $bash .claude/hooks/protect-prod-config.sh; "exit=$LASTEXITCODE"   # 메시지 + exit=2
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' | & $bash .claude/hooks/protect-prod-config.sh; "exit=$LASTEXITCODE"   # exit=2
+'{"tool_input":{"file_path":"/x/backend/src/main/resources/application-dev.yml"}}' | & $bash .claude/hooks/protect-prod-config.sh; "exit=$LASTEXITCODE"   # exit=0
+
+# ② PowerShell 스크립트(.ps1)를 테스트 (Git Bash 없이 PowerShell 훅을 쓸 때)
+$ps1 = ".claude\hooks\protect-prod-config.ps1"
+'{"tool_input":{"file_path":"/x/backend/src/main/resources/application-prod.yml"}}' | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1; "exit=$LASTEXITCODE"   # 메시지 + exit=2
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1; "exit=$LASTEXITCODE"   # exit=2
+'{"tool_input":{"file_path":"/x/backend/src/main/resources/application-dev.yml"}}' | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1; "exit=$LASTEXITCODE"   # exit=0
 ```
 
-> ✅ bash 버전은 위 세 테스트(Linux 경로 차단, Windows 경로 차단, 개발 설정 통과)를 실행해 결과를 확인했습니다.
+| bash | PowerShell | 이유 |
+|---|---|---|
+| `echo '…' \| …` | `'…' \| …` | PowerShell은 문자열만 써도 파이프로 넘어간다 |
+| 줄 끝 `\`로 이어 쓰기 | 한 줄로 쓰거나 줄 끝을 `\|`로 끝내기 | `\`는 PowerShell의 줄 이음이 아니다 |
+| `echo "exit=$?"` | `"exit=$LASTEXITCODE"` | PowerShell의 `$?`는 True/False. 외부 프로그램의 종료 코드는 `$LASTEXITCODE` |
+| `bash …` | `& $bash …` (Git Bash 경로 지정) | PowerShell에서 그냥 `bash`는 WSL의 bash를 실행할 수 있다 (그 안에는 jq가 없을 수 있음) |
+| JSON 안의 `C:\\work` | 그대로 `C:\\work` | JSON 문법상 `\`는 `\\`로 써야 하고, 작은따옴표 문자열은 PowerShell이 바꾸지 않는다 |
+
+> cmd(명령 프롬프트)는 작은따옴표를 문자열로 인식하지 않아 위 명령을 그대로 쓸 수 없습니다. Windows에서는 Git Bash 창이나 PowerShell을 씁니다.
+
+> ✅ bash 버전은 위 세 테스트(Linux 경로 차단, Windows 경로 차단, 개발 설정 통과)를 실행해 결과를 확인했습니다. PowerShell 명령은 이 교재 환경에 PowerShell이 없어 실행해 보지 못했으니 시연 전에 한 번 실행해 주세요.
 
 **시연 순서**
 
@@ -749,7 +771,7 @@ jq --version                    # 없으면 winget install jqlang.jq 후 터미�
 New-Item -ItemType Directory -Force .claude\hooks | Out-Null
 ```
 
-> 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell만 쓴다면 아래 `.ps1` 버전을 씁니다.
+> 💡 **Windows 사용자**: 훅 스크립트(`.sh`)와 이 회차의 `echo '…' | bash .claude/hooks/….sh` 테스트 명령은 **Git Bash 창**에서 그대로 실행합니다 (1-3 Windows 설정 ①). PowerShell에서 테스트할 때는 각 Step의 **PowerShell 테스트 명령**(Git Bash 경로를 지정해 `.sh`를 실행하거나 `.ps1`을 실행)을 씁니다. bash 명령을 PowerShell·cmd에 그대로 붙여 넣으면 문법 오류가 납니다. PowerShell만 쓴다면 아래 `.ps1` 버전을 씁니다.
 
 **이 회차의 훅 스크립트: bash 버전과 Windows PowerShell 버전**
 
@@ -803,7 +825,7 @@ where jq
 | 증상 | 원인과 해결 |
 |---|---|
 | PowerShell에서는 되는데 Git Bash에서 `jq: command not found` | jq를 설치하기 **전부터** 열어 둔 Git Bash 창. 창을 새로 연다. 그래도 안 되면 PowerShell의 `Get-Command jq`로 실제 위치를 보고 Git Bash의 `which jq`와 비교하고, 직접 받은 `jq.exe`를 `~/bin`에 둔다 |
-| 터미널에서는 되는데 훅에서만 `jq: command not found` | Claude Code(또는 데스크톱 앱)를 jq 설치 **전에** 실행했다. Claude Code를 다시 시작한다 |
+| 터미널에서는 되는데 훅에서만 `jq: command not found` 또는 "jq가 없어 보호 훅이 검사할 수 없습니다" | Claude Code(또는 데스크톱 앱)를 jq 설치 **전에** 실행했다. Claude Code를 다시 시작한다 |
 | 회사 PC라 winget·관리자 권한을 쓸 수 없음 | "직접 받기" 방법으로 `~/bin`에 둔다. 그래도 어렵다면 jq가 필요 없는 PowerShell 훅(1-4 `protect-files.ps1`의 `ConvertFrom-Json` 방식)을 쓴다 |
 
 > ✅ **확인**: `git branch --show-current`가 `chore/quality-hooks`이고, `jq --version`이 버전을 출력하면 됩니다. 윈도우에서는 훅이 Git Bash로 실행되는지 강사와 함께 확인합니다.
@@ -970,6 +992,8 @@ $env:CLAUDE_PROJECT_DIR = (Get-Location).Path
 ```bash
 #!/usr/bin/env bash
 # .claude/hooks/protect-files.sh — PreToolUse(Edit|Write): 보호 파일 수정 차단
+# jq가 없으면 검사할 수 없으므로 통과시키지 않고 막는다 (그냥 두면 보호가 조용히 꺼진다)
+command -v jq >/dev/null 2>&1 || { echo "jq가 없어 보호 훅이 검사할 수 없습니다. 사람이 jq를 설치하세요 (Windows: winget install jqlang.jq)." >&2; exit 2; }
 FILE=$(jq -r '.tool_input.file_path // empty')
 FILE="${FILE//\\//}"   # Windows 경로의 \ 를 / 로 (Git Bash에서 실행돼도 경로는 \ 로 들어온다)
 block() { echo "$1" >&2; exit 2; }
@@ -1001,6 +1025,44 @@ echo '{"tool_input":{"file_path":"/x/backend/src/main/java/A.java"}}' \
   | bash .claude/hooks/protect-files.sh; echo "exit=$?"        # exit=0
 ```
 
+**이 명령은 무엇을 하나요?** 훅은 Claude Code가 stdin으로 JSON을 넘겨주면 실행되는 평범한 스크립트입니다. `echo '{"tool_input":…}'`로 Claude Code가 넘겨줄 입력을 흉내 내 스크립트에 흘려 넣고(`|`), `echo "exit=$?"`로 종료 코드(2 = 차단, 0 = 통과)를 확인합니다. 설정에 등록하기 전에 **스크립트의 판단만 따로** 시험하는 단위 테스트입니다.
+
+**어디서 실행하나요?** 위 명령은 bash 문법(줄 끝 `\` 이음, `$?`)입니다. macOS·Linux 터미널, Windows는 **Git Bash 창**에서 **저장소 루트로 이동한 뒤** 실행합니다. PowerShell·cmd에 그대로 붙여 넣으면 문법 오류가 납니다. PowerShell에서 시험하려면 Git Bash의 bash를 직접 지정합니다.
+
+```powershell
+# Windows PowerShell (저장소 루트에서)
+$bash = "C:\Program Files\Git\bin\bash.exe"
+'{"tool_input":{"file_path":"/x/backend/src/main/resources/application-prod.yml"}}' | & $bash .claude/hooks/protect-files.sh; "exit=$LASTEXITCODE"   # exit=2
+'{"tool_input":{"file_path":"/x/backend/src/main/java/A.java"}}' | & $bash .claude/hooks/protect-files.sh; "exit=$LASTEXITCODE"   # exit=0
+
+# PowerShell 버전(protect-files.ps1)을 쓰는 경우
+$ps1 = ".claude\hooks\protect-files.ps1"
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\resources\\application-prod.yml"}}' | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1; "exit=$LASTEXITCODE"   # exit=2
+'{"tool_input":{"file_path":"C:\\work\\eduhub\\backend\\src\\main\\java\\A.java"}}' | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1; "exit=$LASTEXITCODE"   # exit=0
+```
+
+> PowerShell 명령은 이 교재 환경에 PowerShell이 없어 실행해 보지 못했습니다. PowerShell에서 그냥 `bash`라고 쓰면 WSL의 bash가 실행될 수 있어(그 안에는 jq가 없을 수 있음) 경로를 직접 지정했습니다.
+
+**테스트가 에러로 끝날 때**
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| `No such file or directory`, `exit=127` | 저장소 루트가 아닌 곳에서 실행했거나, 스크립트를 아직 만들지 않음 | 저장소 루트로 `cd`, `.claude/hooks/protect-files.sh`가 있는지 확인 |
+| `syntax error near unexpected token $'in\r'` | 스크립트가 CRLF 줄바꿈으로 저장됨 (Windows) | LF로 다시 저장, `.gitattributes`에 `*.sh text eol=lf` |
+| `jq가 없어 보호 훅이 검사할 수 없습니다`, 일반 파일도 `exit=2` | jq 미설치 (위 jq 확인 줄이 막은 것) | jq 설치 (Step 1). 의도한 동작입니다 |
+| PowerShell·cmd에서 문법 오류 | bash 문법을 다른 셸에서 실행 | Git Bash 창 또는 위 PowerShell 명령 |
+
+```bash
+# (선택) jq가 없을 때도 막히는지 확인: PATH를 비워 jq를 못 찾게 하고 실행
+echo '{"tool_input":{"file_path":"/x/backend/src/main/java/A.java"}}' \
+  | env PATH=/nonexistent /bin/bash .claude/hooks/protect-files.sh; echo "exit=$?"   # 안내 메시지 + exit=2
+```
+
+```powershell
+# 같은 확인을 Windows PowerShell에서 (Git Bash 안에서 PATH를 비워 실행)
+'{"tool_input":{"file_path":"/x/backend/src/main/java/A.java"}}' | & $bash -c 'env PATH=/nonexistent /bin/bash .claude/hooks/protect-files.sh'; "exit=$LASTEXITCODE"   # 안내 메시지 + exit=2
+```
+
 > ✅ **확인**: Claude에게 `application-prod.yml에 로그 레벨 설정을 추가해줘`라고 지시하면 수정이 막히고, Claude가 이유를 읽고 다른 방법(개발 설정 수정 또는 사람에게 확인 요청)을 제안해야 합니다.
 
 ---
@@ -1024,6 +1086,8 @@ echo '{"tool_input":{"file_path":"/x/backend/src/main/java/A.java"}}' \
 ```bash
 #!/usr/bin/env bash
 # .claude/hooks/guard-bash.sh — PreToolUse(Bash): 위험 명령 차단 (최선의 노력용 안전망)
+# jq가 없으면 검사할 수 없으므로 통과시키지 않고 막는다 (그냥 두면 보호가 조용히 꺼진다)
+command -v jq >/dev/null 2>&1 || { echo "jq가 없어 보호 훅이 검사할 수 없습니다. 사람이 jq를 설치하세요 (Windows: winget install jqlang.jq)." >&2; exit 2; }
 CMD=$(jq -r '.tool_input.command // empty')
 block() { echo "$1" >&2; exit 2; }
 
@@ -1039,6 +1103,27 @@ case "$CMD" in
 esac
 exit 0
 ```
+
+**직접 테스트해 보기**
+
+```bash
+# macOS·Linux·Git Bash (저장소 루트에서)
+echo '{"tool_input":{"command":"git push --force origin feature/x"}}' | bash .claude/hooks/guard-bash.sh; echo "exit=$?"   # exit=2
+echo '{"tool_input":{"command":"git push origin main"}}' | bash .claude/hooks/guard-bash.sh; echo "exit=$?"               # exit=2
+echo '{"tool_input":{"command":"./gradlew flywayClean"}}' | bash .claude/hooks/guard-bash.sh; echo "exit=$?"              # exit=2
+echo '{"tool_input":{"command":"./gradlew test"}}' | bash .claude/hooks/guard-bash.sh; echo "exit=$?"                     # exit=0
+```
+
+```powershell
+# Windows PowerShell (Git Bash로 .sh 실행)
+$bash = "C:\Program Files\Git\bin\bash.exe"
+'{"tool_input":{"command":"git push --force origin feature/x"}}' | & $bash .claude/hooks/guard-bash.sh; "exit=$LASTEXITCODE"   # exit=2
+'{"tool_input":{"command":"git push origin main"}}' | & $bash .claude/hooks/guard-bash.sh; "exit=$LASTEXITCODE"               # exit=2
+'{"tool_input":{"command":"./gradlew flywayClean"}}' | & $bash .claude/hooks/guard-bash.sh; "exit=$LASTEXITCODE"              # exit=2
+'{"tool_input":{"command":"./gradlew test"}}' | & $bash .claude/hooks/guard-bash.sh; "exit=$LASTEXITCODE"                     # exit=0
+```
+
+> 💡 **jq 확인 줄**: 보호 훅 세 개(`protect-prod-config.sh`, `protect-files.sh`, `guard-bash.sh`)는 맨 앞에서 jq가 있는지 확인합니다. jq가 없으면 `jq -r …`가 실패해 경로·명령이 빈 값이 되고, 어떤 규칙에도 걸리지 않아 **`exit 0`(통과)으로 끝납니다.** 보호가 조용히 꺼지는 것이므로 막는 쪽(`exit 2`)을 택했습니다. jq가 없는 PC에서는 `guard-bash.sh`가 Claude의 모든 Bash 명령을 막으므로 **jq는 사람이 직접 설치**합니다. 포맷(`format.sh`)·알림(`check-openapi.sh`)처럼 막는 목적이 아닌 훅은 jq가 없으면 아무것도 하지 않고 넘어가도 괜찮습니다.
 
 > ⚠️ 이 훅은 **안전망**입니다. `git push origin HEAD:main`처럼 다른 형태의 명령은 빠져나갈 수 있습니다. 그래서 GitHub의 **`main` 브랜치 보호**(직접 푸시·강제 푸시 금지)와 권한 설정의 `deny`(예: `Bash(git push --force *)`)를 함께 씁니다. 하나만 믿지 않는 것이 핵심입니다.
 
@@ -1162,7 +1247,7 @@ git push -u origin chore/quality-hooks
 | 증상 | 원인과 해결 |
 |---|---|
 | 훅이 전혀 실행되지 않음 | `/hooks`에서 등록 여부 확인. JSON 문법 오류(`jq . .claude/settings.json`), 이벤트 이름 철자(`PostToolUse`) 확인 |
-| `jq: command not found` | jq 설치. 윈도우는 Step 1의 "Windows에서 jq 설치하기"와 Git Bash에서 `which jq`로 확인. 설치 후 Claude Code를 다시 시작 |
+| `jq: command not found`, 또는 보호 훅이 "jq가 없어 … 검사할 수 없습니다"로 모든 수정·명령을 막음 | jq 설치. 윈도우는 Step 1의 "Windows에서 jq 설치하기"와 Git Bash에서 `which jq`로 확인. 설치 후 Claude Code를 다시 시작 |
 | 스크립트를 찾지 못함 | 상대 경로 대신 `"$CLAUDE_PROJECT_DIR/.claude/hooks/…"` 사용 |
 | 차단했는데 Claude가 같은 시도를 반복 | 메시지에 **대안**을 쓴다. "금지"만 쓰면 다른 우회 방법을 찾으려 한다 |
 | 작업이 눈에 띄게 느려짐 | PostToolUse에서 전체 빌드를 돌리고 있지 않은지 확인. 무거운 작업은 Stop으로 |
