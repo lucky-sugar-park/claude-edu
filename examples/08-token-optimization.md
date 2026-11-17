@@ -163,21 +163,36 @@
 | **숨은 사용량** | `/loop`·예약 작업, 다른 세션에서 온 메시지, 백그라운드 작업 확인은 세션이 놀고 있어도 전체 컨텍스트를 보낸다 |
 | **조직 참고치** | 기업 배포 평균은 활동일 기준 개발자 1인당 약 13달러, 월 150~250달러(사용자의 90%는 하루 30달러 미만). 소규모 파일럿으로 기준선을 먼저 잡는다 |
 
-**훅으로 테스트 출력 줄이기 (공식 문서 예시를 Gradle에 맞게 바꾼 개념 예시)**
+**훅으로 테스트 출력 줄이기 (공식 문서 예시를 Gradle·EduHub에 맞게 바꾼 예시)**
 
 ```bash
-#!/bin/bash
-# ~/.claude/hooks/filter-test-output.sh — PreToolUse(matcher: Bash)에 등록
+#!/usr/bin/env bash
+# ~/.claude/hooks/filter-test-output.sh — PreToolUse(matcher: Bash), 내 개인 설정에만 등록
+# 테스트 명령의 전체 출력은 로그 파일에 저장하고, Claude에게는 실패 부분과 요약만 보여 준다
 input=$(cat)
-cmd=$(echo "$input" | jq -r '.tool_input.command')
+command -v jq >/dev/null 2>&1 || exit 0          # jq가 없으면 아무것도 바꾸지 않는다 (명령은 원래대로 실행)
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
-if [[ "$cmd" =~ ^(\./gradlew\ test|npm\ test) ]]; then
-  filtered_cmd="$cmd 2>&1 | grep -A 5 -E '(FAILED|FAIL|ERROR|error:)' | head -100"
-  echo "$input" | jq --arg filtered "$filtered_cmd" \
-    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: (.tool_input + {command: $filtered})}}'
-else
-  echo "{}"
-fi
+# 대상: ./gradlew … test …, cd backend && ./gradlew test, npm test, npm --prefix frontend test
+# 파이프(|)·세미콜론(;)·리다이렉트(>)가 섞인 명령은 건드리지 않는다
+w="[A-Za-z0-9_.:=*'\"/-]+"
+re="^(cd $w && )?(\./gradlew( $w)* test|npm( --prefix $w)? (run )?test)( $w)*$"
+[[ "$cmd" =~ $re ]] || exit 0
+
+log="${TMPDIR:-/tmp}/claude-test-output.log"
+new="{ $cmd ; } > \"$log\" 2>&1; rc=\$?
+grep -E -A 6 'FAILED|FAIL |Exception|Error:|tests completed|Tests: |BUILD (SUCCESSFUL|FAILED)' \"$log\" | head -80
+echo \"--- exit=\$rc · 전체 로그: $log (\$(wc -l < \"$log\")줄)\"
+exit \$rc"
+
+printf '%s' "$input" | jq --arg c "$new" '{
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "allow",
+    permissionDecisionReason: "테스트 출력 줄이기 (개인 훅)",
+    updatedInput: (.tool_input + {command: $c})
+  }
+}'
 ```
 
-> 이 훅은 테스트 명령을 자동 승인(`allow`)하도록 바꿉니다. 팀의 권한 정책과 맞는지 확인하고, 실패 원인을 놓치지 않도록 필터 범위를 조정하세요.
+> 이 훅은 정규식에 맞는 테스트 명령을 자동 승인(`allow`)합니다. 팀의 권한 정책과 맞는지 확인하세요. 처음 예시(`명령 2>&1 | grep … | head -100`)는 파이프 마지막 `head`의 종료 코드 0이 남아 **실패한 테스트도 성공처럼** 보이는 문제가 있어, 전체 출력을 로그 파일에 저장하고 원래 종료 코드를 돌려주도록 고쳤습니다. 단계별 실습(설치, 등록, 전후 측정)은 [5회차 6-2](../sessions/session-05-hooks-and-mcp.md#6-2-테스트-출력-줄이기-훅-개인-설정)에 있습니다.

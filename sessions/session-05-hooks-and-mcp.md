@@ -1991,14 +1991,174 @@ exit 0
 
 ## 6-2. 테스트 출력 줄이기 훅 (개인 설정)
 
-긴 Gradle 테스트 출력이 컨텍스트를 채우는 것을 막습니다. 팀 설정이 아니라 **내 설정**(`~/.claude/settings.json`)에 넣어 실험합니다. 스크립트는 [토큰 최적화 예제](../examples/08-token-optimization.md)의 "훅으로 테스트 출력 줄이기"를 씁니다.
+**무엇을 하나요?** Claude가 `./gradlew test` 같은 테스트 명령을 실행하면 수백 줄의 빌드·테스트 출력이 그대로 **도구 결과로 컨텍스트에 들어갑니다.** 이 훅은 Claude가 테스트 명령을 실행하기 **직전에(PreToolUse)** 명령을 살짝 바꿔서, 전체 출력은 로그 파일에 저장하고 Claude에게는 **실패 부분과 요약만** 보여 주게 합니다.
+
+```mermaid
+flowchart LR
+    A["Claude: cd backend && ./gradlew test<br/>실행 요청"] --> H{"PreToolUse 훅<br/>filter-test-output.sh"}
+    H -->|테스트 명령이면| B["바뀐 명령 실행<br/>전체 출력 → 로그 파일<br/>화면 → 실패 줄 + 요약 + exit 코드"]
+    H -->|그 밖의 명령| C["원래 명령 그대로"]
+    B --> R["Claude가 받는 결과: 수십 줄"]
+```
+
+**왜 개인 설정(`~/.claude/settings.json`)인가?** 이 훅은 출력을 숨기고 테스트 명령을 **자동 승인**합니다. 팀 전체에 바로 적용하기에는 영향이 크므로 먼저 **내 PC에서만** 실험하고, 효과가 확인되면 팀에서 논의합니다.
+
+**오늘 할 일**: 같은 실패를 **훅 없이 한 번, 훅을 켜고 한 번** 실행해 컨텍스트 사용량을 비교합니다 (약 15분).
+
+### ① 실험 준비: 테스트 하나를 일부러 깨기
+
+```bash
+git switch main && git pull
+git switch -c experiment/test-output-hook      # 실험용 브랜치. 병합하지 않는다
+```
+
+`backend/src/test/.../EnrollmentServiceTest.java`에서 정원 검사 테스트의 기대값 하나를 **직접** 틀리게 바꿉니다 (예: `WAITING` → `CONFIRMED`). Claude에게 시키지 않고 직접 바꾸는 이유는 두 번의 측정 조건을 똑같이 맞추기 위해서입니다.
+
+### ② 기준 측정: 훅 없이
+
+1. Claude Code에서 `/clear`로 새 대화를 시작합니다
+2. `/context`를 실행해 **Messages** 항목의 토큰 수를 적습니다 (시작값)
+3. 아래 지시를 그대로 보냅니다
+
+   ```text
+   다음 명령을 그대로 한 번만 실행하고, 실패한 테스트 이름과 원인을 한 줄로 알려줘.
+   다른 명령이나 옵션은 추가하지 마.
+   cd backend && ./gradlew test
+   ```
+
+4. 답을 받은 뒤 다시 `/context`를 실행해 **Messages** 토큰 수를 적습니다 (끝값). 끝값 − 시작값이 이번 실행에서 늘어난 양입니다
+5. Claude가 원인(어느 테스트, 기대값과 실제값)을 맞혔는지 적습니다
+
+### ③ 훅 설치 (내 PC에만)
+
+**스크립트 만들기**: 홈 폴더의 `.claude/hooks/`에 저장합니다 (macOS·Linux: `~/.claude/hooks/`, Windows: `C:\Users\<사용자 이름>\.claude\hooks\`). 줄바꿈은 **LF**로 저장합니다.
+
+```bash
+mkdir -p ~/.claude/hooks
+# 아래 내용을 ~/.claude/hooks/filter-test-output.sh 로 저장 (VS Code 등)
+```
+
+```bash
+#!/usr/bin/env bash
+# ~/.claude/hooks/filter-test-output.sh — PreToolUse(matcher: Bash), 내 개인 설정에만 등록
+# 테스트 명령의 전체 출력은 로그 파일에 저장하고, Claude에게는 실패 부분과 요약만 보여 준다
+input=$(cat)
+command -v jq >/dev/null 2>&1 || exit 0          # jq가 없으면 아무것도 바꾸지 않는다 (명령은 원래대로 실행)
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+
+# 대상: ./gradlew … test …, cd backend && ./gradlew test, npm test, npm --prefix frontend test
+# 파이프(|)·세미콜론(;)·리다이렉트(>)가 섞인 명령은 건드리지 않는다
+w="[A-Za-z0-9_.:=*'\"/-]+"
+re="^(cd $w && )?(\./gradlew( $w)* test|npm( --prefix $w)? (run )?test)( $w)*$"
+[[ "$cmd" =~ $re ]] || exit 0
+
+log="${TMPDIR:-/tmp}/claude-test-output.log"
+new="{ $cmd ; } > \"$log\" 2>&1; rc=\$?
+grep -E -A 6 'FAILED|FAIL |Exception|Error:|tests completed|Tests: |BUILD (SUCCESSFUL|FAILED)' \"$log\" | head -80
+echo \"--- exit=\$rc · 전체 로그: $log (\$(wc -l < \"$log\")줄)\"
+exit \$rc"
+
+printf '%s' "$input" | jq --arg c "$new" '{
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "allow",
+    permissionDecisionReason: "테스트 출력 줄이기 (개인 훅)",
+    updatedInput: (.tool_input + {command: $c})
+  }
+}'
+```
+
+| 부분 | 하는 일 |
+|---|---|
+| `re=…` (정규식) | `./gradlew … test …`, `cd backend && ./gradlew test`, `npm test`, `npm --prefix frontend test`만 바꾼다. `\|`, `;`, `>`가 섞인 명령과 `./gradlew build` 같은 다른 명령은 **원래대로** 실행된다 |
+| `{ 원래 명령 ; } > "$log" 2>&1` | 원래 명령을 그대로 실행하되, 화면 대신 **로그 파일**에 모두 저장한다 |
+| `grep -E -A 6 '…' \| head -80` | 실패 줄(`FAILED`, `Exception` 등)과 그 아래 6줄, 요약(`tests completed`, `BUILD …`)만 최대 80줄 보여 준다 |
+| `echo "--- exit=… · 전체 로그: …"`, `exit $rc` | **원래 종료 코드를 그대로 돌려준다.** 실패한 테스트가 "성공"으로 보이지 않게 하고, 더 필요하면 Claude가 로그 파일을 읽을 수 있게 위치를 알려 준다 |
+| `permissionDecision: "allow"` | 바뀐 명령을 **묻지 않고 실행**한다. 정규식에 맞는 테스트 명령에만 적용된다 |
+| `updatedInput` | Claude가 요청한 명령 대신 실행할 명령. 나머지 입력(설명 등)은 그대로 둔다 |
+
+**스크립트만 먼저 시험하기** (Claude 없이):
+
+```bash
+# macOS·Linux·Git Bash
+echo '{"tool_input":{"command":"cd backend && ./gradlew test"}}' | bash ~/.claude/hooks/filter-test-output.sh | jq -r '.hookSpecificOutput.updatedInput.command'
+#  → { cd backend && ./gradlew test ; } > "/tmp/claude-test-output.log" 2>&1; rc=$? … 처럼 바뀐 명령이 보이면 성공
+echo '{"tool_input":{"command":"git status"}}' | bash ~/.claude/hooks/filter-test-output.sh; echo "exit=$?"
+#  → 아무것도 출력되지 않고 exit=0 (테스트 명령이 아니면 건드리지 않음)
+```
+
+```powershell
+# Windows PowerShell (Git Bash로 실행, ~는 bash가 홈 폴더로 바꾼다)
+$bash = "C:\Program Files\Git\bin\bash.exe"
+'{"tool_input":{"command":"cd backend && ./gradlew test"}}' | & $bash -c 'bash ~/.claude/hooks/filter-test-output.sh'
+'{"tool_input":{"command":"git status"}}' | & $bash -c 'bash ~/.claude/hooks/filter-test-output.sh'; "exit=$LASTEXITCODE"   # 출력 없음, exit=0
+```
+
+**내 설정에 등록하기**: `~/.claude/settings.json` (Windows: `C:\Users\<사용자 이름>\.claude\settings.json`). 파일이 없으면 새로 만들고, 이미 있으면 `hooks` 부분만 **합칩니다** (다른 설정은 지우지 않음).
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash ~/.claude/hooks/filter-test-output.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- 저장한 뒤 Claude Code에서 `/hooks`를 열어 `PreToolUse`에 이 훅이 **User settings** 출처로 보이는지 확인합니다. 보이지 않으면 Claude Code를 다시 시작합니다
+- 팀 설정(`.claude/settings.json`)의 `guard-bash.sh`와 함께 실행됩니다. 두 훅은 서로 영향을 주지 않습니다 (위험 명령 검사는 원래 명령으로 합니다)
+- Windows는 훅이 Git Bash로 실행되며 `jq`가 필요합니다 (Step 1). jq가 없으면 이 훅은 아무것도 바꾸지 않고 넘어갑니다
+
+### ④ 훅을 켜고 같은 측정
+
+②와 똑같이 합니다: `/clear` → `/context` (시작값) → 같은 지시 → `/context` (끝값). 이번에는 Claude가 받는 결과가 아래 **모양**이어야 합니다.
+
+```text
+EnrollmentServiceTest > 정원이_차면_대기자로_등록된다() FAILED
+    org.opentest4j.AssertionFailedError: expected: <WAITING> but was: <CONFIRMED>
+        at ...
+12 tests completed, 1 failed
+BUILD FAILED in 9s
+--- exit=1 · 전체 로그: /tmp/claude-test-output.log (256줄)
+```
+
+### ⑤ 결과 기록 (회고에 붙이기)
 
 | 비교 | 훅 없이 | 훅 사용 |
 |---|---|---|
-| `./gradlew test` 실패 시 `/context`의 도구 결과 증가량 | | |
-| Claude가 원인을 찾았나? | | |
+| `/context` Messages 시작값 → 끝값 | | |
+| 이번 실행으로 늘어난 토큰 (끝값 − 시작값) | | |
+| Claude가 받은 출력 줄 수 (대략) | | |
+| Claude가 실패한 테스트와 원인을 맞혔나? | | |
+| Claude가 실패를 "실패"로 인식했나? (exit 코드) | | |
 
-> ⚠️ 그 예제 훅은 테스트 명령을 자동 승인(`allow`)으로 바꿉니다. 팀 권한 정책과 맞는지 확인하고, 실패 원인을 놓치지 않도록 필터 범위를 조정합니다.
+> 💡 **효과가 작게 나올 수 있습니다.** Gradle의 기본 출력은 원래 짧은 편이라, 실패 테스트가 하나면 차이가 수백 토큰에 그칠 수 있습니다. 차이는 실패가 여러 개일 때, `--info`처럼 로그가 긴 옵션을 쓸 때, 프론트 테스트(`npm test`)에서 크게 납니다. **숫자로 확인하고 판단하는 것**이 이 실습의 목적입니다 (7회차 토큰 측정과 같은 방식).
+
+### ⑥ 정리
+
+```bash
+git restore backend/src/test       # 일부러 깬 테스트 되돌리기
+git switch main
+git branch -D experiment/test-output-hook
+```
+
+- 훅을 계속 쓸지 정합니다. 그만 쓰려면 `~/.claude/settings.json`에서 위 `PreToolUse` 항목을 지웁니다
+- 팀에 제안하려면 ⑤의 표를 근거로 PR을 만들고, **자동 승인(`allow`)을 팀 정책으로 받아들일지**를 리뷰에서 함께 정합니다
+
+| 주의 | 설명 |
+|---|---|
+| 자동 승인 | 정규식에 맞는 테스트 명령은 **묻지 않고 실행**된다. 팀 권한 정책에서 테스트 명령을 `ask`로 두었다면 이 훅이 그 질문을 건너뛴다 |
+| 원인을 놓칠 때 | 필터에 걸리지 않는 형식의 오류(예: 컴파일 오류 메시지)는 안 보일 수 있다. 출력 끝의 로그 위치를 보고 Claude가 `/tmp/claude-test-output.log`를 읽게 하거나, `grep` 패턴에 `error:`를 더한다 |
+| 로그 파일 | 실행할 때마다 덮어쓴다. Git Bash의 `/tmp`는 Windows 사용자 임시 폴더다 |
+| 종료 코드 | 처음 나온 예제(`… 2>&1 \| grep … \| head -100`)는 파이프 마지막 명령(`head`)의 종료 코드 0이 남아 **실패한 테스트도 성공처럼** 보였다. 이 버전은 원래 종료 코드를 돌려준다 |
+
+> ✅ 이 교재 환경에서 가짜 `gradlew`(200줄 출력, 실패·성공 두 경우)로 확인했습니다: 실패 시 실패 줄과 요약만 나오고 `exit=1`, 성공 시 `BUILD SUCCESSFUL` 한 줄과 `exit=0`, `--tests` 옵션도 동작, 파이프·세미콜론·리다이렉트가 섞인 명령과 `./gradlew build`, `git status`는 바뀌지 않음. Claude Code에 등록해 실제 세션에서 실행해 보지는 못했으니 ③의 `/hooks` 확인과 ④의 출력 모양을 꼭 확인하세요.
 
 ---
 
