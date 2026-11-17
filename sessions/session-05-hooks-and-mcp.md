@@ -2181,7 +2181,271 @@ exit 0
 
 ## 6-4. 나만의 MCP 서버 만들기 (MariaDB 조회 도구)
 
-범용 SQL 서버 대신, **정해진 질문만 할 수 있는 전용 도구**를 직접 만들어 등록해 봅니다. SQL은 코드에 고정하고 Claude는 값(`sessionId` 등)만 보내므로 더 안전하고 결과도 작습니다. 도구 정의(이름·설명·입력 스키마·실행 함수), 빌드와 테스트, `.mcp.json` 등록, 권한 설정까지의 전체 과정은 [나만의 MCP 서버 만들기](../examples/32-custom-mcp-server-mariadb.md)(TypeScript) 또는 [Java 버전](../examples/33-custom-mcp-server-mariadb-java.md)(MCP Java SDK)을 따라 합니다.
+범용 SQL 서버 대신, **정해진 질문만 할 수 있는 전용 도구**를 직접 만들어 등록해 봅니다. SQL은 코드에 고정하고 Claude는 값(`sessionId` 등)만 보내므로 더 안전하고 결과도 작습니다. 이 절에서는 **MCP 서버가 무엇이고 어떻게 동작하며 어떤 순서로 만드는지**를 먼저 이해하고, 가장 작은 서버를 직접 실행해 봅니다. DB에 연결하는 실제 서버의 전체 코드는 마지막의 링크를 따라 합니다.
+
+### ① MCP 서버란
+
+**MCP 서버 = AI 에이전트에게 "도구"를 제공하는 별도의 프로그램**입니다. Claude Code는 MCP **클라이언트**로서 서버를 실행(또는 접속)하고, 서버가 가진 도구 목록을 받아 Claude(모델)에게 보여 줍니다. Claude가 도구를 쓰겠다고 하면 Claude Code가 서버에 실행을 요청하고, 결과를 다시 Claude에게 전달합니다.
+
+```mermaid
+flowchart LR
+    U["사용자<br/>1번 회차 남은 자리는?"] --> M["Claude (모델)<br/>도구를 고르고<br/>인자를 정한다"]
+    M -->|"get_remaining_seats<br/>{sessionId: 1}"| C["Claude Code<br/>(MCP 클라이언트)<br/>권한 확인 · 메시지 전달"]
+    C -->|"JSON-RPC 요청<br/>tools/call"| S["내 MCP 서버<br/>(별도 프로세스)"]
+    S -->|"고정 SQL 실행"| D[("개발 DB<br/>읽기 전용 계정")]
+    D --> S
+    S -->|"JSON-RPC 응답<br/>content"| C
+    C --> M
+    M --> U
+```
+
+| 개념 | 설명 |
+|---|---|
+| **호스트·클라이언트** | Claude Code(또는 Claude 데스크톱, 사내 에이전트)가 클라이언트다. 서버마다 연결 하나를 맺는다 |
+| **서버** | 기능을 제공하는 프로그램. 어떤 언어로 만들어도 된다 (규약만 지키면 된다) |
+| **서버가 제공하는 3가지** | **도구(Tools)**: 모델이 골라 실행하는 함수 · **리소스(Resources)**: 읽을 수 있는 데이터(`@서버:주소`) · **프롬프트(Prompts)**: 슬래시 명령이 되는 템플릿. 이 실습은 **도구만** 만든다 |
+| **도구 하나** | 이름 + 설명 + 입력 스키마 + (힌트) + 실행 함수. **설명은 모델이 도구를 고르는 근거**다 |
+| **실행 위치** | stdio 서버는 **내 PC에서 내 권한으로** 실행된다. 그래서 DB 접속은 읽기 전용 계정으로 한다 |
+
+### ② 관련 표준
+
+| 표준 | 무엇을 정하나 | 이 실습에서 |
+|---|---|---|
+| **MCP 사양** (modelcontextprotocol.io) | 메시지 종류(`initialize`, `tools/list`, `tools/call` …), 순서, 형식. **날짜로 버전**을 붙인다 (예: `2025-06-18`, `2025-11-25`) | 연결할 때 클라이언트와 서버가 버전을 맞춘다 (③) |
+| **JSON-RPC 2.0** | 메시지의 겉모양. **요청**(`id`, `method`, `params`) → **응답**(같은 `id`, `result` 또는 `error`), 응답이 없는 **알림**(`id` 없음) | 모든 MCP 메시지가 이 형식이다 |
+| **JSON Schema** | 도구 입력의 형식(타입, 필수, 범위) | `inputSchema`. SDK가 실행 전에 입력을 검증한다 |
+| **전송: stdio** | 클라이언트가 서버를 **자식 프로세스로 실행**하고 stdin/stdout으로 **한 줄에 메시지 하나**씩 주고받는다 | ⭐ 이 실습. `.mcp.json`의 `command`, `args` |
+| **전송: Streamable HTTP** | 서버가 URL로 떠 있고 HTTP POST로 주고받는다 (필요하면 스트리밍) | 팀이 함께 쓰는 원격 서버 (2-5 제조 사례의 중앙 서버) |
+| **인가: OAuth 2.1** | HTTP 서버에서 사용자를 인증·인가하는 방법 | 원격 서버를 사내에 배포할 때 |
+
+> 💡 사양을 직접 구현할 필요는 없습니다. 공식 **SDK**(TypeScript `@modelcontextprotocol/sdk`, Java `io.modelcontextprotocol.sdk:mcp`, Python 등)가 JSON-RPC, 버전 협상, 입력 검증을 처리하고, 우리는 **도구 정의와 실행 함수**만 씁니다.
+
+### ③ 동작 순서: 연결부터 도구 호출까지
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code (클라이언트)
+    participant S as 내 MCP 서버
+    Note over CC,S: 세션 시작 (.mcp.json을 읽고 서버 실행)
+    CC->>S: initialize (내 버전·기능·이름)
+    S-->>CC: 결과: 맞춘 버전, 서버 기능(tools), serverInfo
+    CC->>S: notifications/initialized (알림, 응답 없음)
+    CC->>S: tools/list
+    S-->>CC: 도구 목록 (이름, 설명, inputSchema, annotations)
+    Note over CC: 사용자가 질문 → Claude가 도구 선택
+    CC->>S: tools/call {name, arguments}
+    S-->>CC: 결과 {content: [...], isError}
+```
+
+**실제로 오가는 메시지** (아래 ⑤의 서버에 직접 보내서 얻은 결과. 읽기 쉽게 줄였습니다)
+
+```text
+→ {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.1"}}}
+← {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"eduhub-hello","version":"1.0.0"}}}
+
+→ {"jsonrpc":"2.0","method":"notifications/initialized"}
+
+→ {"jsonrpc":"2.0","id":2,"method":"tools/list"}
+← {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_remaining_seats",
+     "description":"교육 회차의 남은 자리 수를 조회한다. 회차 ID를 알 때 사용. 읽기 전용.",
+     "inputSchema":{"type":"object","properties":{"sessionId":{"type":"integer", … ,"description":"회차 ID"}},"required":["sessionId"]},
+     "annotations":{"readOnlyHint":true}}]}}
+
+→ {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":1}}}
+← {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"sessionId\":1,\"title\":\"Spring Boot 입문\",\"remaining\":0}"}]}}
+
+→ {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":99}}}
+← {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"회차 99이(가) 없습니다."}],"isError":true}}
+
+→ {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":-1}}}
+← {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"MCP error -32602: Input validation error: … expected number to be >0 at sessionId"}],"isError":true}}
+```
+
+| 관찰 | 의미 |
+|---|---|
+| 응답의 `id`가 요청의 `id`와 같다 | JSON-RPC는 `id`로 요청과 응답의 짝을 맞춘다. 실제로 응답 순서가 요청 순서와 다르게 오기도 했다 |
+| `protocolVersion` | 클라이언트가 보낸 버전을 서버가 지원하면 그대로, 아니면 서버가 지원하는 최신 버전으로 답한다 (모르는 버전 `2099-01-01`을 보내면 `2025-11-25`로 답함, TypeScript SDK 1.32) |
+| `tools/list`의 `inputSchema` | 코드에 쓴 zod 스키마(또는 Java의 JSON 문자열)가 **JSON Schema**로 바뀌어 전달된다. Claude는 이것을 보고 인자를 만든다 |
+| 결과 `content` | 도구 결과는 **텍스트 블록 목록**. JSON을 문자열로 넣어 보내는 것이 보통이다 |
+| `isError: true` | "회차 없음" 같은 **업무 오류**는 예외가 아니라 결과로 돌려준다. Claude가 읽고 사용자에게 설명할 수 있다 |
+| `sessionId: -1` | 입력 검증은 **SDK가 실행 함수 전에** 한다. 내 코드는 올바른 입력만 받는다 |
+
+### ④ 만드는 절차
+
+| 단계 | 할 일 | 결과물 | 상세 (TypeScript / Java) |
+|---|---|---|---|
+| 1. 도구 설계 | 어떤 질문에 답할지 정하고 **도구 이름·입력·출력**을 정한다. SQL은 코드에 고정, 결과는 필요한 열·최대 건수만 | 도구 목록 표 | [32번 1장](../examples/32-custom-mcp-server-mariadb.md#1-왜-직접-만드나-범용-sql-서버-vs-전용-도구) |
+| 2. 프로젝트 준비 | SDK와 DB 드라이버 설치, 접속 정보는 **환경 변수**로 | `package.json` / `build.gradle.kts` | [32번 3장](../examples/32-custom-mcp-server-mariadb.md#3-준비) · [33번](../examples/33-custom-mcp-server-mariadb-java.md) |
+| 3. 서버 만들기 + 도구 등록 | 서버 이름·버전, 도구마다 이름·**설명**·입력 스키마·`readOnlyHint`·실행 함수 | `index.ts` / `*.java` | [32번 4장](../examples/32-custom-mcp-server-mariadb.md#4-도구-만들기) |
+| 4. 전송 연결 | stdio로 시작. **stdout에는 아무것도 출력하지 않는다** (로그는 stderr) | 실행 가능한 서버 | ⑤ 코드의 ③ |
+| 5. Claude 없이 테스트 | 원시 메시지 보내기(⑤), MCP Inspector, 스모크 테스트 스크립트로 정상·오류 입력 확인 | 테스트 결과 | [32번 5장](../examples/32-custom-mcp-server-mariadb.md#5-빌드하고-claude-없이-먼저-테스트) |
+| 6. Claude Code에 등록 | 저장소 루트 `.mcp.json`에 실행 명령, 권한에 `mcp__서버__도구` | `.mcp.json`, `settings.json` | [32번 6장](../examples/32-custom-mcp-server-mariadb.md#6-내-mcp-서버를-claude-code에-등록하기) |
+| 7. 사용하며 다듬기 | Claude가 엉뚱한 도구를 고르면 **설명**을, 결과가 크면 **출력**을 고친다 | 개선 PR | [32번 7~8장](../examples/32-custom-mcp-server-mariadb.md#8-설계보안-체크리스트) |
+
+### ⑤ 핵심 예시 코드: 가장 작은 MCP 서버
+
+DB 없이 메모리 데이터로 답하는 도구 하나짜리 서버입니다. 모든 MCP 서버는 **① 서버 만들기 → ② 도구 등록 → ③ 전송 연결** 세 부분으로 되어 있고, 실제 DB 서버는 ②의 실행 함수 안에서 DB를 조회하는 것만 다릅니다.
+
+**TypeScript** (`@modelcontextprotocol/sdk` 1.32, `zod` 4)
+
+```js
+#!/usr/bin/env node
+// 가장 작은 MCP 서버: 도구 하나, DB 없이 메모리 데이터
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+// ① 서버 만들기: 이름과 버전 (initialize 응답의 serverInfo가 된다)
+const server = new McpServer({ name: "eduhub-hello", version: "1.0.0" });
+
+// 예제 데이터 (실제로는 DB·API를 조회하는 자리)
+const sessions = { 1: { title: "Spring Boot 입문", capacity: 2, confirmed: 2 } };
+
+// ② 도구 등록: 이름 + 설명 + 입력 스키마 + 실행 함수
+server.registerTool(
+  "get_remaining_seats",
+  {
+    description: "교육 회차의 남은 자리 수를 조회한다. 회차 ID를 알 때 사용. 읽기 전용.",
+    inputSchema: { sessionId: z.number().int().positive().describe("회차 ID") },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ sessionId }) => {
+    const s = sessions[sessionId];
+    if (!s) {
+      return { isError: true, content: [{ type: "text", text: `회차 ${sessionId}이(가) 없습니다.` }] };
+    }
+    const result = { sessionId, title: s.title, remaining: s.capacity - s.confirmed };
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  },
+);
+
+// ③ 전송 방식 연결: stdio (stdout = MCP 메시지 전용, 로그는 stderr로)
+await server.connect(new StdioServerTransport());
+console.error("eduhub-hello 시작");
+```
+
+```bash
+# 실행 준비 (빈 폴더에서)
+npm init -y
+npm pkg set type=module
+npm install @modelcontextprotocol/sdk zod
+# 위 코드를 hello-server.mjs로 저장
+```
+
+**Java** (`io.modelcontextprotocol.sdk:mcp` 2.1.0, JDK 21)
+
+```java
+import io.modelcontextprotocol.json.McpJsonDefaults;
+import io.modelcontextprotocol.json.McpJsonMapper;
+import io.modelcontextprotocol.server.McpServer;
+import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
+import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
+import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities;
+import io.modelcontextprotocol.spec.McpSchema.Tool;
+import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations;
+import java.util.Map;
+
+/** 가장 작은 MCP 서버 (Java): 도구 하나, DB 없이 메모리 데이터 */
+public class HelloServer {
+    record Session(String title, int capacity, int confirmed) {}
+    static final Map<Long, Session> SESSIONS = Map.of(1L, new Session("Spring Boot 입문", 2, 2));
+
+    public static void main(String[] args) {
+        McpJsonMapper json = McpJsonDefaults.getMapper();
+
+        // ② 도구 정의: 이름 + 입력 스키마(JSON Schema) + 설명 + 힌트
+        Tool tool = Tool.builder("get_remaining_seats", json, """
+                {"type":"object",
+                 "properties":{"sessionId":{"type":"integer","minimum":1,"description":"회차 ID"}},
+                 "required":["sessionId"]}
+                """)
+            .description("교육 회차의 남은 자리 수를 조회한다. 회차 ID를 알 때 사용. 읽기 전용.")
+            .annotations(ToolAnnotations.builder().readOnlyHint(true).build())
+            .build();
+
+        // ② 실행 함수: 인자를 받아 결과(content)를 돌려준다
+        SyncToolSpecification spec = SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler((exchange, request) -> {
+                long id = ((Number) request.arguments().get("sessionId")).longValue();
+                Session s = SESSIONS.get(id);
+                if (s == null) {
+                    return CallToolResult.builder().addTextContent("회차 " + id + "이(가) 없습니다.").isError(true).build();
+                }
+                String text = "{\"sessionId\":" + id + ",\"title\":\"" + s.title() + "\",\"remaining\":" + (s.capacity() - s.confirmed()) + "}";
+                return CallToolResult.builder().addTextContent(text).build();
+            })
+            .build();
+
+        // ①③ 서버 만들기 + stdio 전송 연결 (System.out 금지, 로그는 System.err)
+        McpServer.sync(new StdioServerTransportProvider(json))
+            .serverInfo("eduhub-hello", "1.0.0")
+            .capabilities(ServerCapabilities.builder().tools(true).build())
+            .tools(spec)
+            .build();
+        System.err.println("eduhub-hello 시작");
+    }
+}
+```
+
+> Java는 [33번 예제](../examples/33-custom-mcp-server-mariadb-java.md)의 Gradle 프로젝트에서 `gradle jar`로 만든 jar에 SDK가 함께 들어 있으므로 `java -cp build/libs/eduhub-mcp.jar HelloServer.java`처럼 소스 파일 하나를 바로 실행할 수 있습니다.
+
+| 부분 | TypeScript | Java | 핵심 |
+|---|---|---|---|
+| ① 서버 만들기 | `new McpServer({ name, version })` | `McpServer.sync(…).serverInfo(name, version)` | `initialize` 응답의 `serverInfo`가 된다 |
+| ② 도구 등록 | `server.registerTool(이름, { description, inputSchema, annotations }, 함수)` | `Tool.builder(이름, json, 스키마)` + `SyncToolSpecification.builder().callHandler(…)` | `tools/list`에 나가는 정보 + `tools/call`이 오면 실행할 함수 |
+| 입력 스키마 | zod (`z.number().int().positive()`) | JSON Schema 문자열 | SDK가 JSON Schema로 내보내고, 들어온 값을 검증한다 |
+| 결과 | `{ content: [{ type: "text", text }] }`, 오류는 `isError: true` | `CallToolResult.builder().addTextContent(…).isError(…)` | 업무 오류도 결과로 돌려준다 |
+| ③ 전송 연결 | `server.connect(new StdioServerTransport())` | `new StdioServerTransportProvider(json)` | stdout은 MCP 메시지 전용. 로그는 `console.error` / `System.err` |
+
+**직접 확인: 서버에 원시 메시지 보내 보기** (Claude 없이 ③의 메시지를 그대로 재현)
+
+```bash
+# msgs.jsonl: 한 줄에 메시지 하나 (③에서 → 로 표시한 요청들)
+cat > msgs.jsonl <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":1}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":99}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_remaining_seats","arguments":{"sessionId":-1}}}
+EOF
+
+node hello-server.mjs < msgs.jsonl                                             # TypeScript
+(cat msgs.jsonl; sleep 3) | java -cp build/libs/eduhub-mcp.jar HelloServer.java   # Java
+```
+
+```powershell
+# Windows PowerShell (msgs.jsonl은 같은 내용으로 VS Code 등에서 만든다)
+Get-Content msgs.jsonl | node hello-server.mjs
+```
+
+- 응답 5개가 ③의 ← 줄과 같은 모양이면 성공입니다. `eduhub-hello 시작`은 stderr로 나온 로그입니다
+- Java는 입력이 끝나면 남은 응답을 보내기 전에 종료될 수 있어 `sleep 3`으로 잠깐 기다립니다. PowerShell에서 Java 서버를 시험할 때는 33번 예제의 스모크 테스트(SDK 클라이언트)를 씁니다
+- Claude Code에 붙여 보려면 저장소 루트 `.mcp.json`에 `"eduhub-hello": { "command": "node", "args": ["tools/hello/hello-server.mjs"] }`처럼 등록하고(경로는 저장소 루트 기준), `/mcp`에서 연결을 확인한 뒤 "1번 회차 남은 자리 알려줘"라고 물어봅니다
+
+> ✅ 위 TypeScript·Java 코드와 메시지는 이 교재 환경에서 실제로 실행해 얻은 결과입니다 (TypeScript SDK 1.32.2 + zod 4.6.7 / Node.js 22, Java SDK 2.1.0 / JDK 21). 빈 폴더에 위 "실행 준비" 명령으로 설치한 뒤 실행하는 것까지 확인했습니다. Claude Code 화면에서 이 서버를 등록해 쓰는 과정은 직접 확인하지 못했습니다.
+
+### ⑥ 좋은 도구를 만드는 원칙과 흔한 실수
+
+| 원칙 | 왜 | 흔한 실수 |
+|---|---|---|
+| **업무 단위**로 만든다 ("회차 현황", "사원별 신청 내역") | Claude가 테이블 구조를 몰라도 된다 | `run_sql(query)` 같은 범용 도구를 또 만든다 |
+| **설명에 무엇을, 언제** 쓰는지 쓴다 | Claude가 도구를 고르는 유일한 근거 | "회차 조회" 한 마디만 쓴다 → 다른 도구와 헷갈린다 |
+| **SQL은 코드에 고정**, 값만 받아 바인딩 | SQL 인젝션·무거운 쿼리 차단 | 입력 문자열을 SQL에 이어 붙인다 |
+| **결과는 작게** (필요한 열, `LIMIT`, 요약값) | 결과는 컨텍스트에 들어가 토큰을 쓴다 | 테이블 전체를 돌려준다 |
+| **읽기 전용**: DB 계정 + 읽기 전용 세션 + `readOnlyHint` | 힌트는 표시일 뿐, 강제는 계정 권한 | 쓰기 계정으로 연결하고 힌트만 단다 |
+| **업무 오류는 `isError` 결과**로 | Claude가 사용자에게 이유를 설명할 수 있다 | 예외를 던져 서버가 죽는다 |
+| **stdout 금지** (stdio 서버) | stdout은 MCP 메시지 통로 | `console.log`, `System.out.println`, 콘솔 로거가 메시지를 깨뜨려 연결이 끊긴다 |
+
+### ⑦ 이제 실제 DB 서버로
+
+⑤의 실행 함수 안에서 메모리 데이터 대신 **개발 DB(MariaDB)를 읽기 전용 계정으로 조회**하면 실제 서버가 됩니다. 도구 두 개(`get_session_status`, `find_enrollments_by_employee`), DB 연결, 테스트, `.mcp.json` 등록, 권한 설정까지의 전체 과정은 다음 예제를 따라 합니다.
+
+- [나만의 MCP 서버 만들기 (TypeScript)](../examples/32-custom-mcp-server-mariadb.md)
+- [나만의 MCP 서버 만들기 (Java, MCP Java SDK)](../examples/33-custom-mcp-server-mariadb-java.md)
+- 같은 방식을 제조 현장에 적용한 예: [제조 현장 AI 에이전트와 MCP](../examples/34-manufacturing-ai-agent-mcp.md) (MES는 DB, ERP는 REST API로 가져오는 도구 5개)
 
 ---
 
