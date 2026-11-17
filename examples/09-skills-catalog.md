@@ -58,7 +58,7 @@ description: JPA/Hibernate 조회 성능 문제(N+1, 느린 목록 조회, 과�
 
 | 스킬 이름 | 언제 쓰나 | 포함할 내용 |
 |---|---|---|
-| `new-microfrontend` | 새 remote 앱 추가 | webpack Module Federation 템플릿, shared singleton 목록, shell 라우트 등록, 로컬 실행 포트 규칙 |
+| `new-microfrontend` | 새 remote 앱 추가 | Vite Module Federation(`@module-federation/vite`) 템플릿, shared singleton 목록, shell 라우트 등록, 로컬 실행 포트 규칙 |
 | `mfe-shared-deps` | 공유 의존성 버전 변경 | shell과 모든 remote 동시 변경 절차, 버전 불일치 검사 스크립트 |
 | `api-client-usage` | 프론트에서 API 호출 | 클라이언트 재생성 명령, 커스텀 훅 패턴, 에러는 인터셉터에 맡기는 규칙 |
 | `mui-page` | 새 화면 작성 | 사내 테마 사용, 목록/상세/폼 화면 템플릿, 로딩·에러·빈 상태 처리 |
@@ -74,7 +74,7 @@ description: EduHub 프론트엔드에 새 마이크로프론트엔드(remote �
 
 # 새 remote 추가 절차
 1. `templates/remote-app/`을 `apps/{이름}-mfe/`로 복사한다
-2. webpack 설정의 `name`을 camelCase(`{이름}Mfe`)로 바꾼다
+2. `vite.config.ts`의 `federation({ name })`을 camelCase(`{이름}Mfe`)로 바꾸고, `server`·`preview` 포트를 정한다
 3. shared 설정은 `templates/shared.js`를 그대로 사용한다 (버전을 바꾸지 않는다)
 4. 포트는 `ports.md`에서 다음 빈 번호를 사용한다
 5. shell의 `remotes`와 라우트에 등록한다

@@ -33,7 +33,7 @@
 | API 문서 | OpenAPI 3 + Swagger UI (springdoc-openapi) | `/swagger-ui.html`, `/v3/api-docs` |
 | 빌드 | Gradle (Kotlin DSL) | Spotless로 코드 포맷 |
 | 프론트엔드 | React 18 + TypeScript | |
-| 마이크로프론트엔드 | Webpack 5 Module Federation | shell(host) + 2개 remote |
+| 마이크로프론트엔드 | Vite + Module Federation (`@module-federation/vite`) | shell(host) + 2개 remote. Webpack 5 Module Federation으로도 같은 구조 |
 | UI 라이브러리 | MUI (Material UI) | 공통 테마는 shell에서 제공 |
 | HTTP 클라이언트 | Axios | OpenAPI 스펙으로 클라이언트 코드 자동 생성 |
 | 테스트 | JUnit 5, Mockito, `@DataJpaTest` / Jest, React Testing Library | |
@@ -214,6 +214,71 @@ export const enrollmentApi = new EnrollmentApi(config, undefined, http);
 ```
 
 ### 5-4. Module Federation 설정
+
+**Vite (실습 기준, `@module-federation/vite`)**
+
+```ts
+// apps/shell/vite.config.ts (host)
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
+
+export default defineConfig({
+  server: { port: 3000, strictPort: true },
+  preview: { port: 3000, strictPort: true },
+  plugins: [
+    react(),
+    federation({
+      name: "shell",
+      remotes: {
+        courseMfe: {
+          type: "module",                        // Vite remote는 ES 모듈
+          name: "courseMfe",
+          entry: "http://localhost:3001/remoteEntry.js",
+        },
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+        "@mui/material": { singleton: true },
+        "@emotion/react": { singleton: true },
+      },
+      dts: false,
+    }),
+  ],
+});
+```
+
+```ts
+// apps/course-mfe/vite.config.ts (remote)
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
+
+export default defineConfig({
+  server: { port: 3001, strictPort: true },
+  preview: { port: 3001, strictPort: true },
+  plugins: [
+    react(),
+    federation({
+      name: "courseMfe",                         // shell의 remotes 키와 같아야 한다
+      filename: "remoteEntry.js",                // shell이 처음 읽는 진입 파일
+      exposes: { "./CourseApp": "./src/CourseApp.tsx" },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+        "@mui/material": { singleton: true },
+        "@emotion/react": { singleton: true },
+      },
+      dts: false,
+    }),
+  ],
+});
+```
+
+> 설치, remote 불러오기(`React.lazy`), 타입 선언, 확인 방법과 실제 실행 결과는 [6회차 1-4](../sessions/session-06-plugins-artifacts-mfe.md#1-4-vite로-module-federation-구성하기-실습-기준)에 있습니다.
+
+**Webpack 5를 쓰는 경우 (같은 구조)**
 
 ```js
 // apps/shell/webpack.config.js (host)

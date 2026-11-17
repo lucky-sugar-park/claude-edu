@@ -308,7 +308,7 @@ flowchart LR
 |---|---|
 | 백엔드 | Java 21, Spring Boot 3, Spring Data JPA, Hibernate 6, Flyway, springdoc-openapi(Swagger UI) |
 | DB | PostgreSQL (개발: Docker, 테스트: Testcontainers) |
-| 프론트엔드 | React 18 + TypeScript, Webpack 5 Module Federation, MUI, Axios(OpenAPI로 생성) |
+| 프론트엔드 | React 18 + TypeScript, Vite + Module Federation(`@module-federation/vite`), MUI, Axios(OpenAPI로 생성) |
 | 빌드·품질 | Gradle(Kotlin DSL), Spotless, JUnit 5, Mockito / Jest, React Testing Library |
 | 협업·배포 | GitHub(브랜치·PR), GitHub Actions(CI), 스테이징 배포는 컨테이너 이미지 |
 

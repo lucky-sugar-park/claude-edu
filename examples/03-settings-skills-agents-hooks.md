@@ -97,7 +97,7 @@ description: EduHub에 새 REST API를 추가할 때 사용한다. 백엔드 Ent
 
 | 스킬 | 용도 |
 |---|---|
-| `new-microfrontend` | 새 remote 앱 생성: webpack 설정, shared 설정, shell 라우팅 등록 |
+| `new-microfrontend` | 새 remote 앱 생성: `vite.config.ts`의 Module Federation 설정, shared 설정, shell 라우팅 등록 |
 | `jpa-performance-check` | 쿼리 로그 분석, N+1 탐지, 인덱스 제안 |
 | `flyway-migration` | 마이그레이션 번호 규칙, 롤백 스크립트 작성 규칙 |
 
@@ -136,7 +136,7 @@ description: 마이크로프론트엔드 통합 검사. Module Federation 설정
 tools: Read, Grep, Glob
 ---
 
-shell과 모든 remote의 package.json, webpack 설정을 비교해 다음을 보고한다.
+shell과 모든 remote의 package.json, vite.config.ts(Module Federation 설정)를 비교해 다음을 보고한다.
 - shared singleton 의존성의 버전 불일치
 - remote에서 테마를 새로 만드는 코드(createTheme)
 - remote끼리 직접 import하는 코드
