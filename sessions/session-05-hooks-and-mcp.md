@@ -1615,6 +1615,24 @@ sequenceDiagram
 
 예를 들어 MariaDB 예시의 `@benborla29/mcp-server-mysql`은 소스 코드(`index.ts`)에 `mysql_query` **하나만** 고정으로 등록합니다. 환경 변수로 이름이나 개수가 바뀌지 않고, 쓰기 허용 옵션을 켜면 설명 문구만 바뀝니다 (2026년 11월, GitHub 소스 확인).
 
+**③ 도구 이름(`execute_sql` 등)은 어디서 확인하나?**
+
+도구 이름은 우리 저장소 파일에 없으므로, **서버가 실제로 보내 준 목록**을 보거나 **서버의 문서·코드**를 봅니다. 권한 규칙에 쓸 이름은 ①을 기준으로 정합니다.
+
+| 방법 | 어떻게 | 보이는 것 | 특징 |
+|---|---|---|---|
+| ① ⭐ Claude Code의 `/mcp` | 대화창에서 `/mcp` → `eduhub-db` 선택 → **View tools**(도구 보기) | 지금 연결된 서버가 보낸 **실제 도구 목록**과 각 도구의 설명 | 설치한 버전 그대로라 가장 정확하다. 서버가 `connected` 상태여야 보인다 |
+| ② Claude에게 묻기 | "eduhub-db MCP 서버가 제공하는 도구 이름과 한 줄 설명만 표로 보여줘. 도구는 실행하지 마" | ①과 같은 목록 (Claude가 받은 도구 정보) | 간편하지만 Claude가 정리한 결과이므로 권한 규칙에 옮길 때는 ①로 다시 확인 |
+| ③ 서버의 README·문서 | Postgres MCP Pro는 README의 도구 표(`list_schemas`, `execute_sql` …), `mcp-server-mysql`은 README·소스의 도구 설명 | 서버 작성자가 문서에 적은 목록 | **연결 전에** 미리 볼 수 있다. 버전이 바뀌면 실제와 다를 수 있다 |
+| ④ 서버 소스 코드 | 도구를 등록하는 부분을 찾는다: TypeScript SDK는 `registerTool("이름", …)`(예전 코드는 `server.tool(…)`), Python(FastMCP)은 `@mcp.tool` 데코레이터가 붙은 함수 이름, Java SDK는 `Tool.builder("이름", …)` | 이름이 정해지는 바로 그 코드 | 6-4에서 직접 만든 서버의 도구 이름이 정해지는 곳과 같다 |
+| ⑤ MCP Inspector | `npx @modelcontextprotocol/inspector uvx postgres-mcp --access-mode=restricted` (환경 변수 `DATABASE_URI` 설정 후) → 브라우저 화면의 **Tools** 탭 | `tools/list` 응답 원문 (이름, 설명, 입력 스키마) | Claude 없이 서버만 띄워 확인. 도구를 직접 호출해 볼 수도 있다 |
+
+- 이름이 정해지는 원리는 6-4 ③에서 실제 메시지로 볼 수 있습니다: 클라이언트가 `tools/list`를 보내면 서버가 `{"name": "get_remaining_seats", …}`처럼 도구 목록을 돌려주고, Claude Code가 그 `name` 앞에 `mcp__<서버 이름>__`을 붙입니다 ([6-4 ③ 동작 순서](#6-4-나만의-mcp-서버-만들기-mariadb-조회-도구))
+- `/mcp`에서 서버가 `failed`이면 도구 목록이 오지 않습니다. 이때는 ③(README)으로 이름을 확인해 두고, 연결 문제를 먼저 해결합니다 (5-7 자주 겪는 문제)
+- 권한 규칙에 쓴 이름이 실제 도구 이름과 한 글자라도 다르면 **오류 없이 무시**되고, 그 도구를 쓸 때마다 승인 질문이 나옵니다. 승인 질문이 계속 나오면 이름부터 ①과 대조합니다
+
+> 이 교재 환경에서는 Postgres MCP Pro를 실행해 보지 못해(`uvx` 실행이 막힘) 도구 목록은 README 기준입니다. `/mcp`의 메뉴 이름은 Claude Code 버전에 따라 다를 수 있습니다. ⑤의 Inspector 명령도 직접 실행해 보지 못했습니다(6-4에서는 직접 만든 서버로 `tools/list`를 확인함).
+
 > 💡 **권한 규칙은 도구를 만들지 않습니다.** `permissions.allow`에 이름을 적어도 도구가 생기지 않습니다. 서버가 실행되어 도구 목록을 보내야 도구가 있고, 권한 규칙은 그 도구를 "묻지 않고 써도 된다"고 정할 뿐입니다.
 
 **⚠️ 자주 하는 오타: 오류 없이 무시됩니다**
