@@ -36,6 +36,8 @@
 | 1:53 – 2:00 | 7. 정리, 퀴즈, 과제 안내 | 강의 |
 
 > 6장(더 해 보기)은 시간이 남으면 수업 중에, 아니면 **과제**로 진행합니다.
+>
+> ⏱ 따라하기 ②에는 FR-07 전에 **인증 기반 만들기**([Step 9-1](#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에), 약 15분)가 들어 있습니다. 시간이 부족하면 강사가 준비한 인증 브랜치를 병합하고 구조 설명과 확인(curl, 테스트)만 함께 합니다. 인증이 없으면 FR-07("내" 신청 내역)과 FR-08(관리자만)을 제대로 만들 수 없으므로 건너뛰지 않습니다.
 
 ---
 
@@ -1833,6 +1835,540 @@ eduhub-db로 다음만 조회해줘. 행 데이터는 최대 5건까지만.
 
 ---
 
+## Step 9-1. 인증 기반 만들기 (NFR-03) — FR-07 전에
+
+4회차에서 `employeeId`를 서비스 인자로 받고 `TODO(NFR-03)`를 남겼습니다. FR-07은 **"로그인한 사원 본인"**의 내역이고 FR-08은 **"관리자만"** 쓰는 기능이므로, 지금 인증을 붙입니다. 프론트의 로그인 화면은 6회차에서 만듭니다.
+
+**먼저 사람이 정할 것** (Claude에게 맡기지 않는 설계 결정)
+
+| 결정 | EduHub의 선택 | 이유 |
+|---|---|---|
+| 인증 방식 | **JWT(Bearer 토큰)**, 서버는 세션을 저장하지 않음(stateless) | 6회차에 shell·course-mfe·enrollment-mfe 여러 앱이 같은 API를 부른다. 요청마다 `Authorization` 헤더 하나로 확인 |
+| 로그인 방법 | **교육용 개발 로그인**: 사번 + 비밀번호(BCrypt 해시) | 실제 회사는 사내 SSO(OIDC 등)를 쓴다. 토큰을 받은 **이후** 구조(검증, 사용자 꺼내기, 역할)는 같다 |
+| 토큰 서명 | HS256 공유 비밀키, **환경 변수** `EDUHUB_JWT_SECRET` (32바이트 이상) | 비밀은 저장소에 두지 않는다 (NFR-03). 운영은 비밀 저장소에서 주입 |
+| 공개 범위 | 로그인·과정 조회는 누구나, `/api/admin/**`는 ADMIN, 나머지는 로그인 필요 | FR-01·02는 둘러보기, 신청부터 로그인 |
+| 남의 신청 취소 | **404** (존재 여부를 숨김) | 8회차 보안 점검과 같은 규칙 |
+| 사용자 정보를 꺼내는 곳 | `CurrentUser.from(jwt)` **한 곳** | 요청 본문의 `employeeId`를 믿지 않는다 (2회차 2-3 사례 ④). 7회차의 사내 `CurrentUser` 규칙과 이어진다 |
+
+**지시** (새 세션, Plan 모드)
+
+```text
+[목표] NFR-03 인증 기반: 개발용 로그인으로 JWT를 발급하고, 모든 API에서 토큰으로 사용자를 확인한다. 4회차의 TODO(NFR-03)를 해결한다.
+[위치] backend/ (새 패키지 auth), build.gradle.kts, application.yml, db/migration
+[범위]
+- 의존성: spring-boot-starter-security, spring-boot-starter-oauth2-resource-server (JWT 검증·발급에 Spring 기본 기능 사용, 직접 만든 필터 금지)
+- Flyway 다음 버전: employee에 employee_no(유일), password_hash, role(EMPLOYEE|ADMIN) 추가
+- POST /api/auth/login {employeeNo, password} → {accessToken, expiresIn, user}. 틀리면 사번·비밀번호 구분 없이 401
+- GET /api/me → 현재 사용자
+- JWT: HS256, 비밀키는 환경 변수 EDUHUB_JWT_SECRET, 만료 60분, sub=사원 ID, role 클레임
+- 권한: POST /api/auth/login·GET /api/v1/courses/** 공개, /api/admin/** ADMIN, 나머지 인증 필요. CSRF 끔(헤더 토큰), 세션 STATELESS
+- CurrentUser.from(Jwt) 하나로 사용자를 꺼내고, 기존 신청·취소 컨트롤러의 TODO(NFR-03)를 이것으로 바꾼다
+- dev 프로필에서만 개발용 계정 3개(사원 2, 관리자 1) 생성
+- 테스트: 로그인 성공·실패, 토큰 없음·위조 401, 신청자=토큰의 사원, 남의 신청 취소 404, 관리자 API 403/200
+[하지 않는 것] 회원가입, 비밀번호 변경, 리프레시 토큰, 프론트 화면(6회차)
+[완료 기준] ./gradlew test 통과, 아래 curl 확인
+[진행 방식] 바꿀 파일 목록과 SecurityFilterChain 설정을 먼저 보여줘
+```
+
+**계획 검토 포인트**
+- `OncePerRequestFilter`를 직접 만들어 토큰을 파싱하는 계획이면, Spring Security의 리소스 서버(`oauth2ResourceServer().jwt()`)를 쓰게 합니다 (검증 코드를 직접 만들면 만료·서명 검사를 빠뜨리기 쉽다)
+- 비밀키가 `application.yml`에 **값으로** 들어가 있으면 거절합니다 (환경 변수만)
+- 로그인 실패 메시지가 "없는 사번입니다"처럼 **어느 쪽이 틀렸는지** 알려 주면 고치게 합니다
+
+**기대하는 결과 (핵심 코드)** — 아래 코드는 실제로 빌드하고 테스트한 것입니다 (검증 내용은 이 Step 끝)
+
+```sql
+-- db/migration/V{다음 번호}__employee_login.sql
+ALTER TABLE employee ADD COLUMN employee_no   VARCHAR(20);
+ALTER TABLE employee ADD COLUMN password_hash VARCHAR(100);
+ALTER TABLE employee ADD COLUMN role          VARCHAR(20) NOT NULL DEFAULT 'EMPLOYEE';
+CREATE UNIQUE INDEX ux_employee_no ON employee (employee_no);
+```
+
+```java
+// auth/SecurityConfig.java — 누가 어떤 API를 부를 수 있는가
+package com.example.eduhub.auth;
+
+import org.springframework.context.annotation.*;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain api(HttpSecurity http) throws Exception {
+        return http
+            .csrf(csrf -> csrf.disable())                                   // 쿠키가 아니라 Authorization 헤더로 인증 → CSRF 대상 아님
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").permitAll()   // 과정 조회는 로그인 없이
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/api/health").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")                    // FR-03·08 관리자 기능
+                .anyRequest().authenticated())                                       // 그 밖(신청·취소·내 내역)은 로그인 필요
+            .oauth2ResourceServer(rs -> rs.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter())))
+            .httpBasic(b -> b.disable())
+            .formLogin(f -> f.disable())
+            .build();
+    }
+
+    /** 토큰의 role 클레임("ADMIN")을 스프링 권한("ROLE_ADMIN")으로 */
+    private JwtAuthenticationConverter roleConverter() {
+        JwtGrantedAuthoritiesConverter roles = new JwtGrantedAuthoritiesConverter();
+        roles.setAuthoritiesClaimName("role");
+        roles.setAuthorityPrefix("ROLE_");
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(roles);
+        return converter;
+    }
+
+    @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+}
+```
+
+```java
+// auth/JwtConfig.java
+package com.example.eduhub.auth;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import java.nio.charset.StandardCharsets;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.*;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
+
+/** HS256(공유 비밀키) JWT 발급(JwtEncoder)과 검증(JwtDecoder) */
+@Configuration
+public class JwtConfig {
+    private final SecretKey key;
+
+    JwtConfig(@Value("${eduhub.jwt.secret}") String secret) {
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) throw new IllegalStateException("EDUHUB_JWT_SECRET은 32바이트 이상이어야 합니다.");
+        this.key = new SecretKeySpec(bytes, "HmacSHA256");
+    }
+
+    @Bean JwtEncoder jwtEncoder() { return new NimbusJwtEncoder(new ImmutableSecret<>(key)); }
+
+    @Bean JwtDecoder jwtDecoder() { return NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build(); }
+}
+```
+
+<details>
+<summary>TokenService.java, AuthController.java, CurrentUser.java, DevDataLoader.java</summary>
+
+```java
+// auth/TokenService.java — 토큰 발급
+package com.example.eduhub.auth;
+
+import com.example.eduhub.employee.Employee;
+import java.time.Duration;
+import java.time.Instant;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TokenService {
+    private final JwtEncoder encoder;
+    private final Duration ttl;
+
+    TokenService(JwtEncoder encoder, @Value("${eduhub.jwt.ttl-minutes:60}") long ttlMinutes) {
+        this.encoder = encoder; this.ttl = Duration.ofMinutes(ttlMinutes);
+    }
+
+    public String issue(Employee e) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("eduhub")
+                .subject(String.valueOf(e.getId()))      // sub = 사원 ID → CurrentUser.employeeId()
+                .claim("name", e.getName())
+                .claim("role", e.getRole().name())       // EMPLOYEE | ADMIN
+                .issuedAt(now)
+                .expiresAt(now.plus(ttl))
+                .build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+    }
+
+    public long ttlSeconds() { return ttl.toSeconds(); }
+}
+```
+
+```java
+// auth/AuthController.java
+package com.example.eduhub.auth;
+
+import com.example.eduhub.employee.EmployeeRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+@RequestMapping("/api")
+public class AuthController {
+    public record LoginRequest(@NotBlank String employeeNo, @NotBlank String password) {}
+    public record LoginResponse(String accessToken, long expiresIn, CurrentUser user) {}
+
+    private final EmployeeRepository employees;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenService tokens;
+
+    AuthController(EmployeeRepository employees, PasswordEncoder passwordEncoder, TokenService tokens) {
+        this.employees = employees; this.passwordEncoder = passwordEncoder; this.tokens = tokens;
+    }
+
+    /** 사번·비밀번호가 맞으면 JWT를 발급. 사번이 없든 비밀번호가 틀리든 같은 401 (어느 쪽이 틀렸는지 알려 주지 않는다) */
+    @PostMapping("/auth/login")
+    public LoginResponse login(@Valid @RequestBody LoginRequest req) {
+        var e = employees.findByEmployeeNo(req.employeeNo())
+                .filter(x -> x.getPasswordHash() != null && passwordEncoder.matches(req.password(), x.getPasswordHash()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사번 또는 비밀번호가 올바르지 않습니다."));
+        return new LoginResponse(tokens.issue(e), tokens.ttlSeconds(), new CurrentUser(e.getId(), e.getName(), e.getRole().name()));
+    }
+
+    /** 새로고침 후 화면이 "지금 누구로 로그인했는지" 확인할 때 */
+    @GetMapping("/me")
+    public CurrentUser me(@AuthenticationPrincipal Jwt jwt) { return CurrentUser.from(jwt); }
+}
+```
+
+```java
+// auth/CurrentUser.java
+package com.example.eduhub.auth;
+
+import org.springframework.security.oauth2.jwt.Jwt;
+
+/** 토큰에서 꺼낸 현재 사용자. 컨트롤러는 이것으로만 사용자를 얻는다 (요청 본문의 ID를 믿지 않는다) */
+public record CurrentUser(Long employeeId, String name, String role) {
+    public static CurrentUser from(Jwt jwt) {
+        return new CurrentUser(Long.valueOf(jwt.getSubject()), jwt.getClaimAsString("name"), jwt.getClaimAsString("role"));
+    }
+    public boolean isAdmin() { return "ADMIN".equals(role); }
+}
+```
+
+```java
+// auth/DevDataLoader.java (dev 프로필 전용)
+package com.example.eduhub.auth;
+
+import com.example.eduhub.course.*;
+import com.example.eduhub.employee.*;
+import java.time.LocalDate;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+/** dev 프로필에서만: 개발용 계정과 과정 데이터. 운영에는 절대 실리지 않는다 */
+@Component
+@Profile("dev")
+class DevDataLoader implements CommandLineRunner {
+    private final EmployeeRepository employees;
+    private final CourseRepository courses;
+    private final CourseSessionRepository sessions;
+    private final PasswordEncoder encoder;
+
+    DevDataLoader(EmployeeRepository employees, CourseRepository courses, CourseSessionRepository sessions, PasswordEncoder encoder) {
+        this.employees = employees; this.courses = courses; this.sessions = sessions; this.encoder = encoder;
+    }
+
+    @Override
+    public void run(String... args) {
+        if (employees.count() > 0) return;
+        String pw = encoder.encode("dev-password");   // 개발용 공통 비밀번호
+        employees.save(new Employee("E1001", "김사원", "개발1팀", pw, Employee.Role.EMPLOYEE));
+        employees.save(new Employee("E1002", "이사원", "개발2팀", pw, Employee.Role.EMPLOYEE));
+        employees.save(new Employee("A0001", "박관리", "인사팀", pw, Employee.Role.ADMIN));
+        Course spring = courses.save(new Course("Spring Boot 입문", "BACKEND", "스프링 부트로 REST API 만들기"));
+        Course jpa = courses.save(new Course("JPA 실전", "BACKEND", "N+1과 영속성 컨텍스트"));
+        sessions.save(new CourseSession(spring, LocalDate.now().plusDays(7), "본관 3층", 1));   // 정원 1: 대기 흐름 확인용
+        sessions.save(new CourseSession(spring, LocalDate.now().plusDays(30), "온라인", 20));
+        sessions.save(new CourseSession(jpa, LocalDate.now().plusDays(14), "본관 5층", 10));
+    }
+}
+```
+
+</details>
+
+**컨트롤러: `TODO(NFR-03)`를 토큰의 사용자로 바꾼다**
+
+```java
+package com.example.eduhub.enrollment;
+
+import com.example.eduhub.auth.CurrentUser;
+import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+public class EnrollmentController {
+    private final EnrollmentService service;
+    EnrollmentController(EnrollmentService service) { this.service = service; }
+
+    /** FR-04: 신청자는 요청 본문이 아니라 토큰에서 (NFR-03) */
+    @PostMapping("/api/sessions/{sessionId}/enrollments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EnrollmentService.EnrollmentResult enroll(@PathVariable Long sessionId, @AuthenticationPrincipal Jwt jwt) {
+        return service.enroll(sessionId, CurrentUser.from(jwt).employeeId());
+    }
+
+    /** FR-06: 본인 신청만 취소 */
+    @DeleteMapping("/api/enrollments/{enrollmentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancel(@PathVariable Long enrollmentId, @AuthenticationPrincipal Jwt jwt) {
+        service.cancel(enrollmentId, CurrentUser.from(jwt).employeeId());
+    }
+
+    /** FR-07 */
+    @GetMapping("/api/me/enrollments")
+    public List<EnrollmentService.MyEnrollment> mine(@AuthenticationPrincipal Jwt jwt) {
+        return service.mine(CurrentUser.from(jwt).employeeId());
+    }
+}
+```
+
+```yaml
+# application.yml (추가)
+eduhub:
+  jwt:
+    secret: ${EDUHUB_JWT_SECRET}        # 32바이트 이상. 저장소에 쓰지 않는다 (환경 변수)
+    ttl-minutes: 60
+```
+
+```bash
+# 비밀키는 각자 만들어 셸 프로필(또는 .env를 셸에 올리는 방법, Step 7 참고)에. .env.example에는 변수 이름만
+export EDUHUB_JWT_SECRET="$(openssl rand -base64 48)"
+```
+
+```powershell
+# Windows PowerShell
+$env:EDUHUB_JWT_SECRET = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+**테스트**
+
+```java
+// src/test/.../auth/AuthControllerTest.java — 실제로 로그인해 받은 토큰으로 호출
+package com.example.eduhub.auth;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import com.example.eduhub.employee.Employee;
+import com.example.eduhub.employee.EmployeeRepository;
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+class AuthControllerTest {
+    @Autowired MockMvc mvc;
+    @Autowired EmployeeRepository employees;
+    @Autowired PasswordEncoder encoder;
+
+    @BeforeEach
+    void setUp() {
+        employees.save(new Employee("T0001", "테스트사원", "QA", encoder.encode("pw-1234"), Employee.Role.EMPLOYEE));
+    }
+
+    private String login(String employeeNo, String password) {
+        return """
+            {"employeeNo":"%s","password":"%s"}""".formatted(employeeNo, password);
+    }
+
+    @Test
+    void 사번과_비밀번호가_맞으면_토큰을_발급하고_그_토큰으로_내_정보를_본다() throws Exception {
+        String body = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(login("T0001", "pw-1234")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.name").value("테스트사원"))
+                .andExpect(jsonPath("$.user.role").value("EMPLOYEE"))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(body, "$.accessToken");
+
+        mvc.perform(get("/api/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("테스트사원"));
+    }
+
+    @Test
+    void 비밀번호가_틀리면_401() throws Exception {
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(login("T0001", "wrong")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 토큰이_없거나_위조되면_401() throws Exception {
+        mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/me").header("Authorization", "Bearer abc.def.ghi")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 과정_조회는_로그인_없이_된다() throws Exception {
+        mvc.perform(get("/api/v1/courses")).andExpect(status().isOk());
+    }
+}
+```
+
+<details>
+<summary>EnrollmentSecurityTest.java — 토큰 발급 없이 jwt()로 "이 사람으로 로그인한 요청" 만들기</summary>
+
+```java
+package com.example.eduhub.enrollment;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import com.example.eduhub.course.*;
+import com.example.eduhub.employee.*;
+import com.jayway.jsonpath.JsonPath;
+import java.time.LocalDate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.transaction.annotation.Transactional;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Transactional
+class EnrollmentSecurityTest {
+    @Autowired MockMvc mvc;
+    @Autowired EmployeeRepository employees;
+    @Autowired CourseRepository courses;
+    @Autowired CourseSessionRepository sessions;
+
+    Long kimId, leeId, sessionId;
+
+    @BeforeEach
+    void setUp() {
+        kimId = employees.save(new Employee("T1001", "김사원", "개발1팀", null, Employee.Role.EMPLOYEE)).getId();
+        leeId = employees.save(new Employee("T1002", "이사원", "개발2팀", null, Employee.Role.EMPLOYEE)).getId();
+        Course c = courses.save(new Course("Spring Boot 입문", "BACKEND", null));
+        sessionId = sessions.save(new CourseSession(c, LocalDate.now().plusDays(7), "본관", 1)).getId();
+    }
+
+    /** 테스트에서 "이 사람으로 로그인한 요청"을 만든다. 토큰 발급 없이 검증된 JWT를 흉내 낸다 */
+    static RequestPostProcessor as(Long employeeId, String role) {
+        return jwt().jwt(j -> j.subject(String.valueOf(employeeId)).claim("role", role))
+                    .authorities(new SimpleGrantedAuthority("ROLE_" + role));
+    }
+
+    @Test
+    void 로그인하지_않으면_신청할_수_없다() throws Exception {
+        mvc.perform(post("/api/sessions/{id}/enrollments", sessionId)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 신청자는_요청이_아니라_토큰의_사원이다() throws Exception {
+        mvc.perform(post("/api/sessions/{id}/enrollments", sessionId).with(as(kimId, "EMPLOYEE")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+        mvc.perform(get("/api/me/enrollments").with(as(kimId, "EMPLOYEE")))
+                .andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/me/enrollments").with(as(leeId, "EMPLOYEE")))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void 남의_신청은_취소할_수_없다_404() throws Exception {
+        String body = mvc.perform(post("/api/sessions/{id}/enrollments", sessionId).with(as(kimId, "EMPLOYEE")))
+                .andReturn().getResponse().getContentAsString();
+        Integer enrollmentId = JsonPath.read(body, "$.enrollmentId");
+
+        mvc.perform(delete("/api/enrollments/{id}", enrollmentId).with(as(leeId, "EMPLOYEE"))).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/enrollments/{id}", enrollmentId).with(as(kimId, "EMPLOYEE"))).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void 명단은_관리자만_본다_403() throws Exception {
+        mvc.perform(get("/api/admin/sessions/{id}/roster", sessionId).with(as(kimId, "EMPLOYEE"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/sessions/{id}/roster", sessionId).with(as(kimId, "ADMIN"))).andExpect(status().isOk());
+    }
+
+    @Test
+    void 정원이_차면_대기_그리고_취소하면_대기자가_확정된다() throws Exception {
+        String first = mvc.perform(post("/api/sessions/{id}/enrollments", sessionId).with(as(kimId, "EMPLOYEE"))).andReturn().getResponse().getContentAsString();
+        mvc.perform(post("/api/sessions/{id}/enrollments", sessionId).with(as(leeId, "EMPLOYEE")))
+                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andExpect(jsonPath("$.waitingNo").value(1));
+        mvc.perform(delete("/api/enrollments/{id}", (Integer) JsonPath.read(first, "$.enrollmentId")).with(as(kimId, "EMPLOYEE")));
+        mvc.perform(get("/api/me/enrollments").with(as(leeId, "EMPLOYEE")))
+                .andExpect(jsonPath("$[0].status").value("CONFIRMED"));
+    }
+}
+```
+
+</details>
+
+> 💡 테스트용 비밀키는 `src/test/resources/application-test.yml`에 **테스트 전용 값**으로 둡니다(`eduhub.jwt.secret: test-secret-…`, 32바이트 이상). 운영 비밀이 아니므로 커밋해도 됩니다. DB는 3회차에 정한 테스트 방식(Testcontainers 등)을 그대로 씁니다.
+
+**직접 확인** (백엔드를 dev 프로필로 실행한 뒤)
+
+```bash
+# 로그인 → 토큰
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"employeeNo":"E1001","password":"dev-password"}' | jq -r .accessToken)
+curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/api/me                                  # 401
+curl -s localhost:8080/api/me -H "Authorization: Bearer $TOKEN"                                  # {"employeeId":1,"name":"김사원","role":"EMPLOYEE"}
+curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/api/admin/sessions/1/roster -H "Authorization: Bearer $TOKEN"   # 403
+```
+
+```powershell
+# Windows PowerShell
+$login = Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/auth/login -ContentType 'application/json' -Body '{"employeeNo":"E1001","password":"dev-password"}'
+Invoke-RestMethod -Uri http://localhost:8080/api/me -Headers @{ Authorization = "Bearer $($login.accessToken)" }
+```
+
+| 개발용 계정 (dev 프로필) | 사번 | 비밀번호 | 역할 |
+|---|---|---|---|
+| 김사원 | `E1001` | `dev-password` | EMPLOYEE |
+| 이사원 | `E1002` | `dev-password` | EMPLOYEE |
+| 박관리 | `A0001` | `dev-password` | ADMIN |
+
+> ✅ 이 교재 환경에서 Spring Boot 3.5.16 + PostgreSQL 16 + Flyway로 위 코드를 실행해 확인했습니다: 테스트 9개 통과(로그인 성공·실패, 토큰 없음·위조 401, 과정 조회 공개, 신청자=토큰의 사원, 남의 신청 취소 404, 관리자 API 403/200, 정원 초과 시 대기와 취소 후 자동 확정). `/api/admin/**`의 `hasRole("ADMIN")`을 일부러 `authenticated()`로 바꾸면 테스트가 실패하는 것도 확인했습니다. 과정·신청 쪽 코드는 4~5회차 교재와 같은 규칙으로 만든 축약본이라 팀 코드와 클래스 이름이 다를 수 있습니다.
+
+> 💬 **강사 노트:** "왜 JWT를 직접 파싱하지 않나요?"라는 질문이 나오면, 서명·만료·알고리즘 검사를 빠뜨린 직접 구현이 흔한 보안 사고라는 점을 말합니다. 인증처럼 **검증된 표준 구현이 있는 영역은 그것을 쓰게** 지시하는 것도 개발자의 판단입니다 (2회차 2-2 아키텍처 지식 지도의 "보안").
+
+---
+
 ## Step 10. FR-07 내 신청 내역 구현
 
 권한 모드 **Plan**으로 지시합니다.
@@ -1844,7 +2380,7 @@ eduhub-db로 다음만 조회해줘. 행 데이터는 최대 5건까지만.
 - GET /api/me/enrollments?status=CONFIRMED (status 생략 시 전체), 페이지 단위
 - 응답 DTO: 신청 ID, 과정 제목, 회차 시작일·장소, 상태, 대기 순번, 신청 일시
 - 과정·회차는 fetch join 또는 DTO 프로젝션으로 한 번에 조회 (N+1 금지)
-- 사원 ID는 요청 파라미터가 아니라 인증 정보에서 가져온다 (NFR-03)
+- 사원 ID는 요청 파라미터가 아니라 인증 정보에서 가져온다: `CurrentUser.from(jwt).employeeId()` (NFR-03, Step 9-1)
 - OpenAPI 어노테이션(@Operation, 응답 코드)
 - Step 9 결과 인덱스가 없으면 Flyway 새 버전 파일로 추가
 [하지 않는 것] 화면, FR-08
@@ -1935,7 +2471,7 @@ eduhub-db로 테스트용 회차 하나를 골라 CONFIRMED/WAITING 건수만 �
 그 회차로 명단 API를 로컬에서 호출했을 때 기대 결과를 정리해줘.
 ```
 
-> ✅ **확인**: 관리자 토큰과 일반 사원 토큰으로 각각 호출해 200과 403이 나오는지 직접 확인합니다 (팀의 인증 방식에 맞게). 커밋·푸시·PR은 Step 10과 같습니다 (`feat(enrollment): 회차 명단 조회와 수료 처리 API 추가 (FR-08)`).
+> ✅ **확인**: 관리자 토큰과 일반 사원 토큰으로 각각 호출해 200과 403이 나오는지 직접 확인합니다. 토큰은 Step 9-1처럼 `A0001`(관리자), `E1001`(사원)로 로그인해 받습니다. 커밋·푸시·PR은 Step 10과 같습니다 (`feat(enrollment): 회차 명단 조회와 수료 처리 API 추가 (FR-08)`).
 
 ---
 

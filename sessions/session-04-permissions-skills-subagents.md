@@ -544,7 +544,7 @@ CREATE UNIQUE INDEX ux_enrollment_active
     WHERE status IN ('CONFIRMED', 'WAITING');
 ```
 
-> ⚠️ `employeeId`는 요청 본문이 아니라 **로그인한 사용자 정보**에서 가져와야 합니다(NFR-03). 인증은 이후 회차에서 붙이므로, 오늘은 서비스 메서드의 인자로 받고 Controller에 `TODO(NFR-03)`를 남깁니다.
+> ⚠️ `employeeId`는 요청 본문이 아니라 **로그인한 사용자 정보**에서 가져와야 합니다(NFR-03). 인증은 이후 회차에서 붙이므로, 오늘은 서비스 메서드의 인자로 받고 Controller에 `TODO(NFR-03)`를 남깁니다. 이 TODO는 [5회차 Step 9-1](./session-05-hooks-and-mcp.md#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에)에서 JWT 인증으로 해결합니다.
 
 ### 4-3-1. 비관적 락을 쓰면 처리량이 떨어지지 않나?
 

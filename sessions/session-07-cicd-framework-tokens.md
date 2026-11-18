@@ -178,6 +178,8 @@ Claude는 공개된 Spring, React 코드로 학습했습니다. 그래서 사내
 | **에러 코드** `ErrorCode` | `도메인_의미` 이름, HTTP 상태와 메시지를 함께 정의 | 문자열 메시지 하드코딩, 상태 코드 임의 지정 |
 | **사내 인증 필터** `CorpAuthFilter` | 사용자 정보는 `CurrentUser`로만 꺼냄 | 요청 본문의 `userId`를 그대로 믿음 (2회차 2-3 사례 ④) |
 
+> 💡 EduHub에는 5회차 [Step 9-1](./session-05-hooks-and-mcp.md#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에)에서 만든 JWT 인증과 `CurrentUser.from(jwt)`가 이미 있습니다. 이번 회차의 가상 사내 모듈은 "회사가 정한 `CurrentUser`를 반드시 쓴다"는 규칙을 Claude가 따르게 하는 연습이므로, 실습에서는 5회차의 `CurrentUser`를 `corp-common`의 것으로 옮겼다고 가정합니다 (인증 필터의 실제 구현은 회사마다 SSO 연동 방식에 따라 다르다).
+
 ```java
 // corp-common (가상) — 사내 공통 모듈의 핵심 API
 public record ApiResponse<T>(boolean success, T data, ErrorBody error) {
