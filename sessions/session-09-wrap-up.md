@@ -63,8 +63,8 @@
 | [2회차](./session-02-hands-on-kickoff.md) | 토큰 습관, 프로젝트 생성, GitHub 연결, 요구사항 전달 | 저장소, `docs/requirements.md`, 뼈대 | 한 세션 = 한 작업. **AI는 How, 개발자는 What·Why·Where** |
 | [3회차](./session-03-feature-dev-and-github.md) | 탐색 → 계획 → 구현 → 검증, PR·리뷰·충돌 해결, 세션 관리 | FR-01~03 과정 조회·관리 | 핵심 업무 규칙의 **테스트는 사람이** 쓰고 Claude가 통과시킨다 |
 | [4회차](./session-04-permissions-skills-subagents.md) | 권한, 스킬, 서브에이전트 | FR-04~06 수강 신청, NFR-01 동시성 | **deny는 어디서든 이긴다.** 락을 빼면 실패하는 테스트가 진짜 테스트 |
-| [5회차](./session-05-hooks-and-mcp.md) | 훅, MCP (개발 DB 읽기 전용), MCP vs CLI | 인증(JWT), FR-07~08 내 신청·명단·수료 | 훅은 **강제**, MCP는 **개발 DB + 읽기 전용 계정**으로만 |
-| [6회차](./session-06-plugins-artifacts-mfe.md) | 플러그인, 아티팩트, 병렬 작업 | MFE 완성, 로그인·신청 화면, FR-09 알림 | 플러그인은 **팀 자산의 배포 단위**, 알림은 **커밋 이후에** |
+| [5회차](./session-05-hooks-and-mcp.md) | 훅, MCP (개발 DB 읽기 전용), MCP vs CLI | 인증(JWT), FR-07~08 내 신청·명단·수료, 로그인과 전체 화면(하나의 앱) | 훅은 **강제**, MCP는 **개발 DB + 읽기 전용 계정**으로만 |
+| [6회차](./session-06-plugins-artifacts-mfe.md) | 플러그인, 아티팩트, 병렬 작업 | 하나의 앱을 MFE로 쪼개기, FR-09 알림 | 플러그인은 **팀 자산의 배포 단위**, 알림은 **커밋 이후에** |
 | [7회차](./session-07-cicd-framework-tokens.md) | GitHub Actions, 사내 프레임워크, 토큰 측정 | CI/CD, 런북, NFR-05·06 | **CI가 기준**이고, 배포의 문은 사람이 연다 |
 | [8회차](./session-08-automation-sdk-governance.md) | 헤드리스, Agent SDK, 거버넌스 | NFR-02 성능, NFR-03 보안, 핫픽스 훈련 | **AI 없이 고치고, 배포하고, 되돌릴 수 있어야** 시스템의 주인 |
 

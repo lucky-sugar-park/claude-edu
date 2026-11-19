@@ -1,11 +1,11 @@
 # 6회차: 플러그인·아티팩트 — 마이크로프론트엔드 완성과 알림(FR-09)
 
-🧭 ⬅️ 이전: [5회차: 훅과 MCP — 품질 자동화와 외부 연결 (FR-07~08)](./session-05-hooks-and-mcp.md) · ➡️ 다음: [7회차: CI/CD·환경 분리 완성·사내 프레임워크·토큰 최적화 (NFR-05, NFR-06)](./session-07-cicd-framework-tokens.md) · 📚 [전체 커리큘럼](../CURRICULUM.md#-회차별-강의-자료)
+🧭 ⬅️ 이전: [5회차: 훅과 MCP — 품질 자동화와 외부 연결 (FR-07~08, 로그인과 화면)](./session-05-hooks-and-mcp.md) · ➡️ 다음: [7회차: CI/CD·환경 분리 완성·사내 프레임워크·토큰 최적화 (NFR-05, NFR-06)](./session-07-cicd-framework-tokens.md) · 📚 [전체 커리큘럼](../CURRICULUM.md#-회차별-강의-자료)
 
 > **대상**: 5회차까지 EduHub에 훅과 MCP를 적용한 수강생
 > **시간**: 120분 (강의 약 40% + 따라하기 약 60%)
 > **목표**
-> 1. EduHub 프론트엔드를 **shell + course-mfe + enrollment-mfe** 구조로 완성하고, 마이크로프론트엔드에서 **개발자가 통제해야 할 경계**(공유 의존성, 테마, API 클라이언트, 라우팅)를 설명할 수 있다
+> 1. 5회차에 완성한 **하나의 React 앱**을 **shell + course-mfe + enrollment-mfe**로 쪼개고, 마이크로프론트엔드에서 **개발자가 통제해야 할 경계**(공유 의존성, 테마, API 클라이언트, 라우팅, remote끼리 import 금지)를 설명할 수 있다
 > 2. 서로 간섭하지 않는 작업을 **워크트리와 병렬 세션**으로 나눠 진행하고, 병렬 수를 "리뷰할 수 있는 양"으로 정할 수 있다
 > 3. FR-09 알림을 **트랜잭션 커밋 이후 이벤트**로 구현하고, 그 이유를 설명할 수 있다
 > 4. 3~5주차에 만든 `.claude/` 자산(스킬, 에이전트, 훅)을 **팀 플러그인**으로 묶고, 마켓플레이스로 배포·설치할 수 있다. 남이 만든 플러그인은 **설치 전에 검토**한다
@@ -13,7 +13,7 @@
 >
 > **관련 모듈**: 14(플러그인), 15(아티팩트)
 > **사전 준비**
-> - 5회차 PR이 `main`에 병합되어 있고, `git switch main && git pull`로 최신 상태
+> - 5회차 PR이 `main`에 병합되어 있고, `git switch main && git pull`로 최신 상태. 특히 **5회차 6장(로그인과 화면 완성)**까지 끝나 [6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기)가 `http://localhost:3001`에서 동작해야 합니다 (오늘은 이 앱을 쪼갭니다)
 > - Node.js LTS, `frontend/` 의존성 설치(`npm install`) 완료
 > - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 안내를 봅니다
 > - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나
@@ -31,7 +31,7 @@
 | 0:20 – 0:35 | 2. 플러그인: 팀의 `.claude/`를 한 번에 배포하기 | 강의 + 시연 |
 | 0:35 – 0:45 | 3. 아티팩트: 결과물을 화면으로 공유하기 | 강의 |
 | 0:45 – 0:53 | ☕ 휴식 | — |
-| 0:53 – 1:33 | 4. 따라하기 ①: MFE 분리 완성 + **로그인·신청 화면** (워크트리 병렬 세션) | 실습 |
+| 0:53 – 1:33 | 4. 따라하기 ①: 5회차 앱을 MFE로 쪼개기 (워크트리 병렬 세션) | 실습 |
 | 1:33 – 1:45 | 5. 따라하기 ②: FR-09 알림 (커밋 이후 이벤트) | 실습 |
 | 1:45 – 1:57 | 6. 따라하기 ③: 팀 플러그인 만들기·배포·설치 | 실습 |
 | — | 7. 따라하기 ④: 주간 진행 현황 아티팩트 | **과제** (시간이 남으면 수업 중) |
@@ -97,7 +97,7 @@ flowchart LR
 | **shell (host)** | 공통 레이아웃, MUI 테마(`ThemeProvider`), 최상위 라우팅, 로그인 상태 | 업무 화면 직접 구현 |
 | **course-mfe** | 과정 목록·상세·관리 화면 (FR-01~03) | 신청 로직, 다른 remote 직접 import |
 | **enrollment-mfe** | 신청·취소, 내 신청 내역, 명단 (FR-04~08) | 과정 관리 화면 |
-| **packages/api-client** | OpenAPI 스펙으로 **생성**한 API 호출 코드 | 손으로 고치기 (다시 생성하면 사라진다) |
+| **packages/api-client** | OpenAPI 스펙으로 **생성**한 API 호출 코드(`generated/`) + 손으로 쓴 토큰 처리(`auth.ts`)와 인스턴스(`index.ts`) | `generated/` 손으로 고치기 (다시 생성하면 사라진다) |
 
 ---
 
@@ -129,23 +129,21 @@ shared: {
 
 ## 1-3. 병렬로 나눠도 되는 일, 순서대로 해야 하는 일
 
-이번 주 프론트엔드 작업은 **나눌 수 있는 일**과 **먼저 끝내야 하는 일**이 섞여 있습니다.
+이번 주 프론트엔드 작업(5회차 앱 쪼개기)은 **나눌 수 있는 일**과 **먼저 끝내야 하는 일**이 섞여 있습니다.
 
 ```mermaid
 flowchart LR
-    A["① api-client 재생성<br/>(공통, 먼저 혼자)"] --> B["② shared·테마 정리<br/>(shell, 먼저 혼자)"]
-    B --> C1["③-a course-mfe<br/>워크트리 세션 1"]
-    B --> C2["③-b enrollment-mfe<br/>워크트리 세션 2"]
-    C1 --> D["④ shell 라우팅 연결<br/>(마지막, 혼자)"]
+    A["① 파일 옮기기와 공통 기반<br/>api-client · shell<br/>(먼저, 혼자)"] --> C1["②-a course-mfe를 remote로<br/>워크트리 세션 1"]
+    A --> C2["②-b enrollment-mfe를 remote로<br/>워크트리 세션 2"]
+    C1 --> D["③ 합치기 · 통합 확인<br/>3000 · 3001 · 3002 동시 실행<br/>(마지막, 혼자)"]
     C2 --> D
-    D --> E["⑤ 통합 확인<br/>3000 · 3001 · 3002 동시 실행"]
 ```
 
 | 구분 | 작업 | 이유 |
 |---|---|---|
-| **먼저, 혼자** | api-client 재생성, shared·테마 | 모든 remote가 쓰는 **공통 파일**. 동시에 고치면 충돌 |
-| **병렬** | course-mfe, enrollment-mfe | 디렉터리가 분리되어 서로 건드리지 않음 |
-| **마지막, 혼자** | shell 라우팅 연결, 통합 확인 | 두 remote의 결과가 모두 있어야 가능 |
+| **먼저, 혼자** | 파일 옮기기(`git mv`), api-client에 토큰 처리·인스턴스, shell(로그인·레이아웃·라우팅·shared) | 모든 앱이 쓰는 **공통 파일**과 여러 앱에 걸친 이동. 동시에 고치면 충돌 |
+| **병렬** | course-mfe, enrollment-mfe를 각각 remote로 | 디렉터리가 분리되어 서로 건드리지 않음 |
+| **마지막, 혼자** | 병합, 세 앱 동시 실행, 5회차와 같은 확인 표로 비교 | 두 remote의 결과가 모두 있어야 가능 |
 
 **병렬 방식 고르기** ([병렬 작업 비교](../examples/17-parallel-work-terminal-vs-desktop.md))
 
@@ -347,9 +345,29 @@ npm run preview --workspace apps/shell        # 3000 (다른 창)
 
 ---
 
-## 1-5. 로그인과 화면 조립: 누가 무엇을 책임지나
+## 1-5. 하나의 앱을 쪼개기: 무엇이 어디로 가나
 
-5회차 [Step 9-1](./session-05-hooks-and-mcp.md#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에)에서 백엔드는 JWT로 사용자를 확인합니다. 이번 주에는 **로그인 화면**과 **신청·내 신청 내역·명단 화면**을 만들어, 10회차 데모 흐름(로그인 → 검색 → 상세에서 신청 → 대기 → 취소 → 관리자 명단·수료)이 실제로 동작하게 합니다.
+5회차 [6장](./session-05-hooks-and-mcp.md#6-따라하기-③-로그인과-화면-완성-하나의-react-앱)에서 `apps/course-mfe` 하나에 로그인과 모든 화면을 만들었습니다. 오늘은 **코드를 새로 쓰지 않고 옮겨서** 세 앱으로 나눕니다. 5회차에 폴더를 갈 곳별로 나눠 둔 이유가 여기서 드러납니다.
+
+| 5회차 위치 (`apps/course-mfe/src/`) | 6회차 위치 | 바뀌는 것 |
+|---|---|---|
+| `api/http.ts` (+ 테스트) | `packages/api-client/src/auth.ts` (+ 테스트) | import 한 줄. **모든 앱이 같은 토큰 처리를 쓰도록** 패키지로 |
+| `api/clients.ts`, `api/courseApi.ts`의 인스턴스 생성 | `packages/api-client/src/index.ts` | 인스턴스를 패키지가 만든다. `courseApi.ts`는 다시 내보내기만 (3회차 import 경로 유지) |
+| `auth/AuthContext.tsx`, `auth/RequireAuth.tsx` | `apps/shell/src/auth/` | import 경로만 (`@eduhub/api-client`) |
+| `auth/LoginPage.tsx`, `main.tsx`, `theme.ts`, `App.tsx` | `apps/shell/src/` | `App.tsx`: 일반 import → **remote를 `React.lazy`로** 불러오기 |
+| `pages/`, `hooks/` | 그대로 (`apps/course-mfe`) | `CourseDetailPage`: 신청 버튼을 직접 import하지 않고 **슬롯(`renderSessionAction`)**으로, 관리자 확인은 `useAuth` 대신 `tokenStore` |
+| `enrollment/EnrollButton.tsx` | `apps/enrollment-mfe/src/components/` | `useAuth` 대신 `tokenStore` |
+| `enrollment/MyEnrollmentsPage.tsx`, `RosterPage.tsx` | `apps/enrollment-mfe/src/pages/` | import 경로만 |
+
+**쪼갤 때 반드시 바뀌는 다섯 가지** (나머지는 옮기기만 한다)
+
+| # | 하나의 앱에서는 | 쪼개면 | 이유 |
+|---|---|---|---|
+| ① | 화면이 `src/api/http.ts`를 import | **api-client 패키지**의 `http`·`tokenStore`, 패키지를 `shared` singleton으로 | 앱마다 `http`가 따로 있으면 토큰 처리·401 이벤트가 여러 벌이 된다 |
+| ② | 화면이 `useAuth()`로 로그인 사용자를 안다 | remote는 `tokenStore.user()`·`tokenStore.get()` (화면 표시용) | `AuthContext`는 shell 것이다. **remote는 shell을 import할 수 없다** (1-2) |
+| ③ | `CourseDetailPage`가 `EnrollButton`을 직접 import | 상세는 슬롯을 열어 두고 **shell이 두 remote를 조합** | **remote끼리 직접 import 금지** (1-2). 서로 배포가 묶인다 |
+| ④ | `App.tsx`가 화면을 일반 import | `React.lazy(() => import('courseMfe/…'))` + `Suspense` + 오류 경계 | remote는 실행 중에 다른 서버(3001·3002)에서 받는다. 꺼져 있어도 shell은 떠야 한다 |
+| ⑤ | 테마·라우터·React가 하나 | shell만 `ThemeProvider`·`BrowserRouter`. 모든 앱의 `shared`에 react·react-dom·react-router-dom·MUI·emotion·api-client를 singleton | 두 벌이면 Hook 오류, 라우터 오류, 색이 다른 화면 (1-4) |
 
 ```mermaid
 flowchart TB
@@ -361,6 +379,7 @@ flowchart TB
     subgraph CM["course-mfe :3001"]
         CL["CourseListPage"]
         CD["CourseDetailPage<br/>renderSessionAction 자리"]
+        CF["CourseFormPage (관리자)"]
     end
     subgraph EM["enrollment-mfe :3002"]
         EB["EnrollButton"]
@@ -383,14 +402,12 @@ flowchart TB
 | 로그인 필요·관리자 전용 라우트 | **shell** (`RequireAuth`) | 라우트는 shell이 가진다 |
 | 요청마다 토큰 붙이기, 401이면 토큰 지우기 | **api-client** (`http` 인터셉터) | 모든 remote가 이 클라이언트로만 API를 부르므로 한 곳에서 처리 |
 | 토큰 보관 | **api-client** (`tokenStore`, localStorage) | shell과 remote는 **같은 페이지(origin 3000)**에서 실행되므로 함께 읽는다 |
-| 과정 상세 | **course-mfe** | FR-02. 신청은 모른다 |
+| 과정 목록·상세·등록·수정 | **course-mfe** | FR-01~03. 신청은 모른다 |
 | 신청 버튼, 내 신청 내역, 명단·수료 | **enrollment-mfe** | FR-04~08 |
-| 상세 화면 안에 신청 버튼 넣기 | **shell**이 `renderSessionAction`으로 조립 | **remote끼리 직접 import 금지**(1-2) 규칙을 지키면서 한 화면에 두 remote를 함께 보여 준다 |
+| 상세 화면 안에 신청 버튼 넣기 | **shell**이 `renderSessionAction`으로 조립 | remote끼리 직접 import하지 않으면서 한 화면에 두 remote를 함께 보여 준다 |
 | 401을 shell에 알리기 | api-client가 `eduhub:unauthorized` **이벤트**를 보냄 | remote·api-client가 shell을 import하지 않게 |
 
-> ⚠️ **화면의 권한 확인은 편의일 뿐입니다.** `RequireAuth`나 "로그인 후 신청" 버튼은 사용자에게 길을 안내할 뿐이고, 실제로 막는 것은 백엔드(401·403)입니다. 화면만 막고 API를 열어 두면 누구나 curl로 부를 수 있습니다.
-
-> 🔐 **토큰을 localStorage에 두는 것의 위험**: 페이지에 악성 스크립트가 들어오면(XSS) 토큰을 읽어 갈 수 있습니다. 교육에서는 구조를 단순하게 하려고 localStorage를 쓰고, 토큰 만료를 60분으로 짧게 둡니다. 실제 서비스에서는 `HttpOnly` 쿠키, 짧은 만료 + 리프레시 토큰, 사내 SSO를 함께 검토합니다 (8회차 보안 점검에서 다시 봅니다).
+> ⚠️ 화면의 권한 확인은 편의일 뿐이고, 토큰을 localStorage에 두는 것의 위험도 그대로입니다. 쪼갠 뒤에도 5회차 [Step 14](./session-05-hooks-and-mcp.md#step-14-로그인-토큰-처리-로그인-상태-보호-라우트)의 ⚠️·🔐 내용은 같습니다.
 
 ---
 
@@ -551,102 +568,79 @@ sequenceDiagram
 
 ---
 
-# 4. 따라하기 ①: MFE 분리 완성 (워크트리 병렬 세션)
+# 4. 따라하기 ①: 5회차 앱을 MFE로 쪼개기 (워크트리 병렬 세션)
 
-> **목표**: shell(3000)에서 course-mfe(3001)와 enrollment-mfe(3002)를 불러와 하나의 앱처럼 동작하게 합니다. 공통 작업은 혼자, remote 작업은 병렬로 진행합니다.
+> **목표**: 5회차에 완성한 `apps/course-mfe` 하나를 shell(3000) + course-mfe(3001) + enrollment-mfe(3002)로 나누고, **쪼개기 전과 같은 기능**이 그대로 동작하는지 같은 확인 표로 비교합니다. 공통 작업은 혼자, remote 작업은 병렬로 진행합니다.
+
+> 💡 **먼저 "정답"을 확인해 둡니다.** 시작 전에 `main`에서 5회차 앱을 띄워 [5회차 6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기)가 동작하는지 봅니다. 쪼갠 뒤 같은 표로 비교합니다.
 
 ---
 
-## Step 1. 브랜치와 공통 작업 (혼자)
+## Step 1. 브랜치, 파일 옮기기, 공통 기반 (혼자, 먼저)
 
 ```bash
 git switch main && git pull
-git switch -c feature/fr-07-mfe-split
+git switch -c feature/mfe-split
 ```
 
-새 세션(또는 `/clear`)에서 Plan 모드로 지시합니다.
+**① 파일 옮기기는 사람이 `git mv`로** (Claude에게 맡겨도 되지만, 무엇이 어디로 가는지는 1-5 표로 사람이 정한다). `git mv`로 옮기면 Git이 "이름 바뀜"으로 기록해 이력이 이어집니다.
+
+```bash
+cd frontend
+# 토큰 처리 → api-client 패키지
+git mv apps/course-mfe/src/api/http.ts      packages/api-client/src/auth.ts
+git mv apps/course-mfe/src/api/http.test.ts packages/api-client/src/auth.test.ts
+git rm apps/course-mfe/src/api/clients.ts   # 인스턴스는 packages/api-client/src/index.ts가 만든다
+# 로그인·레이아웃·라우팅·테마 → shell (2회차 뼈대)
+mkdir -p apps/shell/src/auth apps/shell/src/pages
+git mv apps/course-mfe/src/auth/AuthContext.tsx apps/course-mfe/src/auth/RequireAuth.tsx apps/shell/src/auth/
+git mv apps/course-mfe/src/auth/LoginPage.tsx apps/shell/src/pages/
+git mv -f apps/course-mfe/src/main.tsx apps/course-mfe/src/App.tsx apps/course-mfe/src/theme.ts apps/shell/src/   # -f: 뼈대 파일 덮어쓰기
+# 신청 화면 → enrollment-mfe (2회차 뼈대)
+mkdir -p apps/enrollment-mfe/src/components apps/enrollment-mfe/src/pages
+git mv apps/course-mfe/src/enrollment/EnrollButton.tsx apps/course-mfe/src/enrollment/EnrollButton.test.tsx apps/enrollment-mfe/src/components/
+git mv apps/course-mfe/src/enrollment/MyEnrollmentsPage.tsx apps/course-mfe/src/enrollment/RosterPage.tsx \
+       apps/course-mfe/src/enrollment/RosterPage.test.tsx apps/enrollment-mfe/src/pages/
+git status        # renamed: 로 보이는지 확인
+```
+
+```powershell
+# Windows PowerShell: 위 명령을 그대로 쓰되, 줄 끝의 \ 대신 한 줄로 쓰고 mkdir -p 대신
+New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, apps/enrollment-mfe/src/components, apps/enrollment-mfe/src/pages
+```
+
+이 상태에서는 세 앱 모두 빌드되지 않습니다(옮긴 파일의 import가 깨짐). Step 1에서 **api-client와 shell**을, Step 2에서 두 remote를 고칩니다.
+
+**② 공통 기반 지시** (새 세션, Plan 모드)
 
 ```text
-[목표] 마이크로프론트엔드 분리를 위한 공통 기반을 정리한다
-[위치] @frontend/apps/shell/vite.config.ts, @frontend/packages/api-client
+[목표] 옮긴 파일로 api-client와 shell을 완성한다 (1-5의 바뀌는 다섯 가지 중 ①④⑤)
+[위치] @frontend/packages/api-client, @frontend/apps/shell
 [범위]
-- 백엔드 OpenAPI 스펙(/v3/api-docs)으로 packages/api-client를 다시 생성
-- shell의 Module Federation 설정(@module-federation/vite의 federation()): shared에 react, react-dom, @mui/material, @emotion/react를 singleton, 같은 버전 범위
-- remote 모듈 타입 선언 src/remotes.d.ts, 플러그인 옵션 dts: false
-- MUI 테마를 shell의 theme.ts 한 곳에 정의
-- shared에 react-router-dom과 @eduhub/api-client도 singleton으로 (라우터 상태와 토큰 처리를 shell·remote가 함께 쓰도록)
-- 개발 서버·미리보기에서 /api 를 http://localhost:8080 으로 프록시 (CORS 없이 같은 origin)
-- 로그인 (1-5): api-client에 src/auth.ts(손으로 작성, generated/ 밖) — tokenStore(localStorage), http(Axios 인스턴스: 요청마다 Bearer 토큰, 401이면 토큰 삭제 + eduhub:unauthorized 이벤트, 403은 로그아웃 안 함)
-  생성된 *Api 클래스는 index.ts 한 곳에서 new XxxApi(config, undefined, http)로 만든다
-- shell: AuthContext(user, expired, login, logout, 401 이벤트 처리, 새로고침 시 /api/me 확인), RequireAuth(로그인·관리자), LoginPage(로그인 후 원래 가려던 화면으로)
-- 테스트: api-client의 토큰 첨부·401 처리·403은 유지 (Vitest)
-[하지 않는 것] course-mfe, enrollment-mfe 화면 수정 (다음 단계에서 병렬로), 백엔드 수정
-[완료 기준] npm run build --workspace apps/shell 성공, npm test --workspace packages/api-client 통과, api-client 생성 스크립트가 package.json에 있음
+- api-client: src/auth.ts(옮겨 온 http.ts)의 CurrentUser import를 ./generated/api로.
+  src/index.ts에서 generated와 auth를 내보내고, authApi·courseApi·enrollmentApi·adminEnrollmentApi를 new XxxApi(config, undefined, http)로 만든다.
+  auth.test.ts가 패키지에서 돌도록 vitest(jsdom) 설정
+- shell: auth/·pages/LoginPage의 import를 @eduhub/api-client로. App.tsx의 화면 import를 remote React.lazy로
+  (courseMfe: CourseListPage(이름 있는 export), CourseDetailPage, CourseFormPage / enrollmentMfe: EnrollButton, MyEnrollmentsPage, RosterPage),
+  Suspense + 오류 경계(remote가 꺼져 있으면 MUI Alert). /courses/:courseId에서 CourseDetailPage의 renderSessionAction으로 EnrollButton 조립
+- shell vite.config.ts: federation() 호스트(@module-federation/vite), remotes 2개(3001·3002의 remoteEntry.js),
+  shared: react, react-dom, react-router-dom, @mui/material, @emotion/react, @eduhub/api-client 모두 singleton. 포트 3000 strictPort, /api 프록시(server·preview)
+- src/remotes.d.ts에 remote 모듈 6개 타입 선언, 플러그인 옵션 dts: false
+[하지 않는 것] course-mfe, enrollment-mfe 수정 (Step 2에서 병렬로), generated/ 수정, 백엔드 수정
+[완료 기준] npm test --workspace packages/api-client 통과, npm run build --workspace apps/shell 성공
 [진행 방식] 바꿀 파일 목록과 이유를 먼저 보여줘
 ```
 
 **계획 검토 포인트**
-- api-client를 **손으로 고치는 계획**이 있으면 거절합니다 (생성 스크립트로만)
+- shell에 **업무 화면 코드**(과정·신청 화면)가 남거나 새로 생기면 거절합니다 (shell은 조립만)
 - remote별로 다른 버전의 React·MUI를 쓰는 계획이 있으면 맞추게 합니다
 - `@originjs/vite-plugin-federation`이나 Webpack 설정이 섞여 있으면 `@module-federation/vite`로 통일하게 합니다 ([1-4](#1-4-vite로-module-federation-구성하기-실습-기준))
-- 토큰 처리 코드를 `generated/` **안에** 넣는 계획이면 거절합니다 (다시 생성하면 사라진다)
-- remote마다 Axios 인스턴스를 따로 만들어 토큰을 붙이는 계획이면, api-client의 `http` 하나로 모으게 합니다
+- 토큰 처리 코드를 `generated/` **안에** 넣는 계획이면 거절합니다
 
-**기대하는 결과 (핵심 코드)** — 아래 코드는 실제로 빌드·테스트하고 브라우저로 확인한 것입니다 (Step 3 끝의 확인 표)
-
-```ts
-// packages/api-client/src/auth.ts — 손으로 작성 (generated/ 밖에 둔다: 다시 생성해도 지워지지 않게)
-import axios from 'axios';
-import type { CurrentUser } from './generated/api';
-
-const TOKEN_KEY = 'eduhub.accessToken';
-const USER_KEY = 'eduhub.user';
-
-/** 토큰 보관소. shell과 모든 remote가 같은 페이지(같은 origin)에서 실행되므로 localStorage를 함께 본다 */
-export const tokenStore = {
-  get: (): string | null => localStorage.getItem(TOKEN_KEY),
-  user: (): CurrentUser | null => {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as CurrentUser) : null;
-  },
-  save: (token: string, user: CurrentUser) => {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  },
-  clear: () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-  },
-};
-
-/** 로그인이 필요하다는 신호. shell이 듣고 로그인 화면으로 보낸다 (remote가 shell을 import하지 않게 이벤트로) */
-export const UNAUTHORIZED_EVENT = 'eduhub:unauthorized';
-
-/** 모든 API 호출이 쓰는 Axios 인스턴스. 생성된 *Api 클래스의 세 번째 인자로 넘긴다 */
-export const http = axios.create();
-
-// 요청마다 토큰을 붙인다
-http.interceptors.request.use((config) => {
-  const token = tokenStore.get();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-// 401(토큰 없음·만료·위조)이면 저장된 토큰을 지우고 알린다. 403(권한 없음)은 로그아웃하지 않는다
-http.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      tokenStore.clear();
-      window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
-    }
-    return Promise.reject(error);
-  },
-);
-```
+**기대하는 결과 (핵심 코드)** — 아래 코드는 실제로 5회차 앱을 이 순서대로 쪼개 빌드·테스트하고 브라우저로 확인한 것입니다 (Step 3의 확인)
 
 ```ts
-// packages/api-client/src/index.ts
+// frontend/packages/api-client/src/index.ts — 5회차에 앱 안(src/api)에 있던 인스턴스 생성을 패키지로 옮긴다
 import { AdminEnrollmentApi, AuthApi, Configuration, CourseApi, EnrollmentApi } from './generated/api';
 import { http } from './auth';
 
@@ -654,6 +648,7 @@ export * from './generated/api';
 export { http, tokenStore, UNAUTHORIZED_EVENT } from './auth';
 
 // 생성된 클라이언트 인스턴스는 여기 한 곳에서만 만든다. 세 번째 인자 http = 토큰을 붙이는 Axios 인스턴스
+// shell과 remote가 이 패키지를 singleton으로 공유하므로 http(토큰 처리)도 한 벌만 있다
 const config = new Configuration({ basePath: '' }); // 같은 origin의 /api → Vite 프록시가 백엔드로 전달
 export const authApi = new AuthApi(config, undefined, http);
 export const courseApi = new CourseApi(config, undefined, http);
@@ -661,200 +656,133 @@ export const enrollmentApi = new EnrollmentApi(config, undefined, http);
 export const adminEnrollmentApi = new AdminEnrollmentApi(config, undefined, http);
 ```
 
-<details>
-<summary>shell: AuthContext.tsx, RequireAuth.tsx, LoginPage.tsx</summary>
-
-```tsx
-// apps/shell/src/auth/AuthContext.tsx — 로그인 상태는 shell 한 곳에서 관리한다
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authApi, tokenStore, UNAUTHORIZED_EVENT, type CurrentUser } from '@eduhub/api-client';
-
-interface AuthState {
-  user: CurrentUser | null;
-  /** 토큰이 만료·위조되어 로그아웃된 경우 true (로그인 화면에 안내를 띄운다) */
-  expired: boolean;
-  login: (employeeNo: string, password: string) => Promise<void>;
-  logout: () => void;
-}
-const AuthContext = createContext<AuthState | null>(null);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<CurrentUser | null>(tokenStore.user());
-  const [expired, setExpired] = useState(false);
-
-  const login = useCallback(async (employeeNo: string, password: string) => {
-    const { data } = await authApi.login({ employeeNo, password });
-    tokenStore.save(data.accessToken, data.user);
-    setExpired(false);
-    setUser(data.user);
-  }, []);
-
-  const logout = useCallback(() => {
-    tokenStore.clear();
-    setUser(null);
-    navigate('/login');
-  }, [navigate]);
-
-  // 어느 remote에서든 401이 나면 api-client가 이벤트를 보낸다 → 로그인 화면으로
-  useEffect(() => {
-    const onUnauthorized = () => {
-      // 보호 화면이면 RequireAuth도 로그인으로 보낸다. 어느 쪽이 먼저 옮기든 expired가 함께 전달되도록 상태로 둔다
-      setExpired(true);
-      setUser(null);
-      navigate('/login', { replace: true, state: { from: window.location.pathname } });
-    };
-    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, [navigate]);
-
-  // 새로고침 후에도 토큰이 아직 유효한지 서버에 확인 (만료됐으면 401 → 위 이벤트)
-  useEffect(() => {
-    if (tokenStore.get()) authApi.me().then((r) => setUser(r.data)).catch(() => undefined);
-  }, []);
-
-  return <AuthContext.Provider value={{ user, expired, login, logout }}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('AuthProvider 안에서만 쓸 수 있습니다.');
-  return ctx;
-}
+```ts
+// packages/api-client/src/auth.ts — 5회차 http.ts에서 바뀐 곳은 import 한 줄과 주석뿐
+import type { CurrentUser } from './generated/api';     // ★ 전: from '@eduhub/api-client'
 ```
 
 ```tsx
-// apps/shell/src/auth/RequireAuth.tsx — 로그인(·관리자)이 필요한 라우트를 감싼다
-import type { ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { Alert } from '@mui/material';
-import { useAuth } from './AuthContext';
-
-export function RequireAuth({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
-  const { user } = useAuth();
-  const location = useLocation();
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (admin && user.role !== 'ADMIN') return <Alert severity="warning">관리자만 사용할 수 있는 화면입니다.</Alert>;
-  return <>{children}</>;
-}
+// apps/shell/src/auth/AuthContext.tsx — 바뀐 곳은 import뿐 (RequireAuth·LoginPage도 경로만)
+import { authApi, tokenStore, UNAUTHORIZED_EVENT, type CurrentUser } from '@eduhub/api-client';   // ★ 패키지에서
 ```
 
 ```tsx
-// apps/shell/src/pages/LoginPage.tsx
-import { useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material';
-import { useAuth } from '../auth/AuthContext';
+// frontend/apps/shell/src/App.tsx — 5회차 App.tsx에서 import만 remote로 바꾼 것 (★). 업무 화면은 remote가, 로그인·권한은 shell이
+import { Component, lazy, Suspense, type ReactNode } from 'react';
+import { Link as RouterLink, Navigate, Route, Routes } from 'react-router-dom';
+import { Alert, AppBar, Button, CircularProgress, Container, Toolbar, Typography } from '@mui/material';
+import { useAuth } from './auth/AuthContext';
+import { RequireAuth } from './auth/RequireAuth';
+import LoginPage from './pages/LoginPage';
 
-export default function LoginPage() {
-  const { login, expired } = useAuth();
-  const navigate = useNavigate();
-  const state = useLocation().state as { from?: string } | null;
-  const [employeeNo, setEmployeeNo] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
+// ★ 일반 import → 실행 중에 remote에서 불러오기 (React.lazy). CourseListPage는 이름 있는 export라 default로 바꿔 준다
+const CourseListPage = lazy(() => import('courseMfe/CourseListPage').then((m) => ({ default: m.CourseListPage })));
+const CourseDetailPage = lazy(() => import('courseMfe/CourseDetailPage'));
+const CourseFormPage = lazy(() => import('courseMfe/CourseFormPage'));
+const EnrollButton = lazy(() => import('enrollmentMfe/EnrollButton'));
+const MyEnrollmentsPage = lazy(() => import('enrollmentMfe/MyEnrollmentsPage'));
+const RosterPage = lazy(() => import('enrollmentMfe/RosterPage'));
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(false);
-    try {
-      await login(employeeNo, password);
-      navigate(state?.from ?? '/courses', { replace: true });   // 원래 가려던 화면으로
-    } catch {
-      setError(true);
-    }
-  };
+// ★ remote 서버가 꺼져 있어도 shell 전체가 깨지지 않게
+class RemoteBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed ? <Alert severity="error">화면을 불러오지 못했습니다. 잠시 후 다시 시도하세요.</Alert> : this.props.children;
+  }
+}
+const Remote = ({ children }: { children: ReactNode }) => (
+  <RemoteBoundary><Suspense fallback={<CircularProgress />}>{children}</Suspense></RemoteBoundary>
+);
 
+export default function App() {
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   return (
-    <Paper sx={{ p: 4, maxWidth: 400, mx: 'auto', mt: 6 }}>
-      <form onSubmit={submit}>
-        <Stack spacing={2}>
-          <Typography variant="h5">로그인</Typography>
-          {expired && <Alert severity="info">로그인이 만료되었습니다. 다시 로그인하세요.</Alert>}
-          {error && <Alert severity="error">사번 또는 비밀번호가 올바르지 않습니다.</Alert>}
-          <TextField label="사번" value={employeeNo} onChange={(e) => setEmployeeNo(e.target.value)} required />
-          <TextField label="비밀번호" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <Button type="submit" variant="contained">로그인</Button>
-        </Stack>
-      </form>
-    </Paper>
+    <>
+      <AppBar position="static">
+        <Toolbar sx={{ gap: 1 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>EduHub</Typography>
+          <Button color="inherit" component={RouterLink} to="/courses">교육과정</Button>
+          {user && <Button color="inherit" component={RouterLink} to="/my/enrollments">내 신청 내역</Button>}
+          {isAdmin && <Button color="inherit" component={RouterLink} to="/admin/courses/new">과정 등록</Button>}
+          {user
+            ? <><Typography variant="body2">{user.name}{isAdmin ? ' (관리자)' : ''}</Typography><Button color="inherit" onClick={logout}>로그아웃</Button></>
+            : <Button color="inherit" component={RouterLink} to="/login">로그인</Button>}
+        </Toolbar>
+      </AppBar>
+      <Container sx={{ mt: 3 }}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/courses" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/courses" element={<Remote><CourseListPage /></Remote>} />
+          {/* ★ 상세는 course-mfe, 회차 행의 신청 버튼은 enrollment-mfe. 두 remote를 조합하는 것은 shell */}
+          <Route path="/courses/:courseId" element={
+            <Remote><CourseDetailPage renderSessionAction={(s) => <EnrollButton sessionId={s.id} />} /></Remote>} />
+          <Route path="/my/enrollments" element={<RequireAuth><Remote><MyEnrollmentsPage /></Remote></RequireAuth>} />
+          <Route path="/admin/courses/new" element={<RequireAuth admin><Remote><CourseFormPage /></Remote></RequireAuth>} />
+          <Route path="/admin/courses/:courseId/edit" element={<RequireAuth admin><Remote><CourseFormPage /></Remote></RequireAuth>} />
+          <Route path="/admin/sessions/:sessionId/roster" element={<RequireAuth admin><Remote><RosterPage /></Remote></RequireAuth>} />
+        </Routes>
+      </Container>
+    </>
   );
 }
 ```
 
-</details>
-
 <details>
-<summary>api-client 테스트: auth.test.ts (토큰 첨부, 401 처리, 403은 로그아웃 안 함)</summary>
+<summary>shell: vite.config.ts, remotes.d.ts</summary>
 
 ```ts
-// packages/api-client/src/auth.test.ts
-import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { http, tokenStore, UNAUTHORIZED_EVENT } from './auth';
+// frontend/apps/shell/vite.config.ts — 6회차: host
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
 
-// 네트워크 대신 응답을 흉내 내는 어댑터: 받은 요청을 기록하고 정해진 상태 코드로 답한다
-let sent: InternalAxiosRequestConfig[] = [];
-const respondWith = (status: number): AxiosAdapter => async (config) => {
-  sent.push(config);
-  const response = { data: {}, status, statusText: String(status), headers: {}, config };
-  if (status >= 400) throw Object.assign(new Error(`HTTP ${status}`), { isAxiosError: true, response, config });
-  return response;
-};
-
-beforeEach(() => {
-  sent = [];
-  localStorage.clear();
+export default defineConfig({
+  // /api 요청은 백엔드로 (같은 origin이 되어 CORS가 필요 없다). preview도 같게
+  server: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+  preview: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+  plugins: [
+    react(),
+    federation({
+      name: "shell",
+      remotes: {
+        courseMfe: { type: "module", name: "courseMfe", entry: "http://localhost:3001/remoteEntry.js" },
+        enrollmentMfe: { type: "module", name: "enrollmentMfe", entry: "http://localhost:3002/remoteEntry.js" },
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+        "react-router-dom": { singleton: true },   // 라우터 상태를 shell과 remote가 함께 쓴다
+        "@mui/material": { singleton: true },
+        "@emotion/react": { singleton: true },
+        "@eduhub/api-client": { singleton: true }, // 토큰 처리(http 인터셉터)를 한 벌만
+      },
+      dts: false,
+    }),
+  ],
 });
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+```
 
-test('저장된 토큰을 Authorization 헤더로 붙인다', async () => {
-  tokenStore.save('abc.def.ghi', { employeeId: 1, name: '김사원', role: 'EMPLOYEE' });
-  await http.get('/api/me', { adapter: respondWith(200) });
-  expect(sent[0].headers.Authorization).toBe('Bearer abc.def.ghi');
-});
-
-test('토큰이 없으면 헤더를 붙이지 않는다', async () => {
-  await http.get('/api/v1/courses', { adapter: respondWith(200) });
-  expect(sent[0].headers.Authorization).toBeUndefined();
-});
-
-test('401이면 토큰을 지우고 로그인 필요 이벤트를 보낸다', async () => {
-  tokenStore.save('expired', { employeeId: 1, name: '김사원', role: 'EMPLOYEE' });
-  const listener = vi.fn();
-  window.addEventListener(UNAUTHORIZED_EVENT, listener);
-
-  await expect(http.get('/api/me', { adapter: respondWith(401) })).rejects.toThrow('HTTP 401');
-
-  expect(tokenStore.get()).toBeNull();
-  expect(listener).toHaveBeenCalledTimes(1);
-  window.removeEventListener(UNAUTHORIZED_EVENT, listener);
-});
-
-test('403(권한 없음)은 로그아웃시키지 않는다', async () => {
-  tokenStore.save('valid', { employeeId: 1, name: '김사원', role: 'EMPLOYEE' });
-  await expect(http.get('/api/admin/sessions/1/roster', { adapter: respondWith(403) })).rejects.toThrow('HTTP 403');
-  expect(tokenStore.get()).toBe('valid');
-});
+```ts
+// frontend/apps/shell/src/remotes.d.ts — remote 모듈의 타입 선언 (federation dts: false이므로 직접)
+declare module 'courseMfe/CourseListPage' { export const CourseListPage: React.ComponentType; }   // 3회차부터 이름 있는 export
+declare module 'courseMfe/CourseDetailPage' {
+  import type { ReactNode } from 'react';
+  import type { SessionResponse } from '@eduhub/api-client';
+  const C: React.ComponentType<{ renderSessionAction?: (s: SessionResponse) => ReactNode }>;
+  export default C;
+}
+declare module 'courseMfe/CourseFormPage' { const C: React.ComponentType; export default C; }
+declare module 'enrollmentMfe/EnrollButton' { const C: React.ComponentType<{ sessionId: number }>; export default C; }
+declare module 'enrollmentMfe/MyEnrollmentsPage' { const C: React.ComponentType; export default C; }
+declare module 'enrollmentMfe/RosterPage' { const C: React.ComponentType; export default C; }
 ```
 
 </details>
 
-> 💡 `AuthContext`의 `expired`를 **상태로** 두는 이유(실제로 겪은 문제): 401 이벤트에서 `navigate('/login', { state: { expired: true } })`만 하면 "로그인이 만료되었습니다" 안내가 사라졌습니다. React Router 7은 화면 이동을 낮은 우선순위(transition)로 처리해서, `setUser(null)`이 먼저 반영되고 `RequireAuth`가 `/login`으로 **다시** 보내며 이동 상태를 덮어썼기 때문입니다. 누가 먼저 화면을 옮기든 안내가 남도록 만료 여부를 컨텍스트 상태로 바꿨습니다.
-
-구현 후 직접 확인하고 커밋합니다.
-
-```bash
-cd frontend && npm run build --workspace apps/shell && npm test --workspace packages/api-client
-git add frontend/packages/api-client frontend/apps/shell frontend/package.json
-git diff --staged --stat
-git commit -m "feat(frontend): shell 로그인과 api-client 토큰 처리, 공유 의존성·테마 정리 (NFR-03)"
-```
-
-> ✅ **확인**: `packages/api-client`의 변경이 **생성 스크립트의 결과**뿐인지, shell에 업무 화면 코드가 추가되지 않았는지 봅니다.
+> ✅ **확인**: `npm test --workspace packages/api-client`(5회차의 토큰 테스트 4개가 패키지에서 통과), `npm run build --workspace apps/shell`. shell에 업무 화면이 없는지 `git diff --staged --stat`으로 봅니다 → 커밋 `refactor(frontend): 토큰 처리를 api-client로, 로그인·레이아웃을 shell로 옮김`. 이 커밋이 있어야 Step 2의 워크트리가 이를 바탕으로 만들어집니다.
 
 ---
 
@@ -875,58 +803,57 @@ claude -w enrollment-mfe
 **세션 1 (course-mfe) 지시**
 
 ```text
-[목표] course-mfe를 Module Federation remote로 완성한다
+[목표] course-mfe(5회차 앱에서 과정 화면만 남은 것)를 Module Federation remote로 만든다 (1-5의 ②③)
 [위치] @frontend/apps/course-mfe
 [범위]
-- vite.config.ts의 federation() (@module-federation/vite): name courseMfe, filename remoteEntry.js
-  exposes ./CourseListPage, ./CourseDetailPage
-- shared는 shell과 동일 (singleton, react-router-dom·@eduhub/api-client 포함), /api 프록시
-- 과정 목록·상세 화면은 packages/api-client의 courseApi만 사용. 목록 행을 누르면 /courses/:courseId
-- CourseDetailPage(FR-02): 과정 정보 + 회차 표(시작일, 장소, 남은 자리/정원).
-  회차 행 끝은 prop renderSessionAction?: (session) => ReactNode 로 비워 둔다 (신청 버튼은 enrollment-mfe가 만든다)
-- 개발 서버·미리보기 포트 3001 (strictPort)
-[하지 않는 것] shell, enrollment-mfe, api-client 수정. ThemeProvider 새로 만들기
-[완료 기준] npm run build --workspace apps/course-mfe 성공, npm test --workspace apps/course-mfe 통과
+- vite.config.ts에 federation() (@module-federation/vite): name courseMfe, filename remoteEntry.js,
+  exposes ./CourseListPage, ./CourseDetailPage, ./CourseFormPage. shared는 shell과 동일. 포트 3001 strictPort, /api 프록시 유지
+- src/api/courseApi.ts는 @eduhub/api-client의 courseApi를 다시 내보내기만 (3회차 훅·테스트의 import 경로 유지)
+- CourseDetailPage: EnrollButton import를 없애고 prop renderSessionAction?: (session) => ReactNode 로 회차 행 끝을 비워 둔다.
+  관리자 확인은 useAuth 대신 tokenStore.user()
+- src/main.tsx는 단독 실행용(BrowserRouter + 목록·상세)으로만. ThemeProvider는 만들지 않는다
+[하지 않는 것] shell, enrollment-mfe, api-client 수정
+[완료 기준] npm run build --workspace apps/course-mfe 성공, npm test --workspace apps/course-mfe 통과 (3회차 테스트 4개)
 [진행 방식] 계획 먼저. 범위 밖 파일을 고쳐야 하면 멈추고 알려줘
 ```
 
 **세션 2 (enrollment-mfe) 지시**
 
 ```text
-[목표] enrollment-mfe를 Module Federation remote로 만들고 신청 관련 화면을 완성한다 (FR-04~08)
+[목표] enrollment-mfe(옮겨 온 신청 화면)를 Module Federation remote로 만든다 (1-5의 ②)
 [위치] @frontend/apps/enrollment-mfe
 [범위]
-- federation(): name enrollmentMfe, filename remoteEntry.js, 포트 3002 (strictPort), shared·프록시는 shell과 동일
+- package.json 의존성(react, react-dom, react-router-dom, @mui/material, @emotion/*, axios, @eduhub/api-client)과
+  테스트 도구(vitest, jsdom, @testing-library/*), setupTests.ts — course-mfe와 같은 버전
+- vite.config.ts federation(): name enrollmentMfe, filename remoteEntry.js, 포트 3002 strictPort, shared·프록시는 shell과 동일
   exposes ./EnrollButton, ./MyEnrollmentsPage, ./RosterPage
-- EnrollButton({ sessionId }): 토큰이 없으면 "로그인 후 신청"(/login 링크), 있으면 신청 버튼.
-  201이면 "신청이 확정되었습니다" 또는 "대기 N번으로 등록되었습니다", 409면 "이미 신청한 회차입니다"
-- MyEnrollmentsPage(FR-07, FR-06): 내 신청 내역 표, 상태 칩(확정·대기 N번·취소·수료), 확정·대기는 확인 후 취소
-- RosterPage(FR-08, 관리자): 확정자(체크박스)·대기자(순번) 목록, 선택한 사원 수료 처리, 403이면 "관리자만 볼 수 있습니다"
-- API는 api-client의 enrollmentApi, adminEnrollmentApi만 사용. 토큰을 직접 붙이지 않는다 (http가 처리)
-- 테스트(Vitest): EnrollButton — 로그인 안 함, 대기 순번, 409
+- 옮긴 파일의 import: ../api/clients → @eduhub/api-client. EnrollButton은 useAuth 대신 tokenStore.get()
+- 테스트의 mock도 @eduhub/api-client 기준으로 (EnrollButton은 useAuth mock 대신 tokenStore.save로 로그인 상태)
+- src/main.tsx는 단독 실행용(BrowserRouter + 내 신청 내역·명단)으로만
 [하지 않는 것] shell, course-mfe, api-client 수정. ThemeProvider 새로 만들기. 로그인 화면(shell 담당)
-[완료 기준] npm run build --workspace apps/enrollment-mfe 성공, npm test --workspace apps/enrollment-mfe 통과
+[완료 기준] npm run build --workspace apps/enrollment-mfe 성공, npm test --workspace apps/enrollment-mfe 통과 (EnrollButton 3, RosterPage 3)
 [진행 방식] 계획 먼저. 범위 밖 파일을 고쳐야 하면 멈추고 알려줘
 ```
 
-<details>
-<summary>course-mfe: CourseDetailPage.tsx, CourseListPage.tsx (상세로 이동)</summary>
+**기대하는 결과 (핵심 코드)**
 
 ```tsx
-// apps/course-mfe/src/pages/CourseDetailPage.tsx — FR-02 과정 상세와 회차
+// frontend/apps/course-mfe/src/pages/CourseDetailPage.tsx — 6회차: 신청 버튼은 슬롯으로, 관리자 확인은 api-client로 (★)
 import { useEffect, useState, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
-import { Alert, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { courseApi, type CourseDetail, type SessionView } from '@eduhub/api-client';
+import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Alert, Button, Chip, CircularProgress, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { tokenStore, type CourseDetailResponse, type SessionResponse } from '@eduhub/api-client';
+import { courseApi } from '../api/courseApi';
 
 export interface CourseDetailPageProps {
-  /** 회차 행 끝에 붙일 동작(예: 신청 버튼). course-mfe는 신청을 모른다 → shell이 enrollment-mfe의 버튼을 넣어 준다 */
-  renderSessionAction?: (session: SessionView) => ReactNode;
+  /** ★ 회차 행 끝에 붙일 동작(신청 버튼). course-mfe는 신청을 모른다 → shell이 enrollment-mfe의 버튼을 넣어 준다 */
+  renderSessionAction?: (session: SessionResponse) => ReactNode;
 }
 
 export default function CourseDetailPage({ renderSessionAction }: CourseDetailPageProps) {
   const { courseId } = useParams();
-  const [course, setCourse] = useState<CourseDetail>();
+  const isAdmin = tokenStore.user()?.role === 'ADMIN';   // ★ shell의 useAuth 대신 (버튼 표시용, 최종 판단은 백엔드)
+  const [course, setCourse] = useState<CourseDetailResponse>();
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -935,10 +862,15 @@ export default function CourseDetailPage({ renderSessionAction }: CourseDetailPa
 
   if (error) return <Alert severity="error">과정 정보를 불러오지 못했습니다.</Alert>;
   if (!course) return <CircularProgress />;
+  const closed = course.status === 'CLOSED';
   return (
-    <>
-      <Typography variant="h5">{course.title}</Typography>
-      <Typography color="text.secondary" gutterBottom>{course.description}</Typography>
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={2} alignItems="center">
+        <Typography variant="h5">{course.title}</Typography>
+        {closed && <Chip label="종료" size="small" />}
+        {isAdmin && <Button component={RouterLink} to={`/admin/courses/${course.id}/edit`} size="small">과정 수정</Button>}
+      </Stack>
+      <Typography color="text.secondary">{course.description}</Typography>
       <Table>
         <TableHead>
           <TableRow><TableCell>시작일</TableCell><TableCell>장소</TableCell><TableCell>남은 자리</TableCell><TableCell /></TableRow>
@@ -949,73 +881,41 @@ export default function CourseDetailPage({ renderSessionAction }: CourseDetailPa
               <TableCell>{s.startDate}</TableCell>
               <TableCell>{s.place}</TableCell>
               <TableCell>{s.remaining} / {s.capacity}</TableCell>
-              <TableCell>{renderSessionAction?.(s)}</TableCell>
+              <TableCell>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {!closed && renderSessionAction?.(s)}
+                  {isAdmin && <Button component={RouterLink} to={`/admin/sessions/${s.id}/roster`} size="small">명단</Button>}
+                </Stack>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-    </>
+    </Stack>
   );
 }
 ```
 
-```tsx
-// apps/course-mfe/src/pages/CourseListPage.tsx (3회차 화면에 "행을 누르면 상세로"만 추가한 요약본)
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Alert, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { courseApi, type CourseSummary } from '@eduhub/api-client';
-
-export default function CourseListPage() {
-  const navigate = useNavigate();
-  const [rows, setRows] = useState<CourseSummary[]>();
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    courseApi.getCourses(undefined, undefined, 0, 10).then((r) => setRows(r.data.content)).catch(() => setError(true));
-  }, []);
-
-  if (error) return <Alert severity="error">과정 목록을 불러오지 못했습니다.</Alert>;
-  if (!rows) return <CircularProgress />;
-  return (
-    <>
-      <Typography variant="h5" gutterBottom>교육과정</Typography>
-      <Table>
-        <TableHead><TableRow><TableCell>과정명</TableCell><TableCell>분류</TableCell></TableRow></TableHead>
-        <TableBody>
-          {rows.map((c) => (
-            <TableRow key={c.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/courses/${c.id}`)}>
-              <TableCell>{c.title}</TableCell>
-              <TableCell>{c.category}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </>
-  );
-}
+```ts
+// frontend/apps/course-mfe/src/api/courseApi.ts — 6회차: 인스턴스는 api-client 패키지가 만든다. 기존 import 경로는 유지
+export { courseApi } from '@eduhub/api-client';
 ```
 
-</details>
-
-<details>
-<summary>enrollment-mfe: EnrollButton.tsx, MyEnrollmentsPage.tsx, RosterPage.tsx, vite.config.ts</summary>
-
 ```tsx
-// apps/enrollment-mfe/src/components/EnrollButton.tsx — FR-04·05 신청 버튼 (course-mfe 상세 화면의 회차 행에 들어간다)
+// frontend/apps/enrollment-mfe/src/components/EnrollButton.tsx — FR-04·05 신청 버튼 (shell이 course-mfe 상세의 회차 행에 넣어 준다)
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Alert, Button, Stack } from '@mui/material';
 import axios from 'axios';
-import { enrollmentApi, tokenStore, type EnrollmentResult } from '@eduhub/api-client';
+import { enrollmentApi, tokenStore, type EnrollmentResult } from '@eduhub/api-client';   // ★ shell의 useAuth 대신 api-client
 
 export default function EnrollButton({ sessionId }: { sessionId: number }) {
   const [result, setResult] = useState<EnrollmentResult>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
-  // 로그인하지 않았으면 신청 대신 로그인으로 (화면 표시용. 최종 판단은 백엔드가 401로 한다)
-  if (!tokenStore.get()) {
+  // 로그인하지 않았으면 신청 대신 로그인으로 (화면 안내일 뿐, 최종 판단은 백엔드가 401로 한다)
+  if (!tokenStore.get()) {   // ★ remote는 shell의 AuthContext를 import할 수 없다
     return <Button component={RouterLink} to="/login" size="small">로그인 후 신청</Button>;
   }
   if (result) {
@@ -1046,121 +946,57 @@ export default function EnrollButton({ sessionId }: { sessionId: number }) {
 ```
 
 ```tsx
-// apps/enrollment-mfe/src/pages/MyEnrollmentsPage.tsx — FR-07 내 신청 내역 + FR-06 취소
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Chip, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { enrollmentApi, type EnrollmentStatus, type MyEnrollment } from '@eduhub/api-client';
-
-const LABEL: Record<EnrollmentStatus, string> = { CONFIRMED: '확정', WAITING: '대기', CANCELED: '취소', COMPLETED: '수료' };
-
-export default function MyEnrollmentsPage() {
-  const [rows, setRows] = useState<MyEnrollment[]>();
-  const [error, setError] = useState(false);
-
-  const load = useCallback(() => {
-    enrollmentApi.getMyEnrollments().then((r) => setRows(r.data)).catch(() => setError(true));
-  }, []);
-  useEffect(load, [load]);
-
-  const cancel = async (id: number) => {
-    if (!window.confirm('신청을 취소할까요? 대기 1순위가 있으면 자동으로 확정됩니다.')) return;
-    await enrollmentApi.cancel(id);
-    load();
-  };
-
-  if (error) return <Alert severity="error">신청 내역을 불러오지 못했습니다.</Alert>;
-  if (!rows) return <CircularProgress />;
-  return (
-    <>
-      <Typography variant="h5" gutterBottom>내 신청 내역</Typography>
-      {rows.length === 0 && <Alert severity="info">신청한 과정이 없습니다.</Alert>}
-      <Table>
-        <TableHead><TableRow><TableCell>과정</TableCell><TableCell>시작일</TableCell><TableCell>상태</TableCell><TableCell /></TableRow></TableHead>
-        <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.enrollmentId}>
-              <TableCell>{r.courseTitle}</TableCell>
-              <TableCell>{r.startDate}</TableCell>
-              <TableCell>
-                <Chip size="small" label={r.status === 'WAITING' ? `대기 ${r.waitingNo}번` : LABEL[r.status]} />
-              </TableCell>
-              <TableCell>
-                {(r.status === 'CONFIRMED' || r.status === 'WAITING') && (
-                  <Button size="small" color="error" onClick={() => cancel(r.enrollmentId)}>취소</Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </>
-  );
-}
+// apps/enrollment-mfe/src/pages/MyEnrollmentsPage.tsx, RosterPage.tsx — 바뀐 곳은 import 한 줄씩
+import { enrollmentApi, type EnrollmentStatus, type MyEnrollmentResponse } from '@eduhub/api-client';   // ★
+import { adminEnrollmentApi, type CompletionResult, type RosterResponse } from '@eduhub/api-client';   // ★
 ```
 
-```tsx
-// apps/enrollment-mfe/src/pages/RosterPage.tsx — FR-08 회차 명단과 수료 처리 (관리자)
-import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Alert, Button, Checkbox, CircularProgress, List, ListItem, ListItemText, Stack, Typography } from '@mui/material';
-import axios from 'axios';
-import { adminEnrollmentApi, type Roster } from '@eduhub/api-client';
-
-export default function RosterPage() {
-  const sessionId = Number(useParams().sessionId);
-  const [roster, setRoster] = useState<Roster>();
-  const [error, setError] = useState<string>();
-  const [checked, setChecked] = useState<number[]>([]);
-  const [message, setMessage] = useState<string>();
-
-  const load = useCallback(() => {
-    adminEnrollmentApi.getRoster(sessionId).then((r) => setRoster(r.data))
-      .catch((e) => setError(axios.isAxiosError(e) && e.response?.status === 403 ? '관리자만 볼 수 있습니다.' : '명단을 불러오지 못했습니다.'));
-  }, [sessionId]);
-  useEffect(load, [load]);
-
-  const toggle = (id: number) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
-  const complete = async () => {
-    const { data } = await adminEnrollmentApi.complete(sessionId, { employeeIds: checked });
-    setMessage(`${data.completed}명을 수료 처리했습니다.`);
-    setChecked([]);
-    load();
-  };
-
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (!roster) return <CircularProgress />;
-  return (
-    <Stack spacing={2}>
-      <Typography variant="h5">회차 {sessionId} 명단</Typography>
-      {message && <Alert severity="success">{message}</Alert>}
-      <Typography variant="h6">확정 {roster.confirmed.length}명</Typography>
-      <List dense>
-        {roster.confirmed.map((r) => (
-          <ListItem key={r.enrollmentId} disablePadding>
-            <Checkbox checked={checked.includes(r.employeeId)} onChange={() => toggle(r.employeeId)} inputProps={{ 'aria-label': `사원 ${r.employeeId} 선택` }} />
-            <ListItemText primary={`사원 ${r.employeeId}`} />
-          </ListItem>
-        ))}
-      </List>
-      <Typography variant="h6">대기 {roster.waiting.length}명</Typography>
-      <List dense>
-        {roster.waiting.map((r) => <ListItem key={r.enrollmentId}><ListItemText primary={`대기 ${r.waitingNo}번 · 사원 ${r.employeeId}`} /></ListItem>)}
-      </List>
-      <Button variant="contained" disabled={checked.length === 0} onClick={complete}>선택한 {checked.length}명 수료 처리</Button>
-    </Stack>
-  );
-}
-```
+<details>
+<summary>course-mfe·enrollment-mfe: vite.config.ts, main.tsx</summary>
 
 ```ts
 /// <reference types="vitest/config" />
-// apps/enrollment-mfe/vite.config.ts (remote)
+// frontend/apps/course-mfe/vite.config.ts — 6회차: remote (5회차 설정 + federation)
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { federation } from "@module-federation/vite";
 
 export default defineConfig({
-  // /api 요청은 백엔드로 (같은 origin이 되어 CORS가 필요 없다). preview도 같게
+  server: { port: 3001, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+  preview: { port: 3001, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+  plugins: [
+    react(),
+    federation({
+      name: "courseMfe",                 // shell의 remotes 키와 같아야 한다
+      filename: "remoteEntry.js",        // shell이 처음 읽는 진입 파일
+      exposes: {
+        "./CourseListPage": "./src/pages/CourseListPage.tsx",
+        "./CourseDetailPage": "./src/pages/CourseDetailPage.tsx",
+        "./CourseFormPage": "./src/pages/CourseFormPage.tsx",
+      },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+        "react-router-dom": { singleton: true },   // 라우터 상태를 shell과 remote가 함께 쓴다
+        "@mui/material": { singleton: true },
+        "@emotion/react": { singleton: true },
+        "@eduhub/api-client": { singleton: true }, // 토큰 처리(http 인터셉터)를 한 벌만
+      },
+      dts: false,
+    }),
+  ],
+  test: { environment: "jsdom", setupFiles: ["./src/setupTests.ts"] },
+});
+```
+
+```ts
+/// <reference types="vitest/config" />
+// frontend/apps/enrollment-mfe/vite.config.ts — 6회차: remote
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
+
+export default defineConfig({
   server: { port: 3002, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
   preview: { port: 3002, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
   plugins: [
@@ -1188,13 +1024,47 @@ export default defineConfig({
 });
 ```
 
+```tsx
+// frontend/apps/course-mfe/src/main.tsx — 6회차: remote 단독 실행용 (개발 편의). 로그인·테마·레이아웃은 shell이 맡는다
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { CourseListPage } from './pages/CourseListPage';
+import CourseDetailPage from './pages/CourseDetailPage';
+
+createRoot(document.getElementById('root')!).render(
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<CourseListPage />} />
+      <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+    </Routes>
+  </BrowserRouter>,
+);
+```
+
+```tsx
+// frontend/apps/enrollment-mfe/src/main.tsx — remote 단독 실행용 (개발 편의)
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import MyEnrollmentsPage from './pages/MyEnrollmentsPage';
+import RosterPage from './pages/RosterPage';
+
+createRoot(document.getElementById('root')!).render(
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<MyEnrollmentsPage />} />
+      <Route path="/admin/sessions/:sessionId/roster" element={<RosterPage />} />
+    </Routes>
+  </BrowserRouter>,
+);
+```
+
 </details>
 
 <details>
-<summary>enrollment-mfe 테스트: EnrollButton.test.tsx</summary>
+<summary>테스트: EnrollButton.test.tsx (tokenStore로 로그인 상태), RosterPage.test.tsx의 mock 부분</summary>
 
 ```tsx
-// apps/enrollment-mfe/src/components/EnrollButton.test.tsx
+// frontend/apps/enrollment-mfe/src/components/EnrollButton.test.tsx (5회차 테스트에서 useAuth mock 대신 tokenStore 사용)
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -1237,166 +1107,39 @@ test('이미 신청했으면(409) 그 이유를 보여 준다', async () => {
 });
 ```
 
-</details>
-
-**각 세션에서 diff 검토 체크리스트**
-
-- [ ] 자기 remote 폴더 밖의 파일이 바뀌지 않았는가?
-- [ ] `shared` 설정이 shell과 같은가? (`singleton: true`)
-- [ ] `@module-federation/vite`의 `federation()`을 쓰는가? (다른 플러그인·Webpack 설정이 섞이지 않았는가)
-- [ ] `ThemeProvider`, `createTheme`가 remote에 새로 생기지 않았는가?
-- [ ] API 주소(`http://localhost:8080`)가 코드에 직접 들어가지 않았는가?
-- [ ] 다른 remote를 직접 import하지 않았는가? (상세 화면 안의 신청 버튼은 shell이 조립)
-- [ ] 토큰을 직접 헤더에 붙이거나 `axios.create`를 새로 하지 않았는가? (api-client의 `http`만)
-
-각 워크트리에서 커밋합니다 (워크트리마다 자기 브랜치가 있습니다).
-
-```bash
-git add frontend/apps/course-mfe
-git commit -m "feat(course-mfe): Module Federation remote 구성과 과정 화면 연결"
+```tsx
+// apps/enrollment-mfe/src/pages/RosterPage.test.tsx — 바뀐 곳: mock 대상이 ../api/clients → @eduhub/api-client
+vi.mock('@eduhub/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@eduhub/api-client')>()),
+  adminEnrollmentApi: { getRoster: vi.fn(), complete: vi.fn() },
+}));
 ```
 
-> ✅ **확인**: 두 세션의 `/usage`를 비교합니다. 병렬 세션은 사용량이 **각각** 쌓입니다.
+</details>
+
+**diff 검토 체크리스트** (원칙 ③: 위험한 경계는 사람이 본다)
+- [ ] 자기 remote 폴더 밖의 변경이 없는가?
+- [ ] `shared`가 shell과 같은가? (singleton, react-router-dom·@eduhub/api-client 포함)
+- [ ] remote에 `ThemeProvider`·`AuthProvider`가 없는가? remote가 shell 파일(`AuthContext`)을 import하지 않는가?
+- [ ] course-mfe가 enrollment-mfe를 import하지 않는가? (슬롯으로만 연결)
+- [ ] `localhost:8080`을 직접 쓰지 않는가?
+
+각 워크트리에서 커밋합니다 (예: `refactor(course-mfe): Module Federation remote로 전환, 신청 버튼은 슬롯으로`). 두 세션의 `/usage`도 비교합니다. 병렬 세션은 사용량이 **각각** 쌓입니다.
 
 ---
 
-## Step 3. 합치고 shell 라우팅 연결 (혼자)
+## Step 3. 합치고 쪼개기 전과 비교 (혼자)
 
 두 워크트리의 커밋을 작업 브랜치로 가져옵니다. 워크트리 브랜치 이름은 `git branch`로 확인합니다.
 
 ```bash
-git switch feature/fr-07-mfe-split
+git switch feature/mfe-split
 git branch                                   # 워크트리 브랜치 이름 확인
 git merge <course-mfe 워크트리 브랜치>
 git merge <enrollment-mfe 워크트리 브랜치>
 ```
 
-> 💡 데스크톱 앱이나 Claude에게 "두 워크트리의 변경을 feature/fr-07-mfe-split에 병합해줘"라고 맡길 수도 있습니다. 충돌이 나면 2회차 [3-8-3](./session-02-hands-on-kickoff.md#3-8-3-충돌conflict이-나면)대로 **두 변경의 의도를 확인**하고 정리합니다.
-
-이어서 shell 라우팅을 연결합니다.
-
-```text
-[목표] shell에서 두 remote를 라우트로 연결한다
-[위치] @frontend/apps/shell/src
-[범위]
-- /courses → courseMfe/CourseListPage, /courses/:courseId → courseMfe/CourseDetailPage에
-  renderSessionAction={(s) => <EnrollButton sessionId={s.id} />} (enrollmentMfe/EnrollButton)를 넘겨 조립
-- /my/enrollments → enrollmentMfe/MyEnrollmentsPage (RequireAuth)
-- /admin/sessions/:sessionId/roster → enrollmentMfe/RosterPage (RequireAuth admin)
-- /login → LoginPage. 상단 바: 교육과정, (로그인 시) 내 신청 내역, 이름·로그아웃 / 로그인
-- React.lazy + Suspense, remote 로드 실패 시 MUI Alert로 안내. src/remotes.d.ts에 다섯 모듈 타입 선언
-[완료 기준] 세 앱과 백엔드(dev 프로필)를 함께 실행했을 때 아래 확인 표의 흐름이 모두 동작
-```
-
-<details>
-<summary>shell: App.tsx, remotes.d.ts, vite.config.ts</summary>
-
-```tsx
-// apps/shell/src/App.tsx — 레이아웃과 라우팅. 업무 화면은 remote가, 로그인·권한은 shell이
-import { Component, lazy, Suspense, type ReactNode } from 'react';
-import { Link as RouterLink, Navigate, Route, Routes } from 'react-router-dom';
-import { Alert, AppBar, Box, Button, CircularProgress, Container, Toolbar, Typography } from '@mui/material';
-import { useAuth } from './auth/AuthContext';
-import { RequireAuth } from './auth/RequireAuth';
-import LoginPage from './pages/LoginPage';
-
-const CourseListPage = lazy(() => import('courseMfe/CourseListPage'));
-const CourseDetailPage = lazy(() => import('courseMfe/CourseDetailPage'));
-const EnrollButton = lazy(() => import('enrollmentMfe/EnrollButton'));
-const MyEnrollmentsPage = lazy(() => import('enrollmentMfe/MyEnrollmentsPage'));
-const RosterPage = lazy(() => import('enrollmentMfe/RosterPage'));
-
-class RemoteBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  render() {
-    return this.state.failed ? <Alert severity="error">화면을 불러오지 못했습니다. 잠시 후 다시 시도하세요.</Alert> : this.props.children;
-  }
-}
-const Remote = ({ children }: { children: ReactNode }) => (
-  <RemoteBoundary><Suspense fallback={<CircularProgress />}>{children}</Suspense></RemoteBoundary>
-);
-
-export default function App() {
-  const { user, logout } = useAuth();
-  return (
-    <>
-      <AppBar position="static">
-        <Toolbar sx={{ gap: 1 }}>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>EduHub</Typography>
-          <Button color="inherit" component={RouterLink} to="/courses">교육과정</Button>
-          {user && <Button color="inherit" component={RouterLink} to="/my/enrollments">내 신청 내역</Button>}
-          {user
-            ? <><Typography variant="body2">{user.name}{user.role === 'ADMIN' ? ' (관리자)' : ''}</Typography><Button color="inherit" onClick={logout}>로그아웃</Button></>
-            : <Button color="inherit" component={RouterLink} to="/login">로그인</Button>}
-        </Toolbar>
-      </AppBar>
-      <Container sx={{ mt: 3 }}>
-        <Box>
-          <Routes>
-            <Route path="/" element={<Navigate to="/courses" replace />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/courses" element={<Remote><CourseListPage /></Remote>} />
-            {/* 상세는 course-mfe, 회차 행의 신청 버튼은 enrollment-mfe. 두 remote를 조합하는 것은 shell */}
-            <Route path="/courses/:courseId" element={
-              <Remote><CourseDetailPage renderSessionAction={(s) => <EnrollButton sessionId={s.id} />} /></Remote>} />
-            <Route path="/my/enrollments" element={<RequireAuth><Remote><MyEnrollmentsPage /></Remote></RequireAuth>} />
-            <Route path="/admin/sessions/:sessionId/roster" element={<RequireAuth admin><Remote><RosterPage /></Remote></RequireAuth>} />
-          </Routes>
-        </Box>
-      </Container>
-    </>
-  );
-}
-```
-
-```ts
-// apps/shell/src/remotes.d.ts
-declare module 'courseMfe/CourseListPage' { const C: React.ComponentType; export default C; }
-declare module 'courseMfe/CourseDetailPage' {
-  import type { ReactNode } from 'react';
-  import type { SessionView } from '@eduhub/api-client';
-  const C: React.ComponentType<{ renderSessionAction?: (s: SessionView) => ReactNode }>;
-  export default C;
-}
-declare module 'enrollmentMfe/EnrollButton' { const C: React.ComponentType<{ sessionId: number }>; export default C; }
-declare module 'enrollmentMfe/MyEnrollmentsPage' { const C: React.ComponentType; export default C; }
-declare module 'enrollmentMfe/RosterPage' { const C: React.ComponentType; export default C; }
-```
-
-```ts
-// apps/shell/vite.config.ts (host)
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { federation } from "@module-federation/vite";
-
-export default defineConfig({
-  // /api 요청은 백엔드로 (같은 origin이 되어 CORS가 필요 없다). preview도 같게
-  server: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
-  preview: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
-  plugins: [
-    react(),
-    federation({
-      name: "shell",
-      remotes: {
-        courseMfe: { type: "module", name: "courseMfe", entry: "http://localhost:3001/remoteEntry.js" },
-        enrollmentMfe: { type: "module", name: "enrollmentMfe", entry: "http://localhost:3002/remoteEntry.js" },
-      },
-      shared: {
-        react: { singleton: true, requiredVersion: "^18.0.0" },
-        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
-        "react-router-dom": { singleton: true },   // 라우터 상태를 shell과 remote가 함께 쓴다
-        "@mui/material": { singleton: true },
-        "@emotion/react": { singleton: true },
-        "@eduhub/api-client": { singleton: true }, // 토큰 처리(http 인터셉터)를 한 벌만
-      },
-      dts: false,
-    }),
-  ],
-});
-```
-
-</details>
+> 💡 데스크톱 앱이나 Claude에게 "두 워크트리의 변경을 feature/mfe-split에 병합해줘"라고 맡길 수도 있습니다. 충돌이 나면 2회차 [3-8-3](./session-02-hands-on-kickoff.md#3-8-3-충돌conflict이-나면)대로 **두 변경의 의도를 확인**하고 정리합니다.
 
 **직접 확인** (원칙 ②: 사람이 직접 실행할 수 있어야 한다)
 
@@ -1408,29 +1151,21 @@ npm run dev --workspace apps/shell             # 3000 (다른 창)
 # 백엔드: 5회차 Step 9-1의 dev 프로필 (EDUHUB_JWT_SECRET 설정 후) → http://localhost:3000
 ```
 
-**10회차 데모 흐름으로 확인하기** (개발용 계정: `E1001`·`E1002` 사원, `A0001` 관리자, 비밀번호 `dev-password`)
+**쪼개기 전과 같은 표로 비교**: [5회차 6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기)의 12개를 이번에는 **http://localhost:3000**(shell)에서 똑같이 해 봅니다. 결과가 같아야 "기능을 바꾸지 않고 구조만 바꾼" 것입니다. MFE에서만 볼 것은 아래 셋입니다.
 
 | # | 할 일 | 기대 결과 |
 |---|---|---|
-| 1 | 로그인하지 않고 `/courses` → 과정 클릭 | 목록과 상세가 보이고, 회차마다 **로그인 후 신청** |
-| 2 | 로그인하지 않고 `/my/enrollments` | `/login`으로 이동 → `E1001` 로그인 → **원래 가려던 내 신청 내역**으로 돌아옴 |
-| 3 | `E1001`로 정원 1명인 회차에 신청 | "신청이 확정되었습니다" |
-| 4 | 로그아웃 → `E1002`로 같은 회차 신청 | "대기 1번으로 등록되었습니다", 내 신청 내역에 **대기 1번** |
-| 5 | `E1002`로 `/admin/sessions/1/roster` | "관리자만 사용할 수 있는 화면입니다" (백엔드도 403) |
-| 6 | `E1001`로 내 신청 내역에서 취소 | 상태가 **취소** → `E1002`로 로그인하면 **확정**(대기자 자동 확정) |
-| 7 | `A0001`로 명단 → 확정자 선택 → 수료 처리 | "1명을 수료 처리했습니다." |
-| 8 | 개발자 도구에서 `localStorage`의 `eduhub.accessToken`을 아무 값으로 바꾸고 새로고침 | 로그인 화면 + "로그인이 만료되었습니다", 토큰 삭제됨 |
-| 9 | remote 화면의 버튼 색 | shell 테마 색 (React·MUI 한 벌) |
+| M1 | 개발자 도구 Network 탭 | `remoteEntry.js`가 3001·3002에서 로드된다. 개발 서버 모드에서 보이는 `loadShare` 모듈은 정상 ([1-4의 확인 표](#1-4-vite로-module-federation-구성하기-실습-기준)) |
+| M2 | remote 화면의 버튼 색 | shell 테마 색(`#B5591C`). React·MUI가 한 벌 |
+| M3 | course-mfe(3001)를 끄고 `/courses` | shell은 뜨고 그 자리에 "화면을 불러오지 못했습니다" (오류 경계) |
 
-> ✅ 이 교재 환경에서 위 코드(shell + course-mfe + enrollment-mfe + api-client)를 5회차 Step 9-1 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 위 1~9를 개발 서버 모드와 빌드·미리보기 모드 모두에서 확인했습니다. 타입 검사, 세 앱 빌드, api-client 테스트 4개, EnrollButton 테스트 3개도 통과했습니다 (Vite 8.3, `@module-federation/vite` 1.24, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). api-client는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
-
-> ✅ **확인**: 브라우저 개발자 도구 Network 탭에서 `remoteEntry.js`가 3001·3002에서 로드되고, remote 화면에 **shell 테마 색**이 나오며 버튼 같은 상호작용이 동작하는지 봅니다 (React 한 벌, [1-4의 확인 표](#1-4-vite로-module-federation-구성하기-실습-기준)). 개발 서버 모드에서 3001·3002에 보이는 `loadShare` 모듈은 정상입니다. 데스크톱 앱은 미리보기(Browser 패널)로도 볼 수 있습니다.
+> ✅ 이 교재 환경에서 5회차 앱을 위 순서대로 쪼갠 코드(shell + course-mfe + enrollment-mfe + api-client)를 5회차 Step 9-1~11 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 **5회차와 같은 확인 흐름(세분화한 20단계)**을 개발 서버 모드와 빌드·미리보기 모드 모두에서 확인했습니다 (테마 색 포함). 타입 검사, 세 앱 빌드, 테스트 14개(api-client 4, course-mfe 4, enrollment-mfe 6)도 통과했습니다 (Vite 8.3, `@module-federation/vite` 1.24, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). course-mfe를 끄고 shell과 enrollment-mfe만 띄운 상태(M3)에서도 상단 바·로그인 화면은 그대로이고 목록 자리에 오류 안내가 나오는 것을 확인했습니다. Step 1의 `git mv` 명령도 그대로 실행해, 옮긴 파일 배치가 검증한 코드와 같은지(지시문에서 새로 만드는 `remotes.d.ts`, remote의 `main.tsx`·`setupTests.ts` 제외) 확인했습니다. api-client는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
 
 ```bash
-git push -u origin feature/fr-07-mfe-split
+git push -u origin feature/mfe-split
 ```
 
-PR 본문에 "병렬로 나눈 작업 / 혼자 한 작업 / 직접 확인한 것"을 적습니다.
+PR 본문에 "옮긴 것 / 바꾼 것(1-5의 다섯 가지) / 병렬로 나눈 작업 / 쪼개기 전과 비교한 결과"를 적습니다.
 
 ---
 
@@ -1439,14 +1174,16 @@ PR 본문에 "병렬로 나눈 작업 / 혼자 한 작업 / 직접 확인한 것
 | 증상 | 원인과 해결 |
 |---|---|
 | `Invalid hook call`, 또는 `Cannot read properties of null (reading 'useState')` | React가 두 번 로드됨. 모든 앱의 `shared`에 `singleton: true`와 같은 버전 범위 (두 번째 메시지는 빌드 결과물에서 같은 원인으로 나오는 오류) |
-| remote 화면의 색·글꼴이 다름 | remote가 자체 테마를 만듦. shell의 테마만 쓰게 수정 |
-| `Loading script failed ... remoteEntry.js`, `ERR_CONNECTION_REFUSED` | remote 개발 서버가 안 켜졌거나 포트가 다름. 3001·3002 확인. Vite는 포트가 사용 중이면 다른 포트로 옮겨 가므로 `strictPort: true`로 고정 |
-| TypeScript: `Cannot find module 'courseMfe/CourseApp'` | `src/remotes.d.ts`에 `declare module` 선언이 없음 |
-| 인터넷 예제를 따라 했더니 옵션 이름이 다름 (`remotes: { x: "http://…" }` 문자열만 등) | `@originjs/vite-plugin-federation` 예제가 섞임. `@module-federation/vite` 형식(`type`, `name`, `entry`)으로 통일 |
 | `useNavigate() may be used only in the context of a <Router> component` (remote 화면만 실패) | remote의 `shared`에 `react-router-dom`이 빠져 라우터가 두 벌. shell과 모든 remote에 `"react-router-dom": { singleton: true }` |
-| 로그인했는데 remote의 API가 401 | 토큰을 붙이지 않는 다른 Axios 인스턴스를 씀. 모든 *Api는 api-client의 `http`로 만든다. `@eduhub/api-client`도 shared singleton |
-| 브라우저 콘솔에 CORS 오류 | API를 `http://localhost:8080`으로 직접 부름. 상대 경로(`basePath: ''`) + Vite `server.proxy`·`preview.proxy`의 `/api` |
-| 토큰이 만료돼도 "만료" 안내 없이 로그인 화면만 나옴 | React Router 7의 transition 때문에 이동 상태가 덮어써짐. 만료 여부를 `AuthContext` 상태로 (Step 1의 💡) |
+| 로그인했는데 remote의 API가 401 | remote가 자기 `http`나 다른 Axios 인스턴스를 씀, 또는 `@eduhub/api-client`가 shared가 아니라 두 벌. 모든 *Api는 api-client의 인스턴스로, api-client도 singleton |
+| `AuthProvider 안에서만 쓸 수 있습니다` 또는 remote 빌드에서 `../auth/AuthContext`를 못 찾음 | remote에 `useAuth`가 남음. remote는 `tokenStore`를 쓴다 (1-5의 ②) |
+| 상세 화면에 신청 버튼이 안 보임 | shell이 `renderSessionAction`을 넘기지 않음, 또는 course-mfe에 `EnrollButton` 직접 import가 남아 빌드 실패 |
+| remote 화면의 색·글꼴이 다름 | remote가 자체 테마를 만듦(옮기며 `main.tsx`의 `ThemeProvider`가 남은 경우 등). shell의 테마만 쓰게 수정 |
+| `Loading script failed ... remoteEntry.js`, `ERR_CONNECTION_REFUSED` | remote 개발 서버가 안 켜졌거나 포트가 다름. 3001·3002 확인. Vite는 포트가 사용 중이면 다른 포트로 옮겨 가므로 `strictPort: true`로 고정 |
+| TypeScript: `Cannot find module 'courseMfe/CourseListPage'` | `src/remotes.d.ts`에 `declare module` 선언이 없음 |
+| 목록 화면만 비어 있고 콘솔에 `Element type is invalid` | `CourseListPage`는 3회차부터 **이름 있는 export**. `lazy(() => import(…).then((m) => ({ default: m.CourseListPage })))` |
+| 인터넷 예제를 따라 했더니 옵션 이름이 다름 (`remotes: { x: "http://…" }` 문자열만 등) | `@originjs/vite-plugin-federation` 예제가 섞임. `@module-federation/vite` 형식(`type`, `name`, `entry`)으로 통일 |
+| `git status`에 renamed가 아니라 deleted + new file | `git mv` 대신 파일을 지우고 새로 만듦. 이력이 끊기므로 `git mv`로 다시 하거나, 내용이 많이 바뀌기 전에 커밋 |
 | 워크트리에서 백엔드 연결 실패 | 워크트리에 `.env`가 없음. 필요한 파일을 복사하거나 `.worktreeinclude` 설정 확인 |
 | 두 세션이 같은 파일을 고쳐 병합 충돌 | 공통 파일 작업을 Step 1에서 먼저 끝내지 않음. 충돌 해결 후 다음부터 순서 지키기 |
 | 사용량이 평소보다 빨리 소진 | 병렬 세션은 각자 사용. 끝난 세션은 정리하고 병렬 수를 줄인다 |
