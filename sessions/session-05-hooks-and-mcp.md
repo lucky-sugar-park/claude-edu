@@ -20,7 +20,7 @@
 > - `uv` 설치 (`uvx --version`): DB MCP 서버(Postgres MCP Pro) 실행용. 설치 방법은 Step 8 ①
 > - (선택) GitHub CLI `gh` 로그인 (`gh auth status`)
 > - Node.js LTS, `frontend/` 의존성 설치(`npm install`), 3회차의 과정 목록 화면이 `npm run dev --workspace apps/course-mfe`로 뜨는지 확인
-> 🖥️ **슬라이드 덱(46장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(50장, 발표자 노트 포함)**: https://claude.ai/artifact/SuXXVHg7iSzXiDetXP1LRV — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
