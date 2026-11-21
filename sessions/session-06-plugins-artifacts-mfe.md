@@ -34,7 +34,7 @@
 | 0:53 – 1:33 | 4. 따라하기 ①: 5회차 앱을 MFE로 쪼개기 (워크트리 병렬 세션) | 실습 |
 | 1:33 – 1:45 | 5. 따라하기 ②: FR-09 알림 (커밋 이후 이벤트) | 실습 |
 | 1:45 – 1:57 | 6. 따라하기 ③: 팀 플러그인 만들기·배포·설치 | 실습 |
-| — | 4. 따라하기 ① Step 4: 빌드 결과를 nginx에 배포 (Windows) | **과제** (시간이 남으면 수업 중, 7회차 전 필수) |
+| — | 4. 따라하기 ① Step 4: 한 주소로 배포 (운영 구성 이해 + `run\web` 실습) | **과제** (시간이 남으면 수업 중, 7회차 전 필수) |
 | — | 7. 따라하기 ④: 주간 진행 현황 아티팩트 | **과제** (시간이 남으면 수업 중) |
 | 1:57 – 2:00 | 9. 정리, 과제 안내 | 강의 |
 
@@ -1285,49 +1285,146 @@ PR 본문에 "옮긴 것 / 바꾼 것(1-5의 다섯 가지) / 병렬로 나눈 �
 
 ---
 
-## Step 4. 빌드 결과를 nginx 한 곳에 배포하기 (Windows)
+## Step 4. 한 주소로 배포하기: 운영 구성과 실습 구성
 
-> ⏱ 시간이 모자라면 **과제**로 합니다. 7회차 [Step 7-3](./session-07-cicd-framework-tokens.md#7-3-프론트엔드를-nginx로-자동-배포-self-hosted-runner)이 이 nginx에 CI/CD로 자동 배포하므로 **7회차 전까지 반드시** 끝냅니다.
+> ⏱ 시간이 모자라면 **과제**로 합니다. 7회차 [Step 7-3](./session-07-cicd-framework-tokens.md#7-3-프론트엔드를-스테이징-pc에-자동-배포-self-hosted-runner)이 이 구성에 CI/CD로 자동 배포하므로 **7회차 전까지 반드시** 끝냅니다.
 
-지금까지는 개발 서버 3개(3000·3001·3002)를 띄워 확인했습니다. 실제 서비스에서는 사용자가 **주소 하나**로 들어옵니다. 웹 서버 **nginx** 한 대가 세 앱의 빌드 결과(정적 파일)를 서브 폴더별로 내주고, `/api`는 백엔드로 넘깁니다.
+지금까지는 개발 서버 3개(3000·3001·3002)를 띄워 확인했습니다. 실제 사용자는 **주소 하나**로 들어옵니다. 세 앱의 빌드 결과(정적 파일)를 한 주소 아래 **경로별 폴더**로 내주고, `/api`는 백엔드로 넘기는 구성이 필요합니다.
+
+### Step 4-1. 운영에서는 이렇게 구성한다
 
 ```mermaid
 flowchart LR
-    U["브라우저<br/>http://localhost:8088"] --> NG["nginx :8088"]
-    NG -- "/ , /courses/… (화면 주소)" --> S["html\eduhub\shell<br/>index.html · assets"]
-    NG -- "/mfe/course/…" --> C["html\eduhub\mfe\course<br/>remoteEntry.js · assets"]
-    NG -- "/mfe/enrollment/…" --> E["html\eduhub\mfe\enrollment"]
-    NG -- "/api/…" --> BE["Spring Boot :8080"]
+    U["사용자 브라우저"] -- "https://eduhub.회사.com" --> WS["웹 서버 (nginx 등)<br/>TLS · 정적 파일 · 경로별 전달 · 캐시 규칙"]
+    subgraph FOLDER["웹 서버의 화면 폴더 (앱마다 따로 교체)"]
+        S["/ , /assets/… → shell/"]
+        C["/mfe/course/… → mfe/course/"]
+        E["/mfe/enrollment/… → mfe/enrollment/"]
+    end
+    WS --> FOLDER
+    WS -- "/api/…" --> B1["Spring Boot ①"]
+    WS -- "/api/…" --> B2["Spring Boot ②"]
+    B1 --> DB[("PostgreSQL")]
+    B2 --> DB
+    CI["CI/CD (7회차)"] -. "바뀐 앱 폴더만 교체" .-> FOLDER
+    CI -. "jar 배포" .-> B1
 ```
 
-| 앱 | 빌드 결과를 넣을 폴더 | 주소 |
+| 구성 요소 | 맡는 일 |
+|---|---|
+| **웹 서버** (nginx, Apache, IIS, 사내 표준 웹 서버 등) | HTTPS 처리, 화면 파일 제공, `/api`를 백엔드로 전달(여러 대면 나눠 보냄), 캐시 규칙, `/courses/1` 같은 화면 주소로 새로고침해도 shell을 주기 |
+| **화면 폴더** | 앱마다 따로: `shell/`, `mfe/course/`, `mfe/enrollment/`. 바뀐 앱 폴더만 교체한다 (**독립 배포**) |
+| **백엔드** (Spring Boot 여러 대) | API만. 화면 파일은 갖지 않는다 |
+| **CI/CD** (7회차) | 바뀐 앱만 빌드해 그 폴더를 교체, 백엔드는 jar로 따로 배포 |
+
+> 💡 정적 파일을 **오브젝트 스토리지(S3 등) + CDN**에 두고 웹 서버나 게이트웨이가 `/api`만 넘기는 구성도 흔합니다. 이때도 "앱별 폴더, 한 주소의 경로 규칙, 캐시 규칙, 폴더 교체로 배포"라는 핵심은 같습니다.
+
+<details>
+<summary>운영 웹 서버 설정 예 (nginx): 경로별 폴더, /api 전달, 새로고침, 캐시 규칙</summary>
+
+```nginx
+# nginx.conf (운영 서버 예) — EduHub: 화면(shell·remote)과 API를 한 주소로
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+
+    server {
+        listen       8088;          # 운영에서는 443 + TLS 인증서 (ssl_certificate …)
+        server_name  localhost;
+
+        # shell: <nginx 설치 경로>/html/eduhub/shell (상대 경로는 nginx 설치 경로 기준)
+        root   html/eduhub/shell;
+        index  index.html;
+
+        # remote: /mfe/course/… → html/eduhub/mfe/course/…
+        location /mfe/ {
+            root  html/eduhub;
+            # 진입 파일은 매번 확인 → 새 배포가 바로 보인다
+            location ~ /remoteEntry\.js$ { add_header Cache-Control "no-cache"; }
+            # 이름에 해시가 붙은 파일은 내용이 바뀌면 이름도 바뀌므로 오래 캐시
+            location ~ /assets/          { add_header Cache-Control "public, max-age=31536000, immutable"; }
+        }
+
+        location /assets/ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # API는 백엔드(Spring Boot)로. 여러 대면 upstream으로 묶어 나눠 보낸다
+        location /api/ {
+            proxy_pass         http://127.0.0.1:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+        }
+
+        # 화면 주소(/courses/1 등)는 shell의 index.html로 (새로고침·직접 접속 대비)
+        location / {
+            add_header Cache-Control "no-cache";
+            try_files  $uri $uri/ /index.html;
+        }
+    }
+}
+```
+
+| 설정 | 하는 일 |
+|---|---|
+| `root html/eduhub/shell` | `/`와 `/assets/…`를 shell 폴더에서 |
+| `location /mfe/` + `root html/eduhub` | `/mfe/course/x` → `html/eduhub/mfe/course/x` |
+| `location /api/` + `proxy_pass` | API를 백엔드로. 같은 주소라 **CORS가 필요 없다** |
+| `try_files … /index.html` | `/courses/1`로 새로고침·직접 접속해도 shell |
+| `Cache-Control: no-cache` (화면 주소, `remoteEntry.js`) | 새 배포가 **바로** 보인다 |
+| `max-age=31536000, immutable` (`assets/`) | 이름에 해시가 붙은 파일은 오래 캐시 (내용이 바뀌면 이름도 바뀐다) |
+
+> ✅ 이 설정은 이 교재 환경의 **Linux nginx 1.24**로 실행해, 5회차와 같은 브라우저 20단계 4회 연속 통과, 새로고침, 캐시 헤더, 재시작 없는 앱 교체·롤백까지 확인했습니다(주석만 운영 서버 기준으로 다듬음).
+
+</details>
+
+### Step 4-2. 실습은 이렇게 한다: 백엔드가 `run\web` 폴더를 서비스
+
+운영의 웹 서버 자리를 실습에서는 **이미 실행하고 있는 Spring Boot(8080)**가 대신합니다. 화면 파일은 **프로젝트 루트의 `run\web\`**(설정하지 않아도 자동으로 이 폴더)에 운영과 **같은 폴더 구성**으로 둡니다.
+
+```mermaid
+flowchart LR
+    U["브라우저<br/>http://localhost:8080"] --> BE["Spring Boot :8080<br/>화면 파일 + API"]
+    BE -- "/ , /assets/…" --> S["run\web\shell"]
+    BE -- "/mfe/course/…" --> C["run\web\mfe\course"]
+    BE -- "/mfe/enrollment/…" --> E["run\web\mfe\enrollment"]
+    BE -- "/api/…" --> API["컨트롤러 (같은 서버)"]
+```
+
+**왜 실습에서는 nginx를 쓰지 않나**
+
+| 이유 | 내용 |
+|---|---|
+| **Windows용 nginx의 호환 문제** | nginx 공식 문서는 Windows 버전을 성능·기능 제한이 있는 **베타 수준**으로 안내합니다. 실제로 회사 PC에서 **보안 프로그램이 서명 없는 `nginx.exe`의 실행을 붙잡아** `nginx -v`조차 멈추고, 끌 수 없는 프로세스가 쌓이는 일을 겪었습니다(아래 사례). 사용자가 풀 수 없고 IT 허용이 필요합니다 |
+| **Docker는 실습 환경을 복잡하게** | 설치·권한·자원 부담이 크고, 회사 PC 정책에 따라 쓸 수 없는 경우도 많습니다 |
+| **새 프로그램 없이 같은 것을 배운다** | 이미 실행하는 Java(Spring Boot)라 막히지 않고, 아래 표처럼 운영과 **같은 구조**를 그대로 연습합니다 |
+
+| | 운영 (Step 4-1) | 실습 (Step 4-2~4-6) |
 |---|---|---|
-| shell | `C:\nginx\html\eduhub\shell\` | `/`, `/assets/…`, 화면 주소(`/courses/1` 등) |
-| course-mfe | `C:\nginx\html\eduhub\mfe\course\` | `/mfe/course/remoteEntry.js`, `/mfe/course/assets/…` |
-| enrollment-mfe | `C:\nginx\html\eduhub\mfe\enrollment\` | `/mfe/enrollment/…` |
+| 화면을 주는 것 | 웹 서버(nginx 등) | Spring Boot의 `FrontendResourceConfig` (Step 4-4) |
+| 주소 | https://eduhub.회사.com | http://localhost:8080 |
+| 화면 폴더 | 웹 서버의 폴더 | 프로젝트 루트 `run\web\` (바꾸려면 환경 변수 `EDUHUB_WEB_ROOT`) |
+| 폴더 구성·경로 규칙 | `shell/`, `mfe/course/`, `mfe/enrollment/` | **같음** |
+| `/api` | 웹 서버가 백엔드로 전달 | 같은 서버가 바로 처리 |
+| 새로고침 | `try_files … /index.html` | `SpaForwardController` |
+| 캐시 규칙 | 웹 서버 설정 | **같은 규칙**을 Spring 설정으로 |
+| 빌드 | `npm run build:deploy` | **같음** |
+| 배포·롤백 | `deploy-frontend.ps1 -WebRoot <웹 서버 폴더>` | **같은 스크립트** (기본 `run\web`) |
+| 7회차 자동 배포 | 웹 서버 폴더를 교체 | 스테이징 PC의 화면 폴더를 교체 (워크플로우 같음) |
 
-> 💡 **앱마다 폴더가 따로**라서, course-mfe만 고쳤으면 `mfe\course` 폴더만 바꾸면 됩니다. nginx도 백엔드도 다시 시작하지 않습니다. 이것이 1-0에서 말한 "독립 배포"입니다. 같은 구조를 백엔드(Spring Boot)의 정적 폴더에 둘 수도 있지만, 그러면 화면 배포가 백엔드 배포에 묶이기 쉬워 웹 서버를 따로 둡니다.
+> 💡 그래서 이 실습으로 익히는 것(앱별 폴더, 한 주소의 경로 규칙, 캐시 규칙, 폴더 교체·롤백)은 운영에서 **웹 서버만 바뀌고 그대로** 쓰입니다.
 
-### Step 4-1. Windows에 nginx 설치 (사람이 직접)
+<details>
+<summary>사례: 회사 PC에서 <code>nginx.exe</code>가 실행되지 않았던 일 (증상, 판단 방법, IT 요청)</summary>
 
-1. https://nginx.org/en/download.html 에서 **Stable version**의 `nginx/Windows-…` zip을 받습니다
-2. `C:\nginx`에 풉니다 (`C:\nginx\nginx.exe`가 있어야 합니다. 경로에 공백·한글이 없게)
-3. PowerShell에서 실행과 확인
-
-```powershell
-cd C:\nginx
-Start-Process -FilePath .\nginx.exe -WorkingDirectory C:\nginx   # 백그라운드로 실행 (nginx는 실행한 폴더를 기준 경로로 쓴다)
-tasklist /fi "imagename eq nginx.exe"                              # nginx.exe 2개(master, worker)가 보이면 실행 중
-.\nginx.exe -t            # 설정 파일 검사
-.\nginx.exe -s reload     # 설정을 바꾼 뒤 다시 읽기 (끊김 없이)
-.\nginx.exe -s quit       # 끄기
-```
-
-> ⚠️ 처음 실행할 때 Windows 방화벽 창이 뜨면 **개인 네트워크만** 허용합니다. nginx 공식 문서는 Windows 버전을 성능·기능 제한이 있는 **베타 수준**으로 안내합니다. 교육·사내 스테이징에는 충분하지만, 실제 운영은 보통 Linux 서버(또는 사내 표준 웹 서버)에 같은 설정으로 둡니다. 포트는 IIS 등과 겹치지 않게 **8088**을 씁니다.
-
-> 🧭 **설치 직후 먼저 확인**: 설치 폴더에서 cmd로 `nginx -v`를 실행합니다. `nginx version: nginx/1.x.x` 한 줄이 바로 나와야 정상입니다. 이 명령은 설정·로그·포트를 쓰지 않으므로, 여기서 멈추면 nginx가 아니라 **PC 쪽에서 실행이 막힌 것**입니다. 이때는 nginx를 여러 번 실행하지 말고 아래 사례를 봅니다.
-
-#### 사례: 회사 PC에서 `nginx.exe`가 실행되지 않을 때 (실제로 겪은 일)
 
 | 보이는 증상 | 실제 의미 |
 |---|---|
@@ -1368,30 +1465,33 @@ Get-FileHash C:\nginx\nginx.exe -Algorithm SHA256
 
 > IT 담당자에게: 교육 실습용 웹 서버 `nginx.exe`(nginx.org 공식 Windows 버전)를 실행하면 `nginx -v`조차 응답 없이 멈추고 프로세스가 종료되지 않으며 로그도 생기지 않습니다. 코드 서명은 없고(NotSigned), 실행 파일에만 보안 프로그램의 표시로 보이는 대체 데이터 스트림이 붙습니다. nginx.org의 PGP 서명으로 zip을 검증했습니다(Good signature, 키 지문 일치). zip과 `nginx.exe`의 SHA256은 아래와 같습니다. 이 파일(또는 실습 폴더)의 실행 허용을 요청드립니다.
 
-허용을 받기 전까지는 **[Step 4-6의 대안](#step-4-6-대안-nginx를-쓸-수-없을-때-백엔드가-같은-폴더를-서비스)**으로 같은 구성을 실습합니다. 이미 붙잡힌 nginx 프로세스는 해가 없고 다음 로그아웃·재부팅 때 정리됩니다.
+이 교재의 실습은 처음부터 이 상황을 피하는 구성(아래)으로 합니다. 이미 붙잡힌 nginx 프로세스는 해가 없고 다음 로그아웃·재부팅 때 정리됩니다.
 
 > ⚠️ 위 판단 명령과 증상은 실제 회사 PC에서 확인한 것입니다. PGP 검증 절차는 gpg의 표준 사용법이며, 이 교재 환경에서는 nginx.org에 접속할 수 없어 실제 파일로 실행해 보지 못했습니다.
 
-### Step 4-2. nginx용으로 빌드하기 (`--mode nginx`)
 
-개발 서버에서는 remote가 `http://localhost:3001/remoteEntry.js`에 있지만, nginx에서는 같은 서버의 `/mfe/course/remoteEntry.js`에 있습니다. remote의 파일들도 자기 서브 폴더(`/mfe/course/`) 기준으로 서로를 찾아야 합니다(Vite의 `base`). **빌드 모드**로 나눠서, 개발 서버와 미리보기는 지금처럼 두고 `npm run build:nginx`일 때만 바꿉니다.
+</details>
+
+### Step 4-3. 한 주소용 빌드 (`build:deploy`)
+
+개발 서버에서는 remote가 `http://localhost:3001/remoteEntry.js`에 있지만, 한 주소로 배포하면 같은 서버의 `/mfe/course/remoteEntry.js`에 있습니다. remote 파일들도 자기 서브 폴더(`/mfe/course/`) 기준으로 서로를 찾아야 합니다(Vite의 `base`). **빌드 모드**로 나눠, 개발 서버·미리보기는 그대로 두고 `npm run build:deploy`일 때만 바꿉니다. 운영에서도 같은 빌드를 씁니다.
 
 ```json
 // apps/shell, apps/course-mfe, apps/enrollment-mfe 의 package.json scripts에 추가
-"build:nginx": "tsc --noEmit && vite build --mode nginx"
+"build:deploy": "tsc --noEmit && vite build --mode deploy"
 ```
 
 ```ts
 /// <reference types="vitest/config" />
-// frontend/apps/shell/vite.config.ts — 6회차: host. --mode nginx로 빌드하면 remote를 같은 서버의 /mfe/… 에서 받는다 (Step 4)
+// frontend/apps/shell/vite.config.ts — 6회차: host. --mode deploy로 빌드하면 remote를 같은 서버의 /mfe/… 에서 받는다 (Step 4)
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { federation } from "@module-federation/vite";
 
 export default defineConfig(({ mode }) => {
-  const nginx = mode === "nginx";   // npm run build:nginx
+  const deploy = mode === "deploy";   // npm run build:deploy (한 주소로 배포할 때)
   const entry = (port: number, path: string) =>
-    nginx ? `/mfe/${path}/remoteEntry.js` : `http://localhost:${port}/remoteEntry.js`;
+    deploy ? `/mfe/${path}/remoteEntry.js` : `http://localhost:${port}/remoteEntry.js`;
   return {
     // /api 요청은 백엔드로 (같은 origin이 되어 CORS가 필요 없다). preview도 같게
     server: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
@@ -1423,102 +1523,124 @@ export default defineConfig(({ mode }) => {
 ```ts
 // frontend/apps/course-mfe/vite.config.ts — 바뀐 곳 (enrollment-mfe는 "/mfe/enrollment/")
 export default defineConfig(({ mode }) => ({
-  base: mode === "nginx" ? "/mfe/course/" : "/",   // nginx: /mfe/course/ 아래에서 서비스 (Step 4)
+  base: mode === "deploy" ? "/mfe/course/" : "/",   // 한 주소로 배포: /mfe/course/ 아래에서 서비스 (Step 4)
   // … 나머지(server, preview, plugins, test)는 그대로 …
 }));
 ```
 
-```powershell
-cd frontend
-npm run build:nginx --workspace apps/course-mfe
-npm run build:nginx --workspace apps/enrollment-mfe
-npm run build:nginx --workspace apps/shell
+### Step 4-4. 백엔드가 `run\web`을 서비스하게 하기
+
+화면 파일은 **jar에 넣지 않습니다.** `src/main/resources/static`에 넣으면 화면 하나를 고쳐도 백엔드를 다시 빌드·배포해야 해서 독립 배포가 사라집니다. 폴더는 **실행할 때** 정해지고(기본 `../run/web`, 즉 `backend` 폴더에서 실행할 때 프로젝트 루트의 `run\web`), 같은 jar를 PC·서버마다 다른 폴더로 씁니다.
+
+```yaml
+# backend/src/main/resources/application.yml (eduhub 아래에 추가)
+eduhub:
+  # 화면 파일 폴더 (jar 밖). 기본은 프로젝트 루트의 run/web (backend 폴더에서 실행할 때 ../run/web).
+  # 다른 곳을 쓰려면 환경 변수 EDUHUB_WEB_ROOT, 화면 서비스를 끄려면 EDUHUB_WEB_ROOT를 빈 값으로
+  web-root: ${EDUHUB_WEB_ROOT:../run/web}
 ```
 
-### Step 4-3. nginx 설정
+```java
+// web/FrontendResourceConfig.java — 경로별로 폴더와 캐시 규칙을 정한다 (운영 웹 서버 설정과 같은 규칙)
+package com.example.eduhub.web;
 
-설정 파일은 저장소에 `deploy/nginx/nginx.conf`로 두고(리뷰·이력 관리), `C:\nginx\conf\nginx.conf`에 복사한 뒤 `.\nginx.exe -t` → `.\nginx.exe -s reload` 합니다.
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.CacheControl;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-```nginx
-# C:\nginx\conf\nginx.conf — EduHub: 화면(shell·remote)과 API를 한 주소(:8088)로
-worker_processes  1;
+/**
+ * 화면 파일을 jar 밖 폴더(eduhub.web-root, 기본 run/web)에서 서비스한다. 값이 비어 있으면 이 설정은 동작하지 않는다.
+ * 폴더 구성은 운영의 웹 서버(nginx 등)와 같다: <web-root>/shell/, <web-root>/mfe/course/, <web-root>/mfe/enrollment/
+ */
+@Configuration
+@ConditionalOnExpression("!'${eduhub.web-root:}'.isBlank()")
+class FrontendResourceConfig implements WebMvcConfigurer {
+    private static final CacheControl NO_CACHE = CacheControl.noCache();                        // 매번 바뀌었는지 확인
+    private static final CacheControl LONG = CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable(); // 해시 이름 파일
 
-events {
-    worker_connections  1024;
-}
+    private final String root;   // 끝이 /인 file: 주소
 
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-    sendfile      on;
+    FrontendResourceConfig(@Value("${eduhub.web-root}") String webRoot) {
+        // Path.toUri(): Windows의 C:\eduhub-web 도 file:///C:/eduhub-web/ 로 올바르게 바꿔 준다
+        String uri = Path.of(webRoot).toAbsolutePath().normalize().toUri().toString();
+        this.root = uri.endsWith("/") ? uri : uri + "/";   // 폴더가 아직 없으면 끝에 /가 붙지 않으므로
+    }
 
-    server {
-        listen       8088;
-        server_name  localhost;
-
-        # shell: C:\nginx\html\eduhub\shell (상대 경로는 nginx 설치 폴더 기준, 구분자는 /)
-        root   html/eduhub/shell;
-        index  index.html;
-
-        # remote: /mfe/course/… → C:\nginx\html\eduhub\mfe\course\…
-        location /mfe/ {
-            root  html/eduhub;
-            # 진입 파일은 매번 확인 → 새 배포가 바로 보인다
-            location ~ /remoteEntry\.js$ { add_header Cache-Control "no-cache"; }
-            # 이름에 해시가 붙은 파일은 내용이 바뀌면 이름도 바뀌므로 오래 캐시
-            location ~ /assets/          { add_header Cache-Control "public, max-age=31536000, immutable"; }
-        }
-
-        location /assets/ {
-            add_header Cache-Control "public, max-age=31536000, immutable";
-        }
-
-        # API는 백엔드(Spring Boot)로
-        location /api/ {
-            proxy_pass         http://127.0.0.1:8080;
-            proxy_set_header   Host $host;
-            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header   X-Forwarded-Proto $scheme;
-        }
-
-        # 화면 주소(/courses/1 등)는 shell의 index.html로 (새로고침·직접 접속 대비)
-        location / {
-            add_header Cache-Control "no-cache";
-            try_files  $uri $uri/ /index.html;
-        }
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String shell = root + "shell/";
+        String mfe = root + "mfe/";
+        registry.addResourceHandler("/index.html", "/*.js").addResourceLocations(shell).setCacheControl(NO_CACHE);
+        registry.addResourceHandler("/assets/**").addResourceLocations(shell + "assets/").setCacheControl(LONG);
+        registry.addResourceHandler("/mfe/*/remoteEntry.js").addResourceLocations(mfe).setCacheControl(NO_CACHE);
+        registry.addResourceHandler("/mfe/*/assets/**").addResourceLocations(mfe).setCacheControl(LONG);
     }
 }
 ```
 
-| 설정 | 하는 일 | 빠뜨리면 |
-|---|---|---|
-| `root html/eduhub/shell` | `/`와 `/assets/…`를 shell 폴더에서 | 첫 화면이 404 |
-| `location /mfe/` + `root html/eduhub` | `/mfe/course/x` → `html\eduhub\mfe\course\x` | remote를 못 불러와 "화면을 불러오지 못했습니다" |
-| `location /api/` + `proxy_pass` | API를 백엔드로. 같은 주소라 **CORS가 필요 없다** | 로그인·목록이 모두 실패 |
-| `try_files … /index.html` | `/courses/1`로 새로고침·직접 접속해도 shell을 준다 | 새로고침하면 404 |
-| `Cache-Control: no-cache` (shell 화면, `remoteEntry.js`) | 새 배포가 **바로** 보인다 (매번 바뀌었는지 확인) | 배포했는데 예전 화면이 보임 |
-| `max-age=31536000, immutable` (`assets/`) | 이름에 해시가 붙은 파일은 오래 캐시 (내용이 바뀌면 이름도 바뀐다) | 매번 다시 받아 느림 |
+```java
+// web/SpaForwardController.java — 새로고침해도 shell (운영의 try_files 역할)
+package com.example.eduhub.web;
 
-### Step 4-4. 배포 스크립트: 복사해서 이름만 바꿔 교체
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 
-빌드 결과를 폴더에 **바로 덮어쓰면** 복사하는 몇 초 동안 옛 파일과 새 파일이 섞여 화면이 깨질 수 있습니다. 옆 폴더(`.new`)에 다 복사한 뒤 **이름만 바꿔** 교체하고, 직전 버전은 `.prev`로 남겨 **롤백**에 씁니다. 7회차 자동 배포도 이 스크립트를 그대로 씁니다.
+/** 첫 화면과 화면 주소(/courses/1 등)는 shell의 index.html로. /api, /assets, /mfe는 해당 없음 */
+@Controller
+@ConditionalOnExpression("!'${eduhub.web-root:}'.isBlank()")
+class SpaForwardController {
+    @GetMapping({"/", "/login", "/courses", "/courses/**", "/my/**", "/admin/**"})
+    String shell() { return "forward:/index.html"; }
+}
+```
+
+```java
+// auth/SecurityConfig.java (5회차 Step 9-1) — 한 줄 추가: /api 밖(화면 파일)은 로그인 없이
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                .requestMatchers(r -> !r.getRequestURI().startsWith("/api/")).permitAll()   // 화면 파일(shell·remote)은 누구나. 보호는 /api에서
+                // … 나머지 규칙은 그대로 …
+```
+
+```gitignore
+# .gitignore (프로젝트 루트) — 배포된 화면 파일은 저장소에 넣지 않는다
+run/
+```
+
+```kotlin
+// backend/build.gradle.kts — 실수로 화면 파일이 jar에 들어가지 않게 (선택)
+tasks.processResources { exclude("static/**", "public/**") }
+```
+
+- `SecurityConfig` 한 줄이 없으면 `anyRequest().authenticated()` 때문에 화면 파일까지 로그인을 요구해 첫 화면이 401이 됩니다. API 보호 규칙은 바뀌지 않습니다
+- `Path.toUri()`가 Windows 경로(`C:\eduhub-web`)도 `file:///C:/eduhub-web/`로 바꿔 주므로 환경 변수에 일반 Windows 경로를 그대로 씁니다
+
+### Step 4-5. 배포 스크립트: 복사해서 이름만 바꿔 교체
+
+빌드 결과를 폴더에 **바로 덮어쓰면** 복사하는 몇 초 동안 옛 파일과 새 파일이 섞여 화면이 깨질 수 있습니다. 옆 폴더(`.new`)에 다 복사한 뒤 **이름만 바꿔** 교체하고, 직전 버전은 `.prev`로 남겨 **롤백**에 씁니다. 운영 웹 서버 폴더에도, 7회차 자동 배포에도 이 스크립트를 그대로 씁니다(`-WebRoot`만 다름).
 
 ```powershell
-# scripts/deploy-frontend.ps1 — 빌드한 MFE 하나를 nginx 폴더에 배포(교체)하거나 직전 버전으로 되돌린다
-# 사용: .\scripts\deploy-frontend.ps1 -App course-mfe [-Source <빌드 폴더>] [-Rollback]   (Windows PowerShell 5.1 이상)
+# scripts/deploy-frontend.ps1 — 빌드한 MFE 하나를 화면 폴더(기본: 프로젝트 루트의 run\web)에 배포(교체)하거나 직전 버전으로 되돌린다
+# 사용: .\scripts\deploy-frontend.ps1 -App course-mfe [-Source <빌드 폴더>] [-WebRoot <화면 폴더>] [-Rollback]   (Windows PowerShell 5.1 이상)
 param(
     [Parameter(Mandatory = $true)][ValidateSet('shell', 'course-mfe', 'enrollment-mfe')][string]$App,
     [string]$Source,                                   # 기본: frontend\apps\<App>\dist
-    [string]$NginxRoot = 'C:\nginx\html\eduhub',
+    [string]$WebRoot = (Join-Path $PSScriptRoot '..\run\web'),   # 운영에서는 웹 서버(nginx 등)의 폴더
     [switch]$Rollback
 )
 $ErrorActionPreference = 'Stop'
 
 $target = @{ 'shell' = 'shell'; 'course-mfe' = 'mfe\course'; 'enrollment-mfe' = 'mfe\enrollment' }[$App]
-$dest = Join-Path $NginxRoot $target
+$dest = Join-Path $WebRoot $target
 $prev = "$dest.prev"; $new = "$dest.new"; $broken = "$dest.broken"
 
-# 폴더 이름 바꾸기. nginx가 마침 그 폴더의 파일을 읽는 중이면 Windows가 잠시 거부할 수 있어 몇 번 다시 시도한다
+# 폴더 이름 바꾸기. 서버가 마침 그 폴더의 파일을 읽는 중이면 Windows가 잠시 거부할 수 있어 몇 번 다시 시도한다
 function Rename-Retry([string]$Path, [string]$NewPath) {
     for ($i = 1; $i -le 5; $i++) {
         try { Rename-Item -LiteralPath $Path -NewName (Split-Path $NewPath -Leaf) -ErrorAction Stop; return }
@@ -1537,7 +1659,7 @@ if ($Rollback) {
 
 if (-not $Source) { $Source = Join-Path $PSScriptRoot "..\frontend\apps\$App\dist" }
 $entry = if ($App -eq 'shell') { 'index.html' } else { 'remoteEntry.js' }
-if (-not (Test-Path (Join-Path $Source $entry))) { throw "빌드 결과가 없습니다: $Source\$entry (npm run build:nginx 먼저)" }
+if (-not (Test-Path (Join-Path $Source $entry))) { throw "빌드 결과가 없습니다: $Source\$entry (npm run build:deploy 먼저)" }
 
 # 1) 새 버전을 옆 폴더(.new)에 모두 복사해 둔다 — 복사 도중의 반쪽 상태가 사용자에게 보이지 않게
 if (Test-Path $new) { Remove-Item $new -Recurse -Force }
@@ -1552,7 +1674,12 @@ Write-Host "배포 완료: $App -> $dest"
 ```
 
 ```powershell
-# 저장소 루트에서
+# 저장소 루트에서 (빌드 → 배포, 기본 폴더 run\web)
+cd frontend
+npm run build:deploy --workspace apps/course-mfe
+npm run build:deploy --workspace apps/enrollment-mfe
+npm run build:deploy --workspace apps/shell
+cd ..
 .\scripts\deploy-frontend.ps1 -App course-mfe
 .\scripts\deploy-frontend.ps1 -App enrollment-mfe
 .\scripts\deploy-frontend.ps1 -App shell
@@ -1568,11 +1695,11 @@ Write-Host "배포 완료: $App -> $dest"
 ```bash
 #!/usr/bin/env bash
 # scripts/deploy-frontend.sh — deploy-frontend.ps1과 같은 동작 (macOS·Linux)
-# 사용: deploy-frontend.sh <shell|course-mfe|enrollment-mfe> [빌드 폴더] [--rollback]   (NGINX_ROOT 기본 /usr/share/nginx/html/eduhub)
+# 사용: deploy-frontend.sh <shell|course-mfe|enrollment-mfe> [빌드 폴더] [--rollback]   (WEB_ROOT 기본: 프로젝트 루트의 run/web)
 set -euo pipefail
 APP="${1:?앱 이름}"; SRC="${2:-}"; ROLLBACK=false
 [[ "${2:-}" == "--rollback" || "${3:-}" == "--rollback" ]] && ROLLBACK=true && [[ "$SRC" == "--rollback" ]] && SRC=""
-ROOT="${NGINX_ROOT:-/usr/share/nginx/html/eduhub}"
+ROOT="${WEB_ROOT:-$(cd "$(dirname "$0")/.." && pwd)/run/web}"
 case "$APP" in
   shell) TARGET=shell; ENTRY=index.html ;;
   course-mfe) TARGET=mfe/course; ENTRY=remoteEntry.js ;;
@@ -1586,7 +1713,7 @@ if $ROLLBACK; then
   mv "$PREV" "$DEST"; echo "롤백 완료: $APP ← 이전 버전 ($DEST). 문제가 된 버전은 $DEST.broken"; exit 0
 fi
 SRC="${SRC:-$(dirname "$0")/../frontend/apps/$APP/dist}"
-[[ -f "$SRC/$ENTRY" ]] || { echo "빌드 결과가 없습니다: $SRC/$ENTRY (npm run build:nginx 먼저)" >&2; exit 1; }
+[[ -f "$SRC/$ENTRY" ]] || { echo "빌드 결과가 없습니다: $SRC/$ENTRY (npm run build:deploy 먼저)" >&2; exit 1; }
 rm -rf "$NEW"; mkdir -p "$(dirname "$DEST")"; cp -r "$SRC" "$NEW"
 rm -rf "$PREV"; [[ -d "$DEST" ]] && mv "$DEST" "$PREV"
 mv "$NEW" "$DEST" || { [[ -d "$PREV" ]] && mv "$PREV" "$DEST"; exit 1; }
@@ -1595,84 +1722,33 @@ echo "배포 완료: $APP → $DEST"
 
 </details>
 
-### Step 4-5. 확인
+### Step 4-6. 확인
 
-백엔드(dev 프로필)를 띄우고 http://localhost:8088 에서 확인합니다. **개발 서버(3000~3002)는 모두 끈 상태**여야 nginx로 확인하는 것이 됩니다.
+```powershell
+cd backend
+$env:EDUHUB_JWT_SECRET = "<5회차 Step 9-1의 값>"
+.\gradlew bootRun --args='--spring.profiles.active=dev'      # 또는 java -jar build\libs\…jar --spring.profiles.active=dev
+```
+
+백엔드를 `backend` 폴더에서 실행하면 `..\run\web`을 서비스합니다. **개발 서버(3000~3002)는 모두 끈 상태**에서 http://localhost:8080 으로 확인합니다.
 
 | # | 할 일 | 기대 결과 |
 |---|---|---|
-| N1 | [5회차 6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기) 12개를 8088에서 | 개발 서버에서와 같은 결과 |
+| N1 | [5회차 6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기) 12개를 8080에서 | 개발 서버에서와 같은 결과 |
 | N2 | `/courses/1`에서 새로고침 | 상세 화면 그대로 (404 아님) |
-| N3 | 개발자 도구 Network 탭 | 모든 파일이 8088에서. remote 파일은 `/mfe/course/…`, `/mfe/enrollment/…` |
-| N4 | `(Invoke-WebRequest -UseBasicParsing http://localhost:8088/mfe/course/remoteEntry.js).Headers['Cache-Control']` | `no-cache` (해시가 붙은 `assets/` 파일은 `public, max-age=31536000, immutable`) |
-| N5 | course-mfe 검색창 이름을 잠깐 바꿔 `build:nginx` → `deploy-frontend.ps1 -App course-mfe` → 브라우저 새로고침 | nginx·백엔드를 다시 시작하지 않아도 바뀐 화면 (독립 배포) |
-| N6 | `deploy-frontend.ps1 -App course-mfe -Rollback` → 새로고침 | 바꾸기 전 화면으로 돌아옴. `mfe\course.broken`에 문제 버전이 남음 |
+| N3 | 개발자 도구 Network 탭 | 모든 파일이 8080에서. remote 파일은 `/mfe/course/…`, `/mfe/enrollment/…` |
+| N4 | `(Invoke-WebRequest -UseBasicParsing http://localhost:8080/mfe/course/remoteEntry.js).Headers['Cache-Control']` | `no-cache` (해시 이름의 `assets/` 파일은 `max-age=31536000, public, immutable`) |
+| N5 | course-mfe 검색창 이름을 잠깐 바꿔 `build:deploy` → `deploy-frontend.ps1 -App course-mfe` → 브라우저 새로고침 | **백엔드를 다시 시작하지 않아도** 바뀐 화면 (독립 배포) |
+| N6 | `deploy-frontend.ps1 -App course-mfe -Rollback` → 새로고침 | 바꾸기 전 화면. `run\web\mfe\course.broken`에 문제 버전이 남음 |
 
-> ✅ 이 교재 환경에서는 Windows 대신 **Linux의 nginx 1.24**에 위 `nginx.conf`를 그대로 쓰고(시험 환경 때문에 로그·pid 위치와 실행 계정 줄만 추가), 같은 동작의 `deploy-frontend.sh`로 배포해 확인했습니다: 5회차와 같은 브라우저 20단계 4회 연속 통과, N2~N6(새로고침, 캐시 헤더, nginx·백엔드 재시작 없이 course-mfe만 교체, 롤백 후 이전 화면 복귀). 세 앱의 단위 테스트·타입 검사·`build:nginx`·기존 `build`도 통과했습니다. **Windows에서 nginx 설치·실행과 `deploy-frontend.ps1`은 실행해 보지 못했습니다**(이 환경에 Windows·PowerShell이 없음). 같은 단계를 bash로 옮긴 스크립트로 논리만 확인했으니, 처음 쓸 때는 N5·N6을 꼭 직접 해 봅니다.
-
-### Step 4-6. (대안) nginx를 쓸 수 없을 때: 백엔드가 같은 폴더를 서비스
-
-회사 보안 정책 등으로 nginx를 실행할 수 없으면, **이미 실행할 수 있는 Spring Boot 백엔드**가 같은 폴더를 서비스하게 합니다. 새 실행 파일이 없으므로 보안 프로그램에 걸리지 않습니다. **빌드(`build:nginx`), 폴더 구성, 배포 스크립트는 nginx와 똑같이** 쓰고, 백엔드에 두 가지만 더합니다.
-
-| | nginx (Step 4-1~4-5) | 대안: 백엔드가 서비스 |
-|---|---|---|
-| 주소 | http://localhost:8088 | http://localhost:8080 (API와 같은 서버) |
-| 폴더 | `C:\nginx\html\eduhub\shell\`, `…\mfe\course\`, `…\mfe\enrollment\` | 같은 구성, 예: `C:\eduhub-web\shell\`, `…\mfe\…` (**jar 밖** 폴더) |
-| 배포·롤백 | `deploy-frontend.ps1 -App …` | `deploy-frontend.ps1 -App … -NginxRoot C:\eduhub-web` (스크립트 그대로) |
-| 독립 배포 | 폴더만 교체, 재시작 없음 | 같음 (백엔드 재시작 없음) |
-| 캐시 규칙 | nginx 설정으로 조정 | Spring Security가 모든 응답에 `no-cache, no-store`를 붙여 **캐시가 되지 않음**(실습에는 문제없음) |
-| 실무에서 | 화면 배포를 웹 서버에 둔다 | 화면 파일이 백엔드 프로세스에 기대므로 **실습용 대안**으로 쓴다 |
-
-> ⚠️ 정적 폴더를 `src/main/resources/static`(jar 안)에 넣지 않습니다. 그러면 화면 하나를 고쳐도 백엔드를 다시 빌드·배포해야 해서 마이크로프론트엔드의 독립 배포가 사라집니다.
-
-**① 보안 설정: `/api` 밖(화면 파일)은 로그인 없이** — 5회차 Step 9-1의 `SecurityConfig`에 한 줄
-
-```java
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers(r -> !r.getRequestURI().startsWith("/api/")).permitAll()   // 화면 파일(shell·remote)은 누구나. 보호는 /api에서
-                // … 나머지 규칙은 그대로 …
-```
-
-이 줄이 없으면 `anyRequest().authenticated()` 때문에 화면 파일까지 로그인을 요구해 첫 화면이 401이 됩니다. API 보호 규칙은 바뀌지 않습니다.
-
-**② 화면 주소로 새로고침해도 shell을 주는 컨트롤러** (nginx의 `try_files … /index.html` 역할)
-
-```java
-// web/SpaForwardController.java
-package com.example.eduhub.web;
-
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-
-/** 화면 주소(/courses/1 등)로 새로고침·직접 접속하면 shell의 index.html을 돌려준다. /api, /mfe, 파일은 해당 없음 */
-@Controller
-class SpaForwardController {
-    @GetMapping({"/login", "/courses", "/courses/**", "/my/**", "/admin/**"})
-    String shell() { return "forward:/index.html"; }
-}
-```
-
-**③ 실행: 정적 폴더를 jar 밖으로 지정**
-
-```powershell
-# shell 폴더를 먼저, 그다음 /mfe/… 를 찾을 상위 폴더
-java -jar build\libs\eduhub-backend-0.0.1.jar --spring.profiles.active=dev `
-  "--spring.web.resources.static-locations=file:C:/eduhub-web/shell/,file:C:/eduhub-web/"
-```
-
-- `/`, `/assets/…`, `/index.html`은 첫 번째 위치(`shell\`)에서, `/mfe/course/…`는 두 번째 위치(`C:\eduhub-web\mfe\course\…`)에서 찾습니다
-- 두 번째 위치 때문에 `/shell/…`, `/mfe/course.prev/…` 같은 주소로도 파일이 보입니다. 화면 파일이라 비밀은 없지만, 실습용 대안으로만 씁니다
-
-**④ 배포와 확인**: 4-2의 `build:nginx`로 빌드하고 `deploy-frontend.ps1 -App <앱> -NginxRoot C:\eduhub-web`으로 배포한 뒤, Step 4-5의 확인 표를 **8080**에서 합니다(N4의 캐시 헤더만 다름).
-
-> ✅ 이 교재 환경에서 위 설정으로 Spring Boot(8080)가 nginx와 같은 폴더 구성(`shell/`, `mfe/course/`, `mfe/enrollment/`)을 서비스하게 하고, 5회차와 같은 브라우저 20단계 통과, `/courses/1` 새로고침, `/api/me` 401 유지, **백엔드 재시작 없이** course-mfe 교체와 롤백(배포 스크립트의 bash 버전)을 확인했습니다. Windows 경로(`file:C:/…`) 형식은 실행해 보지 못했습니다(Linux 경로로 확인).
+> ✅ 이 교재 환경에서 위 코드로 확인했습니다: 환경 변수 없이 `backend` 폴더에서 실행하면 `../run/web`을 서비스, 5회차와 같은 브라우저 20단계 통과, 캐시 헤더(N4), **백엔드 재시작 없이** 교체와 롤백(N5·N6, 배포 스크립트의 bash 버전), `EDUHUB_WEB_ROOT`를 빈 값으로 두면 화면 서비스만 꺼지고 API는 정상, jar 안에 화면 파일 0건, 세 앱 단위 테스트 16개. Windows 경로와 PowerShell 스크립트는 이 환경에서 실행해 보지 못했습니다(같은 논리의 bash로 확인).
 
 ```bash
-git switch -c chore/nginx-deploy
-git add frontend/apps/*/vite.config.ts frontend/apps/*/package.json deploy/nginx/nginx.conf scripts/deploy-frontend.ps1 scripts/deploy-frontend.sh
-# Step 4-6 대안을 썼다면 backend의 SecurityConfig.java, SpaForwardController.java도
-git commit -m "chore(frontend): nginx 배포 설정과 배포·롤백 스크립트"
+git switch -c chore/web-deploy
+git add .gitignore frontend/apps/*/vite.config.ts frontend/apps/*/package.json \
+        backend/src/main/java/com/example/eduhub/web backend/src/main/java/com/example/eduhub/auth/SecurityConfig.java \
+        backend/src/main/resources/application.yml scripts/deploy-frontend.ps1 scripts/deploy-frontend.sh
+git commit -m "chore: 한 주소 배포 구성(run/web 서비스, build:deploy, 배포·롤백 스크립트)"
 ```
 
 ---
@@ -1692,13 +1768,13 @@ git commit -m "chore(frontend): nginx 배포 설정과 배포·롤백 스크립�
 | 목록 화면만 비어 있고 콘솔에 `Element type is invalid` | `CourseListPage`는 3회차부터 **이름 있는 export**. `lazy(() => import(…).then((m) => ({ default: m.CourseListPage })))` |
 | 인터넷 예제를 따라 했더니 옵션 이름이 다름 (`remotes: { x: "http://…" }` 문자열만 등) | `@originjs/vite-plugin-federation` 예제가 섞임. `@module-federation/vite` 형식(`type`, `name`, `entry`)으로 통일 |
 | `git status`에 renamed가 아니라 deleted + new file | `git mv` 대신 파일을 지우고 새로 만듦. 이력이 끊기므로 `git mv`로 다시 하거나, 내용이 많이 바뀌기 전에 커밋 |
-| (nginx) `nginx -v`조차 멈춤, 끌 수 없는 `nginx.exe`가 쌓임, 로그 없음 | PC의 보안 프로그램이 서명 없는 실행 파일을 붙잡음 → 반복 실행 금지, IT에 허용 요청(Step 4-1의 사례), 그동안 Step 4-6 대안 |
-| (nginx) 첫 화면이 500, error.log에 `rewrite or internal redirection cycle` | shell 폴더가 비었거나 nginx가 읽을 수 없음 → `C:\nginx\html\eduhub\shell\index.html`이 있는지, 폴더 권한 확인 |
-| (nginx) 화면은 뜨는데 "화면을 불러오지 못했습니다" | remote를 `build:nginx`가 아니라 `build`로 빌드함(`base`가 `/`) 또는 `mfe\course` 폴더가 없음 → Network 탭에서 404인 주소 확인 |
-| (nginx) `/courses/1`에서 새로고침하면 404 | `location /`의 `try_files … /index.html` 빠짐 |
-| (nginx) 배포했는데 예전 화면 | `remoteEntry.js`·`index.html`이 캐시됨 → `Cache-Control: no-cache` 확인, 브라우저 강력 새로고침 |
-| (nginx) 설정을 바꿨는데 그대로 | `.\nginx.exe -s reload`를 안 함. 먼저 `.\nginx.exe -t`로 검사 |
-| (nginx) `nginx.exe -s reload`가 `OpenEvent(...) failed` | nginx가 실행 중이 아니거나 다른 폴더에서 실행함 → `C:\nginx`에서 실행 |
+| (배포) http://localhost:8080 첫 화면이 404 | `run\web\shell\index.html`이 없음(배포 전), 또는 백엔드를 `backend` 폴더가 아닌 곳에서 실행해 `../run/web`이 다른 곳을 가리킴 → `EDUHUB_WEB_ROOT`에 절대 경로 |
+| (배포) 첫 화면이 401 | `SecurityConfig`의 "`/api` 밖은 `permitAll`" 줄 빠짐 (Step 4-4) |
+| (배포) 화면은 뜨는데 "화면을 불러오지 못했습니다" | remote를 `build:deploy`가 아니라 `build`로 빌드함(`base`가 `/`), 또는 `run\web\mfe\course`가 없음 → Network 탭에서 404인 주소 확인 |
+| (배포) `/courses/1`에서 새로고침하면 404 | `SpaForwardController`의 경로 목록에 그 화면 주소가 없음 |
+| (배포) 배포했는데 예전 화면 | 브라우저 캐시 → N4의 `no-cache` 확인, 강력 새로고침(Ctrl+F5) |
+| (배포) 화면 하나만 고쳤는데 백엔드를 다시 빌드해야 함, jar가 커짐 | 화면 파일을 `src/main/resources/static`에 넣음 → jar 밖 `run\web`으로 |
+| (참고) 회사 PC에서 `nginx.exe`가 `nginx -v`조차 멈춤 | 보안 프로그램이 서명 없는 실행 파일을 붙잡음 → Step 4-2의 사례. 실습은 nginx 없이 진행 |
 | 워크트리에서 백엔드 연결 실패 | 워크트리에 `.env`가 없음. 필요한 파일을 복사하거나 `.worktreeinclude` 설정 확인 |
 | 두 세션이 같은 파일을 고쳐 병합 충돌 | 공통 파일 작업을 Step 1에서 먼저 끝내지 않음. 충돌 해결 후 다음부터 순서 지키기 |
 | 사용량이 평소보다 빨리 소진 | 병렬 세션은 각자 사용. 끝난 세션은 정리하고 병렬 수를 줄인다 |
@@ -2139,7 +2215,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 ## 9-3. 과제 (다음 회차 전까지)
 
 - [ ] MFE 분리 PR, FR-09 알림 PR을 **리뷰 → Squash merge**까지 완료
-- [ ] ⭐ **4장 Step 4**: nginx 설치, `build:nginx`, `deploy-frontend.ps1`로 배포하고 Step 4-5 확인 표(N1~N6) 직접 확인 → `chore/nginx-deploy` PR. 7회차 자동 배포가 이 nginx를 씁니다
+- [ ] ⭐ **4장 Step 4**: `build:deploy`, 백엔드의 `run\web` 서비스 설정, `deploy-frontend.ps1`로 배포하고 Step 4-6 확인 표(N1~N6) 직접 확인 → `chore/web-deploy` PR. 7회차 자동 배포가 이 구성을 씁니다
 - [ ] 팀 마켓플레이스에 `eduhub-team-kit` 1.0.0 병합, 팀원 전원 설치 확인 (`claude plugin list` 캡처)
 - [ ] EduHub `.claude/`에서 플러그인으로 옮긴 자산 삭제 + `.claude/settings.json`에 마켓플레이스 권장 설정 추가 PR
 - [ ] 6주차 진행 현황 아티팩트(또는 HTML 리포트) 공유, 링크를 `docs/retro/week-06.md`에 기록
@@ -2152,7 +2228,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 
 **7주차: CI/CD와 환경 분리 완성 (모듈 16, 19)**
 - GitHub Actions로 빌드·테스트·포맷 검사, 사람 승인 후 스테이징 배포
-- 오늘 만든 **nginx에 바뀐 앱만 자동 배포**(self-hosted runner, 승인 후 교체, 롤백)
+- 오늘 만든 **화면 폴더에 바뀐 앱만 자동 배포**(self-hosted runner, 승인 후 교체, 롤백)
 - 개발·테스트·운영 설정 분리 완성(NFR-06), 사람이 직접 실행할 수 있는 빌드·배포·롤백 런북
 - 사내 프레임워크 적용, 토큰 사용량 측정과 최적화
 

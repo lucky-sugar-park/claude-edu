@@ -13,8 +13,8 @@
 >
 > **관련 모듈**: 16(사내 커스텀 프레임워크 적용), 19(토큰 사용량 최적화) + EduHub CI/CD
 > **사전 준비**
-> - 6회차 과제 PR이 `main`에 병합되어 있을 것 (MFE 분리, 알림, **nginx 배포 설정**)
-> - 6회차 [Step 4](./session-06-plugins-artifacts-mfe.md#step-4-빌드-결과를-nginx-한-곳에-배포하기-windows)의 **nginx가 설치된 Windows PC**(팀에 한 대, 수업 중 켜 둘 것)와 그 PC에 Git for Windows 설치. 7-3의 자동 배포가 이 PC에서 실행됩니다
+> - 6회차 과제 PR이 `main`에 병합되어 있을 것 (MFE 분리, 알림, **한 주소 배포 구성**)
+> - **스테이징 PC**(팀에 한 대, 수업 중 켜 둘 Windows PC): 백엔드를 dev 프로필로 실행하고 화면 폴더(예: `C:\eduhub-staging\web`)를 `EDUHUB_WEB_ROOT`로 지정 ([6회차 Step 4](./session-06-plugins-artifacts-mfe.md#step-4-한-주소로-배포하기-운영-구성과-실습-구성)), Git for Windows 설치. 7-3의 자동 배포가 이 PC에서 실행됩니다
 > - GitHub 저장소의 **Settings에 접근할 수 있는 권한**(팀에서 한 명 이상, 보통 저장소 관리자)
 > - 로컬에서 `cd backend && ./gradlew test`, `cd frontend && npm test`가 통과하는 상태
 > - Docker Desktop 실행 (Testcontainers, 이미지 빌드 확인용)
@@ -38,7 +38,7 @@
 
 > 7장(더 해 보기)은 시간이 남으면 수업 중에, 아니면 과제로 진행합니다.
 >
-> ⏱ 따라하기 ①의 **7-3(프론트 nginx 자동 배포)**은 시간이 모자라면 강사가 워크플로우 구조와 승인 화면을 시연하고, 러너 설치와 D1~D3 확인은 과제로 합니다.
+> ⏱ 따라하기 ①의 **7-3(프론트 자동 배포)**은 시간이 모자라면 강사가 워크플로우 구조와 승인 화면을 시연하고, 러너 설치와 D1~D3 확인은 과제로 합니다.
 
 ---
 
@@ -92,7 +92,7 @@ flowchart TD
 | 스테이징 배포 | **사람 승인 후 자동** | GitHub Environments의 필수 승인자 |
 | 운영 배포 | 사람 승인 + 파이프라인 | 이번 과정에서는 구조만 설계하고 실행하지 않음 |
 | 롤백 | 사람이 실행 가능 | 런북의 명령 그대로, 이전 이미지 태그로 재배포 |
-| 프론트(MFE) 배포 | **사람 승인 후 자동** | **바뀐 앱만** 빌드해 nginx 폴더를 교체(6회차 Step 4의 스크립트), 직전 버전은 보관해 롤백 (7-3) |
+| 프론트(MFE) 배포 | **사람 승인 후 자동** | **바뀐 앱만** 빌드해 화면 폴더를 교체(6회차 Step 4의 스크립트, 운영에서는 웹 서버의 폴더), 직전 버전은 보관해 롤백 (7-3) |
 
 ---
 
@@ -545,50 +545,54 @@ CI가 한 번 성공한 뒤에 설정합니다 (체크 이름이 목록에 나�
 
 > 💬 **강사 노트:** 교육 환경에 실제 스테이징 서버가 없으면 `scripts/deploy.sh`는 `--dry-run`으로 명령만 출력하게 두고, **승인 게이트가 동작하는 것**까지 확인합니다. 핵심은 배포 자체보다 "사람의 승인 없이는 아무것도 나가지 않는 구조"입니다.
 
-### 7-3. 프론트엔드를 nginx로 자동 배포 (self-hosted runner)
+### 7-3. 프론트엔드를 스테이징 PC에 자동 배포 (self-hosted runner)
 
-6회차 [Step 4](./session-06-plugins-artifacts-mfe.md#step-4-빌드-결과를-nginx-한-곳에-배포하기-windows)에서 사람이 하던 일(`build:nginx` → `deploy-frontend.ps1`)을 파이프라인이 하게 합니다. **바뀐 앱만** 빌드·배포해서 마이크로프론트엔드의 장점(독립 배포)을 살리고, 배포 전에는 7-1의 `staging` 승인을 받습니다.
+6회차 [Step 4](./session-06-plugins-artifacts-mfe.md#step-4-한-주소로-배포하기-운영-구성과-실습-구성)에서 사람이 하던 일(`build:deploy` → `deploy-frontend.ps1`)을 파이프라인이 하게 합니다. **바뀐 앱만** 빌드·배포해서 마이크로프론트엔드의 장점(독립 배포)을 살리고, 배포 전에는 7-1의 `staging` 승인을 받습니다.
+
+> 💡 **운영과의 관계**: 운영에서는 배포 단계가 **웹 서버(nginx 등)의 화면 폴더**를 교체합니다(6회차 Step 4-1의 그림). 실습에서는 Windows용 nginx의 호환 문제 때문에 **스테이징 PC의 백엔드가 서비스하는 화면 폴더**를 교체합니다(6회차 Step 4-2). 워크플로우는 같고, 배포 폴더와 확인 주소만 환경 변수로 다릅니다.
 
 ```mermaid
 flowchart LR
     M["main에 병합<br/>(frontend/** 변경)"] --> CH["changes<br/>바뀐 앱 고르기<br/>(ubuntu)"]
-    CH --> B["build × 앱<br/>test · build:nginx<br/>→ 결과물 업로드 (ubuntu)"]
+    CH --> B["build × 앱<br/>test · build:deploy<br/>→ 결과물 업로드 (ubuntu)"]
     B --> AP{"👤 staging 승인"}
-    AP --> D["deploy<br/>(nginx PC의 self-hosted runner)<br/>remote 먼저, shell 마지막<br/>+ 스모크 테스트"]
+    AP --> D["deploy<br/>(스테이징 PC의 self-hosted runner)<br/>remote 먼저, shell 마지막<br/>+ 스모크 테스트"]
     DSP["수동 실행<br/>rollback=true"] -.-> AP
 ```
 
-**왜 self-hosted runner인가**: GitHub가 제공하는 러너(`ubuntu-latest` 등)는 인터넷 위의 임시 컴퓨터라 **사내 PC의 `C:\nginx`에 파일을 놓을 수 없습니다.** nginx가 있는 PC에 러너 프로그램을 설치하면, 그 PC가 GitHub에 **먼저 접속해 일감을 받아 오므로**(바깥으로 나가는 HTTPS만 사용) 방화벽에 들어오는 포트를 열 필요가 없습니다. 빌드는 GitHub의 러너에서 하고, **파일 교체만** 이 PC에서 합니다.
+**왜 self-hosted runner인가**: GitHub가 제공하는 러너(`ubuntu-latest` 등)는 인터넷 위의 임시 컴퓨터라 **사내 PC의 화면 폴더에 파일을 놓을 수 없습니다.** 스테이징 PC에 러너 프로그램을 설치하면, 그 PC가 GitHub에 **먼저 접속해 일감을 받아 오므로**(바깥으로 나가는 HTTPS만 사용) 방화벽에 들어오는 포트를 열 필요가 없습니다. 빌드는 GitHub의 러너에서 하고, **파일 교체만** 이 PC에서 합니다.
 
-**① runner 설치 (사람이 직접, nginx PC에서)**
+**① runner 설치와 환경 변수 (사람이 직접)**
 
-1. 저장소 **Settings** → **Actions** → **Runners** → **New self-hosted runner** → **Windows**, **x64**
+1. 스테이징 PC에서 저장소 **Settings** → **Actions** → **Runners** → **New self-hosted runner** → **Windows**, **x64**
 2. 화면에 나온 명령을 PowerShell에서 그대로 실행합니다 (러너 내려받기 → `.\config.cmd --url … --token …`). 설정 중 질문에서
-   - **labels**에 `eduhub-nginx` 추가 (워크플로우가 이 이름표로 이 PC를 고른다)
-   - **서비스로 실행**: 예. 실행 계정은 `C:\nginx\html\eduhub`에만 쓰기 권한이 있는 **전용 계정**을 권장 (관리자 계정 ✕)
+   - **labels**에 `eduhub-staging` 추가 (워크플로우가 이 이름표로 이 PC를 고른다)
+   - **서비스로 실행**: 예. 실행 계정은 화면 폴더(`C:\eduhub-staging\web`)에만 쓰기 권한이 있는 **전용 계정**을 권장 (관리자 계정 ✕)
 3. **Runners** 목록에서 상태가 **Idle**(초록)인지 확인
 4. 이 PC에서 저장소의 `.ps1`이 실행되도록 실행 정책 확인: `Get-ExecutionPolicy -List` (Windows PC의 기본값은 스크립트를 막는 경우가 많다. 팀이 판단해 `RemoteSigned` 등으로)
-
-> 💡 **nginx를 쓸 수 없어 6회차 [Step 4-6 대안](./session-06-plugins-artifacts-mfe.md#step-4-6-대안-nginx를-쓸-수-없을-때-백엔드가-같은-폴더를-서비스)(백엔드가 정적 폴더 서비스)을 쓰는 팀**: 러너는 백엔드가 도는 PC에 설치하고, 아래 워크플로우의 배포 단계에 `-NginxRoot C:\eduhub-web`을, 스모크 테스트 주소를 `http://localhost:8080`으로 바꿉니다. 나머지(바뀐 앱 고르기, 승인, 롤백 절차)는 같습니다.
+5. **Settings** → **Environments** → `staging` → **Environment variables**에 두 값 추가
+   - `FRONTEND_WEB_ROOT`: 백엔드가 서비스하는 화면 폴더 (예: `C:\eduhub-staging\web`. 백엔드는 `EDUHUB_WEB_ROOT`를 같은 값으로 실행)
+   - `APP_URL`: 스모크 테스트 주소 (예: `http://localhost:8080`)
 
 > ⚠️ **self-hosted runner의 보안**: 러너는 그 PC에서 **워크플로우의 명령을 그대로 실행**합니다. GitHub 문서는 **공개 저장소에는 self-hosted runner를 쓰지 말라**고 안내합니다(누구나 PR로 코드를 실행시킬 수 있다). EduHub는 비공개 저장소이고, 이 워크플로우는 `main`에 대한 push와 수동 실행에서만 돌며, 배포 잡은 `staging` 승인을 거칩니다. 러너 PC에는 운영 비밀을 두지 않습니다.
 
 **② 워크플로우 작성 (Claude + 리뷰)** — 브랜치 `chore/frontend-deploy`, Plan 모드
 
 ```text
-[목표] main에 frontend가 바뀌어 병합되면, 바뀐 MFE만 빌드해서 사람 승인 후 nginx(Windows)에 배포하는 워크플로우를 만들려고 해
+[목표] main에 frontend가 바뀌어 병합되면, 바뀐 MFE만 빌드해서 사람 승인 후 스테이징 PC의 화면 폴더에 배포하는 워크플로우를 만들려고 해
 [위치] .github/workflows/deploy-frontend.yml (새 파일), scripts/changed-frontend-apps.sh (새 파일),
        scripts/deploy-frontend.ps1 (6회차 Step 4 그대로 사용)
 [범위]
 - 트리거: push(main, paths frontend/**), workflow_dispatch(app: all|shell|course-mfe|enrollment-mfe, rollback: boolean)
 - changes 잡(ubuntu): push 직전 커밋과 비교해 바뀐 앱을 JSON 배열로. packages/·루트 package.json·lock이 바뀌면 셋 다.
   순서는 remote 먼저, shell 마지막. 비교 기준이 없으면 셋 다
-- build 잡(ubuntu, 앱별 matrix): npm ci, 그 앱의 npm test, npm run build:nginx → 결과물을 frontend-<앱> 이름으로 업로드
-- deploy 잡: runs-on [self-hosted, windows, eduhub-nginx], environment: staging, 결과물을 받아 앱마다 deploy-frontend.ps1,
-  rollback이면 빌드 없이 -Rollback. 끝나면 8088의 /, /courses, remoteEntry.js 두 개, /api/v1/courses 스모크 테스트
+- build 잡(ubuntu, 앱별 matrix): npm ci, 그 앱의 npm test, npm run build:deploy → 결과물을 frontend-<앱> 이름으로 업로드
+- deploy 잡: runs-on [self-hosted, windows, eduhub-staging], environment: staging, 결과물을 받아 앱마다
+  deploy-frontend.ps1 -WebRoot (staging 환경 변수 FRONTEND_WEB_ROOT), rollback이면 빌드 없이 -Rollback.
+  끝나면 APP_URL의 /, /courses, remoteEntry.js 두 개, /api/v1/courses 스모크 테스트
 - 권한 최소(contents: read), 배포는 동시에 하나만(concurrency, 중간에 취소하지 않음)
-- 입력값은 run에 ${{ }}로 직접 넣지 말고 env로 넘긴다
-[하지 않는 것] 운영 배포, nginx 설정 변경 자동화, 백엔드 배포(7-2)
+- 입력값·변수는 run에 ${{ }}로 직접 넣지 말고 env로 넘긴다
+[하지 않는 것] 운영 배포, 백엔드 배포(7-2)
 [완료 기준] actionlint 통과, changed-frontend-apps.sh를 여러 경우로 시험한 결과 표
 [진행 방식] 잡 구성과 각 잡이 어디서(어느 러너) 도는지 먼저 보여줘
 ```
@@ -596,8 +600,8 @@ flowchart LR
 **기대하는 결과** — 아래 파일은 actionlint로 검사하고, 앱 고르기 스크립트는 9가지 경우로 시험했습니다 (끝의 ✅)
 
 ```yaml
-# .github/workflows/deploy-frontend.yml — 프론트(MFE)를 사람 승인 후 nginx(Windows)에 배포
-name: Deploy frontend (nginx)
+# .github/workflows/deploy-frontend.yml — 프론트(MFE)를 사람 승인 후 스테이징 PC의 화면 폴더에 배포
+name: Deploy frontend
 
 on:
   push:
@@ -611,7 +615,7 @@ on:
         options: [all, shell, course-mfe, enrollment-mfe]
         default: all
       rollback:
-        description: '빌드하지 않고 nginx에 보관된 직전 버전으로 되돌리기'
+        description: '빌드하지 않고 화면 폴더에 보관된 직전 버전으로 되돌리기'
         type: boolean
         default: false
 
@@ -659,7 +663,7 @@ jobs:
         run: |
           npm ci
           npm test --workspace "apps/$APP"
-          npm run build:nginx --workspace "apps/$APP"
+          npm run build:deploy --workspace "apps/$APP"
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-${{ matrix.app }}
@@ -672,8 +676,8 @@ jobs:
     if: >-
       always() && needs.changes.outputs.apps != '[]' &&
       (needs.build.result == 'success' || (inputs.rollback && needs.build.result == 'skipped'))
-    runs-on: [self-hosted, windows, eduhub-nginx]
-    environment: staging                 # 필수 승인자가 승인해야 실행된다 (Step 7-1)
+    runs-on: [self-hosted, windows, eduhub-staging]
+    environment: staging                 # 필수 승인자가 승인해야 실행된다 (Step 7-1). 아래 vars도 이 환경의 변수
     steps:
       - uses: actions/checkout@v4        # scripts/deploy-frontend.ps1을 쓰려고
       - if: ${{ !inputs.rollback }}
@@ -686,17 +690,21 @@ jobs:
         env:
           APPS: ${{ needs.changes.outputs.apps }}
           ROLLBACK: ${{ inputs.rollback }}
+          WEB_ROOT: ${{ vars.FRONTEND_WEB_ROOT }}   # 예: C:\eduhub-staging\web (백엔드가 서비스하는 폴더)
         run: |
+          if (-not $env:WEB_ROOT) { throw "staging 환경 변수 FRONTEND_WEB_ROOT가 없습니다" }
           $apps = $env:APPS | ConvertFrom-Json
           foreach ($app in $apps) {
-            if ($env:ROLLBACK -eq 'true') { .\scripts\deploy-frontend.ps1 -App $app -Rollback }
-            else { .\scripts\deploy-frontend.ps1 -App $app -Source "artifacts\frontend-$app" }
+            if ($env:ROLLBACK -eq 'true') { .\scripts\deploy-frontend.ps1 -App $app -WebRoot $env:WEB_ROOT -Rollback }
+            else { .\scripts\deploy-frontend.ps1 -App $app -WebRoot $env:WEB_ROOT -Source "artifacts\frontend-$app" }
           }
       - name: Smoke test
         shell: powershell
+        env:
+          APP_URL: ${{ vars.APP_URL }}               # 예: http://localhost:8080
         run: |
           foreach ($path in '/', '/courses', '/mfe/course/remoteEntry.js', '/mfe/enrollment/remoteEntry.js', '/api/v1/courses') {
-            $r = Invoke-WebRequest -UseBasicParsing "http://localhost:8088$path"
+            $r = Invoke-WebRequest -UseBasicParsing "$($env:APP_URL)$path"
             if ($r.StatusCode -ne 200) { throw "$path -> $($r.StatusCode)" }
             Write-Host "OK $path"
           }
@@ -734,7 +742,7 @@ echo "apps=[$(IFS=,; echo "${apps[*]:-}")]"
 # .github/actionlint.yaml — actionlint가 직접 정한 러너 이름표를 알도록 (actionlint를 쓰는 팀만)
 self-hosted-runner:
   labels:
-    - eduhub-nginx   # nginx가 있는 Windows PC의 runner (7회차 Step 7-3)
+    - eduhub-staging   # 스테이징 PC(백엔드와 화면 폴더가 있는 Windows)의 runner (7회차 Step 7-3)
 ```
 
 **검토 포인트**
@@ -744,7 +752,8 @@ self-hosted-runner:
 | `deploy`에 `environment: staging`이 있는가 | 승인 게이트. 빠지면 병합 즉시 사내 PC에 배포된다 |
 | `deploy`만 `self-hosted`에서 도는가 | 빌드·테스트까지 사내 PC에서 돌리면 PC가 느려지고 공격 면이 넓어진다 |
 | 트리거에 `pull_request`가 **없는가** | PR 코드는 아직 리뷰 전이다. self-hosted runner에서 돌면 안 된다 |
-| 입력값·출력값을 `env:`로 넘기는가 | `run:` 안에 `${{ }}`로 바로 넣으면 명령 주입 위험 |
+| 입력값·변수를 `env:`로 넘기는가 | `run:` 안에 `${{ }}`로 바로 넣으면 명령 주입 위험 |
+| 배포 폴더·주소를 코드에 박지 않고 환경 변수로 받는가 | PC·환경마다 다르다. 운영에서는 같은 워크플로우가 웹 서버 폴더를 받는다 |
 | 순서가 remote 먼저, shell 마지막인가 | 새 shell이 아직 없는 remote 모듈을 찾는 시간을 줄인다 |
 | `concurrency`에서 `cancel-in-progress: false`인가 | 폴더를 바꾸는 도중에 끊기면 반쪽 상태가 될 수 있다 |
 | 공통 파일 변경 시 **셋 다** 배포하는가 | api-client·lock 파일은 모든 앱에 들어간다 |
@@ -754,18 +763,18 @@ self-hosted-runner:
 | # | 할 일 | 기대 결과 |
 |---|---|---|
 | D1 | course-mfe의 검색창 이름만 바꾼 PR을 병합 | `changes`의 출력이 `["course-mfe"]`, build는 course-mfe만, deploy는 **승인 대기(Waiting)** |
-| D2 | 승인자가 **Review deployments**에서 승인 | 러너 PC에서 `deploy-frontend.ps1 -App course-mfe` 실행, 스모크 테스트 통과. 브라우저(8088) 새로고침하면 바뀐 이름. `mfe\course.prev`에 직전 버전 |
-| D3 | **Actions** → **Deploy frontend (nginx)** → **Run workflow**: app `course-mfe`, rollback ✔ | 빌드 없이 승인 후 직전 버전으로 복귀 |
+| D2 | 승인자가 **Review deployments**에서 승인 | 러너 PC에서 `deploy-frontend.ps1 -App course-mfe` 실행, 스모크 테스트 통과. 브라우저(`APP_URL`) 새로고침하면 바뀐 이름. 화면 폴더의 `mfe\course.prev`에 직전 버전 |
+| D3 | **Actions** → **Deploy frontend** → **Run workflow**: app `course-mfe`, rollback ✔ | 빌드 없이 승인 후 직전 버전으로 복귀 |
 | D4 | 백엔드·문서만 바꾼 PR 병합 | 이 워크플로우가 돌지 않는다 (`paths`) |
 | D5 | `frontend/packages/api-client`를 바꾼 PR 병합 | 세 앱 모두 빌드, remote → shell 순서로 배포 |
 
 > 💡 언제, 어떻게 되돌리는지와 되돌린 뒤 할 일은 바로 아래 **7-4**에 절차로 정리했습니다.
 
-> ✅ 이 교재 환경에서 확인한 것: `deploy-frontend.yml`은 actionlint 1.7로 검사해 문제가 없었고(러너 이름표는 `actionlint.yaml`에 등록), `changed-frontend-apps.sh`는 9가지 경우(앱 하나, 둘, api-client, lock 파일, 백엔드·문서만, 비교 기준 없음, 강제 푸시, 수동 실행 all·shell)에서 기대한 결과를 냈습니다. 배포 단계가 쓰는 교체·롤백 동작은 6회차 Step 4에서 Linux nginx로 확인했습니다. **실제 GitHub Actions 실행, Windows self-hosted runner 설치와 실행, 승인 화면, `download-artifact`의 폴더 구조, PowerShell 단계는 이 환경에서 실행해 보지 못했습니다.** 처음 적용할 때는 D1~D3을 꼭 직접 확인하고, Actions 로그에서 `artifacts\frontend-<앱>` 경로가 맞는지 봅니다.
+> ✅ 이 교재 환경에서 확인한 것: `deploy-frontend.yml`은 actionlint 1.7로 검사해 문제가 없었고(러너 이름표는 `actionlint.yaml`에 등록), `changed-frontend-apps.sh`는 9가지 경우(앱 하나, 둘, api-client, lock 파일, 백엔드·문서만, 비교 기준 없음, 강제 푸시, 수동 실행 all·shell)에서 기대한 결과를 냈습니다. 배포 단계가 쓰는 교체·롤백과 백엔드의 화면 폴더 서비스는 6회차 Step 4에서 확인했습니다. **실제 GitHub Actions 실행, Windows self-hosted runner 설치와 실행, 승인 화면, 환경 변수(`vars`), `download-artifact`의 폴더 구조, PowerShell 단계는 이 환경에서 실행해 보지 못했습니다.** 처음 적용할 때는 D1~D3을 꼭 직접 확인하고, Actions 로그에서 `artifacts\frontend-<앱>` 경로가 맞는지 봅니다.
 
-### 7-4. nginx 배포·롤백 절차 (런북에 그대로 옮긴다)
+### 7-4. 프론트 배포·롤백 절차 (런북에 그대로 옮긴다)
 
-7-3의 파이프라인이 있어도, **언제 되돌릴지 정하고 실제로 되돌리는 것은 사람**입니다. 아래 절차를 `docs/runbook.md`의 "프론트(nginx) 배포·롤백" 절로 옮기고(Step 8), 팀원 한 명이 실제로 한 번 해 봅니다.
+7-3의 파이프라인이 있어도, **언제 되돌릴지 정하고 실제로 되돌리는 것은 사람**입니다. 아래 절차를 `docs/runbook.md`의 "프론트 배포·롤백" 절로 옮기고(Step 8), 팀원 한 명이 실제로 한 번 해 봅니다.
 
 **① 평소 배포 (자동)**
 
@@ -774,8 +783,8 @@ self-hosted-runner:
 | 1 | 개발자 | `frontend/` 변경 PR을 리뷰 받아 `main`에 병합 | CI 통과 |
 | 2 | 파이프라인 | `changes` → 바뀐 앱만 `build` | `changes` 잡 로그의 `apps=[…]`가 바꾼 앱과 같은가 |
 | 3 | 승인자 | **Review deployments**에서 승인. 배포 시간(사용자가 적은 때)인지, 무엇이 나가는지 PR 목록으로 확인 | 승인 전에 `apps=[…]`를 한 번 더 본다 |
-| 4 | 파이프라인 | nginx PC에서 앱마다 교체 → 스모크 테스트 | `deploy` 잡 초록, 로그에 `배포 완료: <앱> -> …`, `OK /` 등 5줄 |
-| 5 | 승인자 | 브라우저에서 http://(nginx PC):8088 을 **강력 새로고침**(Ctrl+F5) 후 바꾼 화면과 로그인·목록 확인 | 5회차 6-2 확인 표 중 바뀐 화면에 해당하는 줄 |
+| 4 | 파이프라인 | 스테이징 PC에서 앱마다 교체 → 스모크 테스트 | `deploy` 잡 초록, 로그에 `배포 완료: <앱> -> …`, `OK /` 등 5줄 |
+| 5 | 승인자 | 브라우저에서 `APP_URL`(예: http://(스테이징 PC):8080)을 **강력 새로고침**(Ctrl+F5) 후 바꾼 화면과 로그인·목록 확인 | 5회차 6-2 확인 표 중 바뀐 화면에 해당하는 줄 |
 
 **② 언제 되돌리나** (판단은 승인자·당번. 고쳐서 다시 배포할 수 있으면 그쪽이 먼저)
 
@@ -789,20 +798,20 @@ self-hosted-runner:
 
 | 방법 | 언제 | 어떻게 |
 |---|---|---|
-| **A. 직전 버전으로** (가장 빠름) | 방금 배포한 것이 문제 | Actions → **Deploy frontend (nginx)** → **Run workflow** → app: 문제 앱, rollback: ✔ → 승인. nginx PC의 `.prev`(직전 버전)가 다시 서비스되고 문제 버전은 `.broken`으로 옮겨진다 |
+| **A. 직전 버전으로** (가장 빠름) | 방금 배포한 것이 문제 | Actions → **Deploy frontend** → **Run workflow** → app: 문제 앱, rollback: ✔ → 승인. 화면 폴더의 `.prev`(직전 버전)가 다시 서비스되고 문제 버전은 `.broken`으로 옮겨진다 |
 | **B. 코드로 되돌리기** (근본 조치) | A를 이미 한 번 했거나, 두 단계 이상 전으로 가야 함 | 문제 커밋을 `git revert`한 PR → 병합 → 평소 배포(①)로 이전 코드가 다시 나간다. **A를 했더라도 B는 꼭 한다** (아래 ④) |
-| **C. 사람이 직접** (파이프라인·러너가 안 될 때) | GitHub 장애, 러너 꺼짐, 승인자 부재 | nginx PC에서 아래 명령. 6회차 Step 4와 같은 스크립트 |
+| **C. 사람이 직접** (파이프라인·러너가 안 될 때) | GitHub 장애, 러너 꺼짐, 승인자 부재 | 스테이징 PC에서 아래 명령. 6회차 Step 4와 같은 스크립트 |
 
 ```powershell
-# C-1. 직전 버전으로 (nginx PC, 사람이 받아 둔 저장소 폴더에서. 러너의 작업 폴더가 아니다)
+# C-1. 직전 버전으로 (스테이징 PC, 사람이 받아 둔 저장소 폴더에서. 러너의 작업 폴더가 아니다)
 cd C:\work\eduhub
 git pull
-.\scripts\deploy-frontend.ps1 -App course-mfe -Rollback
+.\scripts\deploy-frontend.ps1 -App course-mfe -WebRoot C:\eduhub-staging\web -Rollback
 
 # C-2. 특정 정상 버전을 다시 빌드해서 배포 (두 단계 이상 전으로 가야 할 때)
 git switch --detach <정상이던 커밋>          # git log --oneline -- frontend/apps/course-mfe 로 찾는다
-cd frontend; npm ci; npm run build:nginx --workspace apps/course-mfe; cd ..
-.\scripts\deploy-frontend.ps1 -App course-mfe
+cd frontend; npm ci; npm run build:deploy --workspace apps/course-mfe; cd ..
+.\scripts\deploy-frontend.ps1 -App course-mfe -WebRoot C:\eduhub-staging\web
 git switch main
 ```
 
@@ -821,14 +830,14 @@ git switch main
 
 **④ 롤백한 뒤 반드시 할 일**
 
-1. **`main`에는 아직 문제 코드가 있습니다.** 그 앱을 고친 다른 PR이 병합되면 문제 코드가 **다시 배포**됩니다. 바로 B(revert PR) 또는 수정 PR을 만들고, 그때까지는 그 앱을 건드리는 PR을 병합하지 않습니다. 급하면 Actions → **Deploy frontend (nginx)** → ⋯ → **Disable workflow**로 자동 배포를 잠시 멈추고, 끝나면 **Enable workflow**
+1. **`main`에는 아직 문제 코드가 있습니다.** 그 앱을 고친 다른 PR이 병합되면 문제 코드가 **다시 배포**됩니다. 바로 B(revert PR) 또는 수정 PR을 만들고, 그때까지는 그 앱을 건드리는 PR을 병합하지 않습니다. 급하면 Actions → **Deploy frontend** → ⋯ → **Disable workflow**로 자동 배포를 잠시 멈추고, 끝나면 **Enable workflow**
 2. **공통 변경(api-client 등)이 들어간 배포를 되돌릴 때**는 그 배포에서 **함께 나간 앱을 모두** 되돌립니다(app: `all`, 또는 앱별로). 하나만 되돌리면 shell과 remote의 공유 코드가 어긋날 수 있습니다
 3. 반대로 **그 배포에 없던 앱은 되돌리지 않습니다.** 롤백은 앱마다 "그 앱의 직전 배포"로 가므로, 이번에 배포되지 않은 앱을 되돌리면 **더 예전 버전**이 됩니다. 어떤 앱이 나갔는지는 그 실행의 `changes` 로그(`apps=[…]`)로 확인합니다
 4. 기록: 언제, 무엇을, 왜 되돌렸는지 PR이나 `docs/retro/`에 한 줄. 8회차 "AI 없이 핫픽스" 훈련의 재료가 됩니다
 
 > 💡 **Re-run으로 되돌리기**: 예전에 성공한 실행을 **Re-run all jobs** 하면 그 실행의 커밋으로 다시 빌드·배포됩니다(승인 필요). 다만 `changes`가 그때 바뀐 앱만 고르므로 다른 앱은 따라가지 않고, `main`의 코드는 그대로라 ④의 문제가 같이 남습니다. 이 교재 환경에서는 Re-run 동작을 실행해 보지 못했으니, 런북의 기본 방법은 A와 B로 둡니다.
 
-> ✅ ③의 폴더 표는 `deploy-frontend.sh`(PowerShell 스크립트와 같은 논리)로 배포·롤백을 차례로 실행한 결과입니다. 6회차 Step 4에서 Linux nginx로 "nginx·백엔드 재시작 없이 롤백하면 이전 화면이 나온다"도 확인했습니다. Actions 화면의 메뉴 이름(Run workflow, Review deployments, Disable workflow)은 GitHub 화면 기준이며 실제 실행은 이 환경에서 해 보지 못했습니다.
+> ✅ ③의 폴더 표는 `deploy-frontend.sh`(PowerShell 스크립트와 같은 논리)로 배포·롤백을 차례로 실행한 결과입니다. 6회차 Step 4에서 "백엔드 재시작 없이 롤백하면 이전 화면이 나온다"도 확인했습니다. Actions 화면의 메뉴 이름(Run workflow, Review deployments, Disable workflow)은 GitHub 화면 기준이며 실제 실행은 이 환경에서 해 보지 못했습니다.
 
 ---
 
@@ -837,7 +846,7 @@ git switch main
 ```text
 [목표] docs/runbook.md를 작성하려고 해. 사람이 AI 없이 그대로 따라 할 수 있어야 해.
 [위치] .github/workflows/ci.yml, .github/workflows/deploy.yml, scripts/deploy.sh, backend/, frontend/
-[범위] 절: 로컬 빌드·테스트 / 스테이징 배포 / 롤백(이전 태그 찾기 포함) / 프론트(nginx) 배포와 롤백(7-4의 절차: 평소 배포, 판단 기준, 롤백 A·B·C, 롤백 후 할 일) / 수동 핫픽스 절차 / 필요한 권한과 승인자
+[범위] 절: 로컬 빌드·테스트 / 스테이징 배포 / 롤백(이전 태그 찾기 포함) / 프론트(화면 폴더) 배포와 롤백(7-4의 절차: 평소 배포, 판단 기준, 롤백 A·B·C, 롤백 후 할 일) / 수동 핫픽스 절차 / 필요한 권한과 승인자
 [하지 않는 것] 실제 시크릿 값, 운영 접속 정보
 [완료 기준] 모든 명령은 복사해서 바로 실행할 수 있는 코드 블록, 각 절 끝에 "확인 방법" 한 줄
 ```
@@ -861,14 +870,15 @@ git switch main
 | 커버리지 기준 때문에 계속 실패 | 기준을 낮추기 전에 부족한 클래스 확인. 테스트 보강은 별도 PR로 |
 | 배포 잡이 승인 없이 실행됨 | 잡에 `environment: staging`이 빠졌거나 환경에 필수 승인자가 설정되지 않음 |
 | ghcr.io 푸시 권한 오류 | 잡의 `permissions`에 `packages: write`가 없음 |
-| (프론트) deploy 잡이 `Waiting for a runner…`에서 멈춤 | nginx PC의 러너가 꺼져 있거나 이름표가 다름 → Settings → Actions → Runners에서 상태와 `eduhub-nginx` 이름표 확인 |
+| (프론트) deploy 잡이 `Waiting for a runner…`에서 멈춤 | 스테이징 PC의 러너가 꺼져 있거나 이름표가 다름 → Settings → Actions → Runners에서 상태와 `eduhub-staging` 이름표 확인 |
+| (프론트) deploy가 `staging 환경 변수 FRONTEND_WEB_ROOT가 없습니다` | Environments → staging → Environment variables에 `FRONTEND_WEB_ROOT`, `APP_URL` 추가 (7-3 ①의 5) |
 | (프론트) `…ps1 cannot be loaded because running scripts is disabled` | 러너 PC의 PowerShell 실행 정책 → 7-3 ①의 4 |
 | (프론트) deploy에서 `빌드 결과가 없습니다: artifacts\frontend-…` | 결과물 이름·경로가 어긋남 → build의 `name`과 deploy의 `pattern`, 로그의 실제 폴더 확인 |
 | (프론트) 프론트를 고쳤는데 배포가 안 돎 | `paths: frontend/**` 밖만 바뀌었거나, `changes`가 `[]`를 냈음 → changes 잡 로그 확인 |
 | (프론트) 롤백이 `되돌릴 이전 버전이 없습니다`로 실패 | 이미 한 번 롤백했거나 첫 배포였음. 롤백은 한 단계만 → 7-4 ③-B(revert) 또는 C-2 |
 | (프론트) 롤백했는데 며칠 뒤 같은 문제가 다시 배포됨 | `main`에 문제 코드가 남아 있었음 → 7-4 ④-1, revert PR |
 | (프론트) 롤백 후 다른 화면이 예전 모습으로 돌아감 | 그 배포에 없던 앱까지 되돌림 → 그 앱은 다시 배포(Run workflow, 그 앱, rollback 해제) |
-| (프론트) 배포는 성공인데 화면이 그대로 | 브라우저·중간 캐시 → nginx의 `Cache-Control: no-cache`(6회차 Step 4-3) 확인 |
+| (프론트) 배포는 성공인데 화면이 그대로 | 백엔드가 다른 폴더를 서비스 중(`EDUHUB_WEB_ROOT`와 `FRONTEND_WEB_ROOT`가 다름), 또는 브라우저 캐시 → `Cache-Control: no-cache`(6회차 Step 4-6의 N4) 확인 |
 | Claude가 워크플로우 수정 때마다 승인을 묻는다 | 의도한 동작 (`ask` 규칙). 워크플로우 변경은 매번 확인하는 것이 맞다 |
 
 ---
