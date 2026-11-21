@@ -3075,11 +3075,11 @@ getCourses.mockResolvedValue(pageOf(['Spring Boot 입문', 'JPA 실전']) as nev
   - 요청 인터셉터: 토큰이 있으면 Authorization: Bearer
   - 응답 인터셉터: 401이면 토큰 삭제 + window 이벤트 eduhub:unauthorized. 403은 로그아웃하지 않는다
 - 생성된 *Api는 new XxxApi(config, undefined, http)로 src/api 안에서만 만든다 (courseApi.ts는 http를 쓰도록 변경, 나머지는 clients.ts)
-- src/auth/AuthContext.tsx: user, expired, login, logout. eduhub:unauthorized를 들으면 로그인 화면으로. 새로고침 시 토큰이 있으면 /api/me로 확인
+- src/auth/AuthContext.tsx: user, expired, login, logout. eduhub:unauthorized를 들으면 로그인 화면으로(이미 로그인 화면이면 그대로 — 원래 가려던 곳을 덮지 않게). 새로고침 시 토큰이 있으면 /api/me로 확인
 - src/auth/RequireAuth.tsx: 로그인 안 했으면 /login(원래 경로를 state.from에), admin이면 관리자 확인
 - src/auth/LoginPage.tsx: 로그인 후 원래 가려던 화면으로. 실패하면 "사번 또는 비밀번호가 올바르지 않습니다." 만료로 왔으면 안내
 - App.tsx: 상단 바(교육과정, 로그인 시 내 신청 내역, 관리자면 과정 등록, 이름·로그아웃/로그인)와 라우팅. main.tsx: ThemeProvider(theme.ts) → BrowserRouter → AuthProvider
-- 테스트(Vitest): http — 토큰 첨부, 토큰 없으면 헤더 없음, 401이면 토큰 삭제·이벤트, 403은 유지
+- 테스트(Vitest): http — 토큰 첨부, 토큰 없으면 헤더 없음, 401이면 토큰 삭제·이벤트, 403은 유지 / AuthContext — 401이 두 번 와도 원래 가려던 곳 유지
 [하지 않는 것] 상세·신청·관리자 화면(Step 15·16), 백엔드 수정, generated/ 수정
 [완료 기준] npm run build·npm test (apps/course-mfe) 통과, 로그인·로그아웃·보호 화면 이동이 브라우저에서 동작
 [진행 방식] 바꿀 파일 목록과 이유를 먼저 보여줘
@@ -3168,8 +3168,8 @@ export const adminEnrollmentApi = new AdminEnrollmentApi(config, undefined, http
 
 ```tsx
 // frontend/apps/course-mfe/src/auth/AuthContext.tsx — 로그인 상태는 이 한 곳에서 관리한다
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { CurrentUser } from '@eduhub/api-client';
 import { authApi } from '../api/clients';
 import { tokenStore, UNAUTHORIZED_EVENT } from '../api/http';
@@ -3185,6 +3185,8 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const path = useRef('');
+  path.current = useLocation().pathname;   // 401 처리에서 지금 화면을 알기 위해
   const [user, setUser] = useState<CurrentUser | null>(tokenStore.user());
   const [expired, setExpired] = useState(false);
 
@@ -3207,7 +3209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 보호 화면이면 RequireAuth도 로그인으로 보낸다. 어느 쪽이 먼저 옮기든 안내가 남도록 expired를 상태로 둔다
       setExpired(true);
       setUser(null);
-      navigate('/login', { replace: true, state: { from: window.location.pathname } });
+      // 이미 로그인 화면이면 다시 보내지 않는다. 401이 여러 번 오면 "원래 가려던 곳"이 /login으로 덮여
+      // 로그인에 성공해도 로그인 화면에 머무는 문제가 있었다 (Step 14의 💡)
+      if (path.current !== '/login') navigate('/login', { replace: true, state: { from: path.current } });
     };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
@@ -3264,7 +3268,8 @@ export default function LoginPage() {
     setError(false);
     try {
       await login(employeeNo, password);
-      navigate(state?.from ?? '/courses', { replace: true });   // 원래 가려던 화면으로
+      const from = state?.from && state.from !== '/login' ? state.from : '/courses';
+      navigate(from, { replace: true });   // 원래 가려던 화면으로 (그곳이 로그인 화면이면 목록으로)
     } catch {
       setError(true);
     }
@@ -3369,7 +3374,7 @@ export default function App() {
 </details>
 
 <details>
-<summary>테스트: http.test.ts (토큰 첨부, 401 처리, 403은 로그아웃 안 함)</summary>
+<summary>테스트: http.test.ts (토큰 첨부, 401 처리, 403은 로그아웃 안 함), AuthContext.test.tsx (401이 여러 번 와도 원래 가려던 곳 유지)</summary>
 
 ```ts
 // frontend/apps/course-mfe/src/api/http.test.ts
@@ -3421,9 +3426,47 @@ test('403(권한 없음)은 로그아웃시키지 않는다', async () => {
 });
 ```
 
+```tsx
+// frontend/apps/course-mfe/src/auth/AuthContext.test.tsx — 401이 와도 "원래 가려던 곳"을 지킨다
+import { act, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { UNAUTHORIZED_EVENT } from '../api/http';
+import { AuthProvider } from './AuthContext';
+
+vi.mock('../api/clients', () => ({ authApi: { login: vi.fn(), me: vi.fn() } }));
+
+/** 지금 주소와 이동 상태를 글자로 보여 준다 */
+function Where() {
+  const { pathname, state } = useLocation();
+  return <p>{`${pathname} ${JSON.stringify(state)}`}</p>;
+}
+const renderAt = (path: string) =>
+  render(<MemoryRouter initialEntries={[path]}><AuthProvider><Where /></AuthProvider></MemoryRouter>);
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+test('401이 오면 로그인 화면으로, 원래 가려던 곳을 기억한다', () => {
+  renderAt('/my/enrollments');
+  act(() => { window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT)); });
+  expect(screen.getByText('/login {"from":"/my/enrollments"}')).toBeInTheDocument();
+});
+
+test('이미 로그인 화면이면 401이 더 와도 원래 가려던 곳을 /login으로 덮지 않는다', () => {
+  renderAt('/my/enrollments');
+  act(() => { window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT)); });
+  act(() => { window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT)); });   // 두 번째 401 (예: /api/me 확인)
+  expect(screen.getByText('/login {"from":"/my/enrollments"}')).toBeInTheDocument();
+});
+```
+
 </details>
 
 > 💡 `AuthContext`의 `expired`를 **상태로** 두는 이유(실제로 겪은 문제): 401 이벤트에서 `navigate('/login', { state: { expired: true } })`만 하면 "로그인이 만료되었습니다" 안내가 사라졌습니다. React Router 7은 화면 이동을 낮은 우선순위(transition)로 처리해서, `setUser(null)`이 먼저 반영되고 `RequireAuth`가 `/login`으로 **다시** 보내며 이동 상태를 덮어썼기 때문입니다. 누가 먼저 화면을 옮기든 안내가 남도록 만료 여부를 컨텍스트 상태로 바꿨습니다.
+
+> 💡 **이미 로그인 화면이면 다시 보내지 않는 이유**(실제로 겪은 문제 두 번째): 만료된 토큰으로 화면을 열면 401이 **두 번** 옵니다(화면의 API 호출과 새로고침 시 `/api/me` 확인). 첫 401이 로그인 화면으로 보낸 **뒤에** 두 번째 401이 오면 "원래 가려던 곳"(`from`)이 `/login`으로 덮였고, 브라우저는 같은 주소로 다시 열거나 새로고침해도 이 이동 상태를 유지하므로, **로그인에 성공해도 로그인 화면에 머물렀습니다**(상단 바에는 이름이 보이는 이상한 상태). 타이밍에 따라 가끔만 생겨서 브라우저 자동 확인에서 몇 번에 한 번 실패하는 것으로 처음 드러났습니다. 이미 `/login`이면 다시 보내지 않고(`AuthContext`), 원래 가려던 곳이 `/login`이면 목록으로 보내게(`LoginPage`) 고친 뒤, 이 상황을 `AuthContext.test.tsx`로 고정했습니다 (고치기 전 코드로 되돌리면 테스트가 실패).
 
 > ⚠️ **화면의 권한 확인은 편의일 뿐입니다.** `RequireAuth`나 "로그인 후 신청" 버튼은 길을 안내할 뿐이고, 실제로 막는 것은 백엔드(401·403, Step 9-1)입니다. 화면만 막고 API를 열어 두면 누구나 curl로 부를 수 있습니다.
 
@@ -4099,7 +4142,7 @@ test('시작 전 회차(409)면 서버가 준 이유를 보여 준다', async ()
 
 > 💡 다시 처음부터 해 보려면 개발 DB를 비우고(예: 컨테이너의 `eduhub` DB를 지우고 다시 만들기) 백엔드를 다시 시작합니다. 개발용 데이터는 계정이 하나도 없을 때만 들어갑니다.
 
-> ✅ 이 교재 환경에서 위 코드를 Step 9-1~11 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 위 흐름(세분화한 20단계)을 개발 서버 모드와 빌드·미리보기 모드 모두에서 확인했습니다. 단위 테스트 14개(3회차 4개 + http 4, EnrollButton 3, RosterPage 3), 타입 검사, 빌드도 통과했습니다 (Vite 8.3, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). 개발 서버 모드에서 네 번 중 한 번은 마지막 단계(만료 토큰 확인 뒤 다시 로그인)에서 브라우저 자동화가 시간 초과로 멈췄고, 다시 실행하면 통과해 원인을 확정하지 못했습니다. API 클라이언트는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
+> ✅ 이 교재 환경에서 위 코드를 Step 9-1~11 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 위 흐름(세분화한 20단계)을 개발 서버 모드와 빌드·미리보기 모드에서 확인했습니다. 단위 테스트 16개(3회차 4개 + http 4, AuthContext 2, EnrollButton 3, RosterPage 3), 타입 검사, 빌드도 통과했습니다 (Vite 8.3, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). 처음에는 몇 번에 한 번씩 "만료 후 다시 로그인" 단계에서 멈췄는데, 원인(Step 14의 두 번째 💡)을 찾아 고친 뒤 개발 서버 모드에서 3회 연속 통과했습니다. API 클라이언트는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
 
 ## 6-3. 자주 겪는 문제 (화면)
 
@@ -4113,6 +4156,7 @@ test('시작 전 회차(409)면 서버가 준 이유를 보여 준다', async ()
 | `useNavigate() may be used only in the context of a <Router> component` (테스트에서) | 화면 테스트가 라우터 없이 렌더링함. `MemoryRouter`로 감싼다 (Step 15) |
 | `npm run build`에서 `useCourses.test.ts` 타입 오류 | 생성 클라이언트의 `AxiosResponse` 타입. `as never` (Step 13 ③) |
 | 수료 처리가 항상 409 | 회차 시작일 전. dev 데이터의 4번 회차(이미 시작)로 확인한다 |
+| 로그인에 성공했는데 로그인 화면에 그대로 있음 (상단 바에는 이름이 보임) | 401이 여러 번 와서 "원래 가려던 곳"이 `/login`으로 덮임. 이미 로그인 화면이면 다시 보내지 않기 (Step 14의 두 번째 💡) |
 | 새로고침하면 로그인이 풀림 | `tokenStore`에 저장하지 않거나 `AuthProvider`의 초깃값을 `tokenStore.user()`로 두지 않음 |
 
 ---

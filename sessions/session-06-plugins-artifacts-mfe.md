@@ -34,6 +34,7 @@
 | 0:53 – 1:33 | 4. 따라하기 ①: 5회차 앱을 MFE로 쪼개기 (워크트리 병렬 세션) | 실습 |
 | 1:33 – 1:45 | 5. 따라하기 ②: FR-09 알림 (커밋 이후 이벤트) | 실습 |
 | 1:45 – 1:57 | 6. 따라하기 ③: 팀 플러그인 만들기·배포·설치 | 실습 |
+| — | 4. 따라하기 ① Step 4: 빌드 결과를 nginx에 배포 (Windows) | **과제** (시간이 남으면 수업 중, 7회차 전 필수) |
 | — | 7. 따라하기 ④: 주간 진행 현황 아티팩트 | **과제** (시간이 남으면 수업 중) |
 | 1:57 – 2:00 | 9. 정리, 과제 안내 | 강의 |
 
@@ -703,7 +704,9 @@ git mv apps/course-mfe/src/api/http.test.ts packages/api-client/src/auth.test.ts
 git rm apps/course-mfe/src/api/clients.ts   # 인스턴스는 packages/api-client/src/index.ts가 만든다
 # 로그인·레이아웃·라우팅·테마 → shell (2회차 뼈대)
 mkdir -p apps/shell/src/auth apps/shell/src/pages
-git mv apps/course-mfe/src/auth/AuthContext.tsx apps/course-mfe/src/auth/RequireAuth.tsx apps/shell/src/auth/
+git mv apps/course-mfe/src/auth/AuthContext.tsx apps/course-mfe/src/auth/AuthContext.test.tsx \
+       apps/course-mfe/src/auth/RequireAuth.tsx apps/shell/src/auth/
+cp apps/course-mfe/src/setupTests.ts apps/shell/src/     # 테스트 설정은 course-mfe도 쓰므로 복사
 git mv apps/course-mfe/src/auth/LoginPage.tsx apps/shell/src/pages/
 git mv -f apps/course-mfe/src/main.tsx apps/course-mfe/src/App.tsx apps/course-mfe/src/theme.ts apps/shell/src/   # -f: 뼈대 파일 덮어쓰기
 # 신청 화면 → enrollment-mfe (2회차 뼈대)
@@ -730,6 +733,7 @@ New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, a
 - api-client: src/auth.ts(옮겨 온 http.ts)의 CurrentUser import를 ./generated/api로.
   src/index.ts에서 generated와 auth를 내보내고, authApi·courseApi·enrollmentApi·adminEnrollmentApi를 new XxxApi(config, undefined, http)로 만든다.
   auth.test.ts가 패키지에서 돌도록 vitest(jsdom) 설정
+- shell 테스트: vite.config.ts에 test(jsdom, setupTests), AuthContext.test.tsx의 import·mock을 @eduhub/api-client 기준으로
 - shell: auth/·pages/LoginPage의 import를 @eduhub/api-client로. App.tsx의 화면 import를 remote React.lazy로
   (courseMfe: CourseListPage(이름 있는 export), CourseDetailPage, CourseFormPage / enrollmentMfe: EnrollButton, MyEnrollmentsPage, RosterPage),
   Suspense + 오류 경계(remote가 꺼져 있으면 MUI Alert). /courses/:courseId에서 CourseDetailPage의 renderSessionAction으로 EnrollButton 조립
@@ -737,7 +741,7 @@ New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, a
   shared: react, react-dom, react-router-dom, @mui/material, @emotion/react, @eduhub/api-client 모두 singleton. 포트 3000 strictPort, /api 프록시(server·preview)
 - src/remotes.d.ts에 remote 모듈 6개 타입 선언, 플러그인 옵션 dts: false
 [하지 않는 것] course-mfe, enrollment-mfe 수정 (Step 2에서 병렬로), generated/ 수정, 백엔드 수정
-[완료 기준] npm test --workspace packages/api-client 통과, npm run build --workspace apps/shell 성공
+[완료 기준] npm test --workspace packages/api-client·apps/shell 통과, npm run build --workspace apps/shell 성공
 [진행 방식] 바꿀 파일 목록과 이유를 먼저 보여줘
 ```
 
@@ -844,6 +848,7 @@ export default function App() {
 <summary>shell: vite.config.ts, remotes.d.ts</summary>
 
 ```ts
+/// <reference types="vitest/config" />
 // frontend/apps/shell/vite.config.ts — 6회차: host
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -872,6 +877,7 @@ export default defineConfig({
       dts: false,
     }),
   ],
+  test: { environment: "jsdom", setupFiles: ["./src/setupTests.ts"] },
 });
 ```
 
@@ -892,7 +898,7 @@ declare module 'enrollmentMfe/RosterPage' { const C: React.ComponentType; export
 
 </details>
 
-> ✅ **확인**: `npm test --workspace packages/api-client`(5회차의 토큰 테스트 4개가 패키지에서 통과), `npm run build --workspace apps/shell`. shell에 업무 화면이 없는지 `git diff --staged --stat`으로 봅니다 → 커밋 `refactor(frontend): 토큰 처리를 api-client로, 로그인·레이아웃을 shell로 옮김`. 이 커밋이 있어야 Step 2의 워크트리가 이를 바탕으로 만들어집니다.
+> ✅ **확인**: `npm test --workspace packages/api-client`(5회차의 토큰 테스트 4개가 패키지에서 통과), `npm test --workspace apps/shell`(옮긴 AuthContext 테스트 2개), `npm run build --workspace apps/shell`. shell에 업무 화면이 없는지 `git diff --staged --stat`으로 봅니다 → 커밋 `refactor(frontend): 토큰 처리를 api-client로, 로그인·레이아웃을 shell로 옮김`. 이 커밋이 있어야 Step 2의 워크트리가 이를 바탕으로 만들어집니다.
 
 ---
 
@@ -1269,13 +1275,299 @@ npm run dev --workspace apps/shell             # 3000 (다른 창)
 | M2 | remote 화면의 버튼 색 | shell 테마 색(`#B5591C`). React·MUI가 한 벌 |
 | M3 | course-mfe(3001)를 끄고 `/courses` | shell은 뜨고 그 자리에 "화면을 불러오지 못했습니다" (오류 경계) |
 
-> ✅ 이 교재 환경에서 5회차 앱을 위 순서대로 쪼갠 코드(shell + course-mfe + enrollment-mfe + api-client)를 5회차 Step 9-1~11 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 **5회차와 같은 확인 흐름(세분화한 20단계)**을 개발 서버 모드와 빌드·미리보기 모드 모두에서 확인했습니다 (테마 색 포함). 타입 검사, 세 앱 빌드, 테스트 14개(api-client 4, course-mfe 4, enrollment-mfe 6)도 통과했습니다 (Vite 8.3, `@module-federation/vite` 1.24, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). course-mfe를 끄고 shell과 enrollment-mfe만 띄운 상태(M3)에서도 상단 바·로그인 화면은 그대로이고 목록 자리에 오류 안내가 나오는 것을 확인했습니다. Step 1의 `git mv` 명령도 그대로 실행해, 옮긴 파일 배치가 검증한 코드와 같은지(지시문에서 새로 만드는 `remotes.d.ts`, remote의 `main.tsx`·`setupTests.ts` 제외) 확인했습니다. api-client는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
+> ✅ 이 교재 환경에서 5회차 앱을 위 순서대로 쪼갠 코드(shell + course-mfe + enrollment-mfe + api-client)를 5회차 Step 9-1~11 백엔드(Spring Boot 3.5 + PostgreSQL 16)와 함께 실행하고, 브라우저(Chromium, Playwright)로 **5회차와 같은 확인 흐름(세분화한 20단계)**을 개발 서버 모드와 빌드·미리보기 모드 모두에서 확인했습니다 (테마 색 포함). 타입 검사, 세 앱 빌드, 테스트 16개(api-client 4, shell 2, course-mfe 4, enrollment-mfe 6)도 통과했습니다 (Vite 8.3, `@module-federation/vite` 1.24, React 18.3, React Router 7.18, MUI 6.5, Vitest 5.1). course-mfe를 끄고 shell과 enrollment-mfe만 띄운 상태(M3)에서도 상단 바·로그인 화면은 그대로이고 목록 자리에 오류 안내가 나오는 것을 확인했습니다. Step 1의 `git mv` 명령도 그대로 실행해, 옮긴 파일 배치가 검증한 코드와 같은지(지시문에서 새로 만드는 `remotes.d.ts`, remote의 `main.tsx`·`setupTests.ts` 제외) 확인했습니다. api-client는 openapi-generator가 만드는 것과 같은 모양의 스텁으로 대신했습니다.
 
 ```bash
 git push -u origin feature/mfe-split
 ```
 
 PR 본문에 "옮긴 것 / 바꾼 것(1-5의 다섯 가지) / 병렬로 나눈 작업 / 쪼개기 전과 비교한 결과"를 적습니다.
+
+---
+
+## Step 4. 빌드 결과를 nginx 한 곳에 배포하기 (Windows)
+
+> ⏱ 시간이 모자라면 **과제**로 합니다. 7회차 [Step 7-3](./session-07-cicd-framework-tokens.md#7-3-프론트엔드를-nginx로-자동-배포-self-hosted-runner)이 이 nginx에 CI/CD로 자동 배포하므로 **7회차 전까지 반드시** 끝냅니다.
+
+지금까지는 개발 서버 3개(3000·3001·3002)를 띄워 확인했습니다. 실제 서비스에서는 사용자가 **주소 하나**로 들어옵니다. 웹 서버 **nginx** 한 대가 세 앱의 빌드 결과(정적 파일)를 서브 폴더별로 내주고, `/api`는 백엔드로 넘깁니다.
+
+```mermaid
+flowchart LR
+    U["브라우저<br/>http://localhost:8088"] --> NG["nginx :8088"]
+    NG -- "/ , /courses/… (화면 주소)" --> S["html\eduhub\shell<br/>index.html · assets"]
+    NG -- "/mfe/course/…" --> C["html\eduhub\mfe\course<br/>remoteEntry.js · assets"]
+    NG -- "/mfe/enrollment/…" --> E["html\eduhub\mfe\enrollment"]
+    NG -- "/api/…" --> BE["Spring Boot :8080"]
+```
+
+| 앱 | 빌드 결과를 넣을 폴더 | 주소 |
+|---|---|---|
+| shell | `C:\nginx\html\eduhub\shell\` | `/`, `/assets/…`, 화면 주소(`/courses/1` 등) |
+| course-mfe | `C:\nginx\html\eduhub\mfe\course\` | `/mfe/course/remoteEntry.js`, `/mfe/course/assets/…` |
+| enrollment-mfe | `C:\nginx\html\eduhub\mfe\enrollment\` | `/mfe/enrollment/…` |
+
+> 💡 **앱마다 폴더가 따로**라서, course-mfe만 고쳤으면 `mfe\course` 폴더만 바꾸면 됩니다. nginx도 백엔드도 다시 시작하지 않습니다. 이것이 1-0에서 말한 "독립 배포"입니다. 같은 구조를 백엔드(Spring Boot)의 정적 폴더에 둘 수도 있지만, 그러면 화면 배포가 백엔드 배포에 묶이기 쉬워 웹 서버를 따로 둡니다.
+
+### Step 4-1. Windows에 nginx 설치 (사람이 직접)
+
+1. https://nginx.org/en/download.html 에서 **Stable version**의 `nginx/Windows-…` zip을 받습니다
+2. `C:\nginx`에 풉니다 (`C:\nginx\nginx.exe`가 있어야 합니다. 경로에 공백·한글이 없게)
+3. PowerShell에서 실행과 확인
+
+```powershell
+cd C:\nginx
+Start-Process -FilePath .\nginx.exe -WorkingDirectory C:\nginx   # 백그라운드로 실행 (nginx는 실행한 폴더를 기준 경로로 쓴다)
+tasklist /fi "imagename eq nginx.exe"                              # nginx.exe 2개(master, worker)가 보이면 실행 중
+.\nginx.exe -t            # 설정 파일 검사
+.\nginx.exe -s reload     # 설정을 바꾼 뒤 다시 읽기 (끊김 없이)
+.\nginx.exe -s quit       # 끄기
+```
+
+> ⚠️ 처음 실행할 때 Windows 방화벽 창이 뜨면 **개인 네트워크만** 허용합니다. nginx 공식 문서는 Windows 버전을 성능·기능 제한이 있는 **베타 수준**으로 안내합니다. 교육·사내 스테이징에는 충분하지만, 실제 운영은 보통 Linux 서버(또는 사내 표준 웹 서버)에 같은 설정으로 둡니다. 포트는 IIS 등과 겹치지 않게 **8088**을 씁니다.
+
+### Step 4-2. nginx용으로 빌드하기 (`--mode nginx`)
+
+개발 서버에서는 remote가 `http://localhost:3001/remoteEntry.js`에 있지만, nginx에서는 같은 서버의 `/mfe/course/remoteEntry.js`에 있습니다. remote의 파일들도 자기 서브 폴더(`/mfe/course/`) 기준으로 서로를 찾아야 합니다(Vite의 `base`). **빌드 모드**로 나눠서, 개발 서버와 미리보기는 지금처럼 두고 `npm run build:nginx`일 때만 바꿉니다.
+
+```json
+// apps/shell, apps/course-mfe, apps/enrollment-mfe 의 package.json scripts에 추가
+"build:nginx": "tsc --noEmit && vite build --mode nginx"
+```
+
+```ts
+/// <reference types="vitest/config" />
+// frontend/apps/shell/vite.config.ts — 6회차: host. --mode nginx로 빌드하면 remote를 같은 서버의 /mfe/… 에서 받는다 (Step 4)
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
+
+export default defineConfig(({ mode }) => {
+  const nginx = mode === "nginx";   // npm run build:nginx
+  const entry = (port: number, path: string) =>
+    nginx ? `/mfe/${path}/remoteEntry.js` : `http://localhost:${port}/remoteEntry.js`;
+  return {
+    // /api 요청은 백엔드로 (같은 origin이 되어 CORS가 필요 없다). preview도 같게
+    server: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+    preview: { port: 3000, strictPort: true, proxy: { "/api": "http://localhost:8080" } },
+    plugins: [
+      react(),
+      federation({
+        name: "shell",
+        remotes: {
+          courseMfe: { type: "module", name: "courseMfe", entry: entry(3001, "course") },
+          enrollmentMfe: { type: "module", name: "enrollmentMfe", entry: entry(3002, "enrollment") },
+        },
+        shared: {
+          react: { singleton: true, requiredVersion: "^18.0.0" },
+          "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+          "react-router-dom": { singleton: true },   // 라우터 상태를 shell과 remote가 함께 쓴다
+          "@mui/material": { singleton: true },
+          "@emotion/react": { singleton: true },
+          "@eduhub/api-client": { singleton: true }, // 토큰 처리(http 인터셉터)를 한 벌만
+        },
+        dts: false,
+      }),
+    ],
+    test: { environment: "jsdom", setupFiles: ["./src/setupTests.ts"] },
+  };
+});
+```
+
+```ts
+// frontend/apps/course-mfe/vite.config.ts — 바뀐 곳 (enrollment-mfe는 "/mfe/enrollment/")
+export default defineConfig(({ mode }) => ({
+  base: mode === "nginx" ? "/mfe/course/" : "/",   // nginx: /mfe/course/ 아래에서 서비스 (Step 4)
+  // … 나머지(server, preview, plugins, test)는 그대로 …
+}));
+```
+
+```powershell
+cd frontend
+npm run build:nginx --workspace apps/course-mfe
+npm run build:nginx --workspace apps/enrollment-mfe
+npm run build:nginx --workspace apps/shell
+```
+
+### Step 4-3. nginx 설정
+
+설정 파일은 저장소에 `deploy/nginx/nginx.conf`로 두고(리뷰·이력 관리), `C:\nginx\conf\nginx.conf`에 복사한 뒤 `.\nginx.exe -t` → `.\nginx.exe -s reload` 합니다.
+
+```nginx
+# C:\nginx\conf\nginx.conf — EduHub: 화면(shell·remote)과 API를 한 주소(:8088)로
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+
+    server {
+        listen       8088;
+        server_name  localhost;
+
+        # shell: C:\nginx\html\eduhub\shell (상대 경로는 nginx 설치 폴더 기준, 구분자는 /)
+        root   html/eduhub/shell;
+        index  index.html;
+
+        # remote: /mfe/course/… → C:\nginx\html\eduhub\mfe\course\…
+        location /mfe/ {
+            root  html/eduhub;
+            # 진입 파일은 매번 확인 → 새 배포가 바로 보인다
+            location ~ /remoteEntry\.js$ { add_header Cache-Control "no-cache"; }
+            # 이름에 해시가 붙은 파일은 내용이 바뀌면 이름도 바뀌므로 오래 캐시
+            location ~ /assets/          { add_header Cache-Control "public, max-age=31536000, immutable"; }
+        }
+
+        location /assets/ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # API는 백엔드(Spring Boot)로
+        location /api/ {
+            proxy_pass         http://127.0.0.1:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+        }
+
+        # 화면 주소(/courses/1 등)는 shell의 index.html로 (새로고침·직접 접속 대비)
+        location / {
+            add_header Cache-Control "no-cache";
+            try_files  $uri $uri/ /index.html;
+        }
+    }
+}
+```
+
+| 설정 | 하는 일 | 빠뜨리면 |
+|---|---|---|
+| `root html/eduhub/shell` | `/`와 `/assets/…`를 shell 폴더에서 | 첫 화면이 404 |
+| `location /mfe/` + `root html/eduhub` | `/mfe/course/x` → `html\eduhub\mfe\course\x` | remote를 못 불러와 "화면을 불러오지 못했습니다" |
+| `location /api/` + `proxy_pass` | API를 백엔드로. 같은 주소라 **CORS가 필요 없다** | 로그인·목록이 모두 실패 |
+| `try_files … /index.html` | `/courses/1`로 새로고침·직접 접속해도 shell을 준다 | 새로고침하면 404 |
+| `Cache-Control: no-cache` (shell 화면, `remoteEntry.js`) | 새 배포가 **바로** 보인다 (매번 바뀌었는지 확인) | 배포했는데 예전 화면이 보임 |
+| `max-age=31536000, immutable` (`assets/`) | 이름에 해시가 붙은 파일은 오래 캐시 (내용이 바뀌면 이름도 바뀐다) | 매번 다시 받아 느림 |
+
+### Step 4-4. 배포 스크립트: 복사해서 이름만 바꿔 교체
+
+빌드 결과를 폴더에 **바로 덮어쓰면** 복사하는 몇 초 동안 옛 파일과 새 파일이 섞여 화면이 깨질 수 있습니다. 옆 폴더(`.new`)에 다 복사한 뒤 **이름만 바꿔** 교체하고, 직전 버전은 `.prev`로 남겨 **롤백**에 씁니다. 7회차 자동 배포도 이 스크립트를 그대로 씁니다.
+
+```powershell
+# scripts/deploy-frontend.ps1 — 빌드한 MFE 하나를 nginx 폴더에 배포(교체)하거나 직전 버전으로 되돌린다
+# 사용: .\scripts\deploy-frontend.ps1 -App course-mfe [-Source <빌드 폴더>] [-Rollback]   (Windows PowerShell 5.1 이상)
+param(
+    [Parameter(Mandatory = $true)][ValidateSet('shell', 'course-mfe', 'enrollment-mfe')][string]$App,
+    [string]$Source,                                   # 기본: frontend\apps\<App>\dist
+    [string]$NginxRoot = 'C:\nginx\html\eduhub',
+    [switch]$Rollback
+)
+$ErrorActionPreference = 'Stop'
+
+$target = @{ 'shell' = 'shell'; 'course-mfe' = 'mfe\course'; 'enrollment-mfe' = 'mfe\enrollment' }[$App]
+$dest = Join-Path $NginxRoot $target
+$prev = "$dest.prev"; $new = "$dest.new"; $broken = "$dest.broken"
+
+# 폴더 이름 바꾸기. nginx가 마침 그 폴더의 파일을 읽는 중이면 Windows가 잠시 거부할 수 있어 몇 번 다시 시도한다
+function Rename-Retry([string]$Path, [string]$NewPath) {
+    for ($i = 1; $i -le 5; $i++) {
+        try { Rename-Item -LiteralPath $Path -NewName (Split-Path $NewPath -Leaf) -ErrorAction Stop; return }
+        catch { if ($i -eq 5) { throw }; Start-Sleep -Milliseconds 500 }
+    }
+}
+
+if ($Rollback) {
+    if (-not (Test-Path $prev)) { throw "되돌릴 이전 버전이 없습니다: $prev" }
+    if (Test-Path $broken) { Remove-Item $broken -Recurse -Force }
+    if (Test-Path $dest) { Rename-Retry $dest $broken }
+    Rename-Retry $prev $dest
+    Write-Host "롤백 완료: $App <- 이전 버전 ($dest). 문제가 된 버전은 $broken"
+    exit 0
+}
+
+if (-not $Source) { $Source = Join-Path $PSScriptRoot "..\frontend\apps\$App\dist" }
+$entry = if ($App -eq 'shell') { 'index.html' } else { 'remoteEntry.js' }
+if (-not (Test-Path (Join-Path $Source $entry))) { throw "빌드 결과가 없습니다: $Source\$entry (npm run build:nginx 먼저)" }
+
+# 1) 새 버전을 옆 폴더(.new)에 모두 복사해 둔다 — 복사 도중의 반쪽 상태가 사용자에게 보이지 않게
+if (Test-Path $new) { Remove-Item $new -Recurse -Force }
+New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+Copy-Item -Path $Source -Destination $new -Recurse
+# 2) 이름만 바꿔 교체: 현재 → .prev(롤백용으로 한 단계 보관), .new → 현재
+if (Test-Path $prev) { Remove-Item $prev -Recurse -Force }
+if (Test-Path $dest) { Rename-Retry $dest $prev }
+try { Rename-Retry $new $dest }
+catch { if (Test-Path $prev) { Rename-Retry $prev $dest }; throw }   # 실패하면 이전 버전을 제자리로
+Write-Host "배포 완료: $App -> $dest"
+```
+
+```powershell
+# 저장소 루트에서
+.\scripts\deploy-frontend.ps1 -App course-mfe
+.\scripts\deploy-frontend.ps1 -App enrollment-mfe
+.\scripts\deploy-frontend.ps1 -App shell
+# 문제가 생기면 직전 버전으로
+.\scripts\deploy-frontend.ps1 -App course-mfe -Rollback
+```
+
+> 💡 "이 시스템에서 스크립트를 실행할 수 없으므로…"가 나오면 PowerShell 실행 정책 때문입니다. 저장소에서 받은 스크립트만 허용하도록 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`를 **사람이** 판단해 실행합니다 (회사 정책이 있으면 그것을 따른다).
+
+<details>
+<summary>macOS·Linux용 같은 스크립트 (deploy-frontend.sh)</summary>
+
+```bash
+#!/usr/bin/env bash
+# scripts/deploy-frontend.sh — deploy-frontend.ps1과 같은 동작 (macOS·Linux)
+# 사용: deploy-frontend.sh <shell|course-mfe|enrollment-mfe> [빌드 폴더] [--rollback]   (NGINX_ROOT 기본 /usr/share/nginx/html/eduhub)
+set -euo pipefail
+APP="${1:?앱 이름}"; SRC="${2:-}"; ROLLBACK=false
+[[ "${2:-}" == "--rollback" || "${3:-}" == "--rollback" ]] && ROLLBACK=true && [[ "$SRC" == "--rollback" ]] && SRC=""
+ROOT="${NGINX_ROOT:-/usr/share/nginx/html/eduhub}"
+case "$APP" in
+  shell) TARGET=shell; ENTRY=index.html ;;
+  course-mfe) TARGET=mfe/course; ENTRY=remoteEntry.js ;;
+  enrollment-mfe) TARGET=mfe/enrollment; ENTRY=remoteEntry.js ;;
+  *) echo "알 수 없는 앱: $APP" >&2; exit 1 ;;
+esac
+DEST="$ROOT/$TARGET"; PREV="$DEST.prev"; NEW="$DEST.new"
+if $ROLLBACK; then
+  [[ -d "$PREV" ]] || { echo "되돌릴 이전 버전이 없습니다: $PREV" >&2; exit 1; }
+  rm -rf "$DEST.broken"; [[ -d "$DEST" ]] && mv "$DEST" "$DEST.broken"
+  mv "$PREV" "$DEST"; echo "롤백 완료: $APP ← 이전 버전 ($DEST). 문제가 된 버전은 $DEST.broken"; exit 0
+fi
+SRC="${SRC:-$(dirname "$0")/../frontend/apps/$APP/dist}"
+[[ -f "$SRC/$ENTRY" ]] || { echo "빌드 결과가 없습니다: $SRC/$ENTRY (npm run build:nginx 먼저)" >&2; exit 1; }
+rm -rf "$NEW"; mkdir -p "$(dirname "$DEST")"; cp -r "$SRC" "$NEW"
+rm -rf "$PREV"; [[ -d "$DEST" ]] && mv "$DEST" "$PREV"
+mv "$NEW" "$DEST" || { [[ -d "$PREV" ]] && mv "$PREV" "$DEST"; exit 1; }
+echo "배포 완료: $APP → $DEST"
+```
+
+</details>
+
+### Step 4-5. 확인
+
+백엔드(dev 프로필)를 띄우고 http://localhost:8088 에서 확인합니다. **개발 서버(3000~3002)는 모두 끈 상태**여야 nginx로 확인하는 것이 됩니다.
+
+| # | 할 일 | 기대 결과 |
+|---|---|---|
+| N1 | [5회차 6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기) 12개를 8088에서 | 개발 서버에서와 같은 결과 |
+| N2 | `/courses/1`에서 새로고침 | 상세 화면 그대로 (404 아님) |
+| N3 | 개발자 도구 Network 탭 | 모든 파일이 8088에서. remote 파일은 `/mfe/course/…`, `/mfe/enrollment/…` |
+| N4 | `(Invoke-WebRequest -UseBasicParsing http://localhost:8088/mfe/course/remoteEntry.js).Headers['Cache-Control']` | `no-cache` (해시가 붙은 `assets/` 파일은 `public, max-age=31536000, immutable`) |
+| N5 | course-mfe 검색창 이름을 잠깐 바꿔 `build:nginx` → `deploy-frontend.ps1 -App course-mfe` → 브라우저 새로고침 | nginx·백엔드를 다시 시작하지 않아도 바뀐 화면 (독립 배포) |
+| N6 | `deploy-frontend.ps1 -App course-mfe -Rollback` → 새로고침 | 바꾸기 전 화면으로 돌아옴. `mfe\course.broken`에 문제 버전이 남음 |
+
+> ✅ 이 교재 환경에서는 Windows 대신 **Linux의 nginx 1.24**에 위 `nginx.conf`를 그대로 쓰고(시험 환경 때문에 로그·pid 위치와 실행 계정 줄만 추가), 같은 동작의 `deploy-frontend.sh`로 배포해 확인했습니다: 5회차와 같은 브라우저 20단계 4회 연속 통과, N2~N6(새로고침, 캐시 헤더, nginx·백엔드 재시작 없이 course-mfe만 교체, 롤백 후 이전 화면 복귀). 세 앱의 단위 테스트·타입 검사·`build:nginx`·기존 `build`도 통과했습니다. **Windows에서 nginx 설치·실행과 `deploy-frontend.ps1`은 실행해 보지 못했습니다**(이 환경에 Windows·PowerShell이 없음). 같은 단계를 bash로 옮긴 스크립트로 논리만 확인했으니, 처음 쓸 때는 N5·N6을 꼭 직접 해 봅니다.
+
+```bash
+git switch -c chore/nginx-deploy
+git add frontend/apps/*/vite.config.ts frontend/apps/*/package.json deploy/nginx/nginx.conf scripts/deploy-frontend.ps1 scripts/deploy-frontend.sh
+git commit -m "chore(frontend): nginx 배포 설정과 배포·롤백 스크립트"
+```
 
 ---
 
@@ -1294,6 +1586,12 @@ PR 본문에 "옮긴 것 / 바꾼 것(1-5의 다섯 가지) / 병렬로 나눈 �
 | 목록 화면만 비어 있고 콘솔에 `Element type is invalid` | `CourseListPage`는 3회차부터 **이름 있는 export**. `lazy(() => import(…).then((m) => ({ default: m.CourseListPage })))` |
 | 인터넷 예제를 따라 했더니 옵션 이름이 다름 (`remotes: { x: "http://…" }` 문자열만 등) | `@originjs/vite-plugin-federation` 예제가 섞임. `@module-federation/vite` 형식(`type`, `name`, `entry`)으로 통일 |
 | `git status`에 renamed가 아니라 deleted + new file | `git mv` 대신 파일을 지우고 새로 만듦. 이력이 끊기므로 `git mv`로 다시 하거나, 내용이 많이 바뀌기 전에 커밋 |
+| (nginx) 첫 화면이 500, error.log에 `rewrite or internal redirection cycle` | shell 폴더가 비었거나 nginx가 읽을 수 없음 → `C:\nginx\html\eduhub\shell\index.html`이 있는지, 폴더 권한 확인 |
+| (nginx) 화면은 뜨는데 "화면을 불러오지 못했습니다" | remote를 `build:nginx`가 아니라 `build`로 빌드함(`base`가 `/`) 또는 `mfe\course` 폴더가 없음 → Network 탭에서 404인 주소 확인 |
+| (nginx) `/courses/1`에서 새로고침하면 404 | `location /`의 `try_files … /index.html` 빠짐 |
+| (nginx) 배포했는데 예전 화면 | `remoteEntry.js`·`index.html`이 캐시됨 → `Cache-Control: no-cache` 확인, 브라우저 강력 새로고침 |
+| (nginx) 설정을 바꿨는데 그대로 | `.\nginx.exe -s reload`를 안 함. 먼저 `.\nginx.exe -t`로 검사 |
+| (nginx) `nginx.exe -s reload`가 `OpenEvent(...) failed` | nginx가 실행 중이 아니거나 다른 폴더에서 실행함 → `C:\nginx`에서 실행 |
 | 워크트리에서 백엔드 연결 실패 | 워크트리에 `.env`가 없음. 필요한 파일을 복사하거나 `.worktreeinclude` 설정 확인 |
 | 두 세션이 같은 파일을 고쳐 병합 충돌 | 공통 파일 작업을 Step 1에서 먼저 끝내지 않음. 충돌 해결 후 다음부터 순서 지키기 |
 | 사용량이 평소보다 빨리 소진 | 병렬 세션은 각자 사용. 끝난 세션은 정리하고 병렬 수를 줄인다 |
@@ -1734,6 +2032,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 ## 9-3. 과제 (다음 회차 전까지)
 
 - [ ] MFE 분리 PR, FR-09 알림 PR을 **리뷰 → Squash merge**까지 완료
+- [ ] ⭐ **4장 Step 4**: nginx 설치, `build:nginx`, `deploy-frontend.ps1`로 배포하고 Step 4-5 확인 표(N1~N6) 직접 확인 → `chore/nginx-deploy` PR. 7회차 자동 배포가 이 nginx를 씁니다
 - [ ] 팀 마켓플레이스에 `eduhub-team-kit` 1.0.0 병합, 팀원 전원 설치 확인 (`claude plugin list` 캡처)
 - [ ] EduHub `.claude/`에서 플러그인으로 옮긴 자산 삭제 + `.claude/settings.json`에 마켓플레이스 권장 설정 추가 PR
 - [ ] 6주차 진행 현황 아티팩트(또는 HTML 리포트) 공유, 링크를 `docs/retro/week-06.md`에 기록
@@ -1746,6 +2045,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 
 **7주차: CI/CD와 환경 분리 완성 (모듈 16, 19)**
 - GitHub Actions로 빌드·테스트·포맷 검사, 사람 승인 후 스테이징 배포
+- 오늘 만든 **nginx에 바뀐 앱만 자동 배포**(self-hosted runner, 승인 후 교체, 롤백)
 - 개발·테스트·운영 설정 분리 완성(NFR-06), 사람이 직접 실행할 수 있는 빌드·배포·롤백 런북
 - 사내 프레임워크 적용, 토큰 사용량 측정과 최적화
 
