@@ -18,7 +18,7 @@
 > - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 안내를 봅니다
 > - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나
 >
-> 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(36장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -27,7 +27,7 @@
 | 시간 | 내용 | 형식 |
 |---|---|---|
 | 0:00 – 0:05 | 지난 회차 복습 & 과제 리뷰 | 강의 |
-| 0:05 – 0:20 | 1. 마이크로프론트엔드 완성: 개발자가 통제할 경계 | 강의 |
+| 0:05 – 0:20 | 1. 마이크로프론트엔드: 개념(lazy loading과의 차이)과 개발자가 통제할 경계 | 강의 |
 | 0:20 – 0:35 | 2. 플러그인: 팀의 `.claude/`를 한 번에 배포하기 | 강의 + 시연 |
 | 0:35 – 0:45 | 3. 아티팩트: 결과물을 화면으로 공유하기 | 강의 |
 | 0:45 – 0:53 | ☕ 휴식 | — |
@@ -65,6 +65,116 @@
 # 1. 마이크로프론트엔드 완성: 개발자가 통제할 경계
 
 > ⭐ **이 회차의 실습은 Vite 기준입니다** ([1-4. Vite로 Module Federation 구성하기](#1-4-vite로-module-federation-구성하기-실습-기준)). Webpack 5 방식은 비교용으로 함께 보여 줍니다. 기술 상세는 [샘플 프로젝트의 Module Federation 설정](../examples/00-sample-project.md#5-4-module-federation-설정)을 봅니다. 2회차 [3-5. 기술과 아키텍처](./session-02-hands-on-kickoff.md#3-5-기술과-아키텍처)의 구조를 이번 주에 완성합니다.
+
+---
+
+## 1-0. 개념 먼저: 마이크로프론트엔드와 lazy loading
+
+오늘은 5회차의 **하나의 React 앱**을 세 앱으로 쪼갭니다. 쪼개기 전에 "마이크로프론트엔드가 무엇인지", 그리고 화면을 나중에 불러오는 **lazy loading과 무엇이 다른지** 분명히 해 둡니다. 둘 다 `React.lazy(() => import(…))`라는 같은 문법을 쓰기 때문에 자주 헷갈립니다.
+
+### ① 마이크로프론트엔드(MFE)란
+
+**마이크로프론트엔드 = 하나의 웹 화면을 업무 영역별 작은 프론트엔드 앱 여러 개로 나누고, 각 앱을 따로 개발·빌드·배포한 뒤, 브라우저에서 실행할 때 하나의 화면으로 합치는 구조**입니다. 백엔드의 마이크로서비스(서비스를 업무별로 나눠 따로 배포)를 프론트엔드에 적용한 것입니다.
+
+| 용어 | 뜻 | EduHub |
+|---|---|---|
+| **host (shell)** | 브라우저가 처음 여는 앱. 레이아웃·라우팅·로그인을 맡고 다른 앱의 화면을 불러와 배치한다 | `shell` (3000) |
+| **remote** | 화면(모듈)을 내보내는(expose) 앱. 자기 서버에서 따로 배포된다 | `course-mfe` (3001), `enrollment-mfe` (3002) |
+| **통합 (composition)** | 여러 앱의 화면을 한 페이지로 합치는 것 | 실행 중에 shell이 remote의 `remoteEntry.js`를 받아 합친다 |
+| **공유 의존성 (shared)** | React·MUI처럼 모든 앱이 쓰는 라이브러리를 **한 벌만** 쓰도록 맞추는 것 | `shared`의 `singleton` (1-4) |
+
+```mermaid
+flowchart LR
+    subgraph ONE["5회차: 하나의 앱 (모놀리식 프론트엔드)"]
+        direction TB
+        SRC1["src/ 전체<br/>로그인 · 과정 · 신청"] --> B1["빌드 한 번"] --> D1["배포 한 번<br/>:3001"]
+    end
+    subgraph MFE["6회차: 마이크로프론트엔드"]
+        direction TB
+        S["shell<br/>빌드·배포"] --> R["브라우저에서<br/>실행 중에 합침"]
+        C["course-mfe<br/>빌드·배포 (따로)"] --> R
+        E["enrollment-mfe<br/>빌드·배포 (따로)"] --> R
+    end
+```
+
+**여러 앱을 합치는 방법** (EduHub는 ⭐)
+
+| 방법 | 언제 합치나 | 특징 |
+|---|---|---|
+| npm 패키지로 묶기 | **빌드할 때** | 단순하지만 화면 하나를 고쳐도 shell까지 다시 빌드·배포해야 한다 (배포가 묶임) |
+| ⭐ **Module Federation** (Webpack 5, `@module-federation/vite`) | **실행할 때** | remote를 따로 배포하면 shell은 다시 배포하지 않아도 새 버전을 받는다. 공유 의존성 협상 기능이 있다 |
+| iframe | 실행할 때 | 격리는 강하지만 화면 간 상태 공유·디자인 통일·주소(라우팅) 처리가 어렵다 |
+| Web Components, single-spa 같은 프레임워크 | 실행할 때 | 서로 다른 프레임워크(React와 Vue 등)를 섞어야 할 때 검토 |
+
+**좋은 점과 비용**
+
+| 좋은 점 | 비용 |
+|---|---|
+| 팀이 맡은 화면을 **다른 팀을 기다리지 않고** 배포한다 | 설정이 복잡하다 (federation, shared, 타입 선언, 포트 3개) |
+| 화면 하나의 장애·실수가 다른 화면 배포를 막지 않는다 | 공유 의존성 버전을 계속 맞춰야 한다 (1-2) |
+| 큰 코드베이스를 업무 경계대로 나눠 이해하기 쉽다 | 전체 흐름 테스트가 어렵고, remote가 꺼지면 화면 일부가 빈다 |
+
+> 💡 **언제 쓰나**: 여러 팀이 한 제품의 서로 다른 화면을 맡고, **배포 주기가 달라서 서로를 기다리는 것이 문제일 때** 검토합니다. 한 팀이 만드는 작은 앱이라면 대개 **하나의 앱 + lazy loading**이 더 낫습니다. EduHub는 실무 규모로는 쪼갤 필요가 없지만, 구조와 경계를 직접 겪어 보려고 쪼갭니다.
+
+### ② lazy loading이란
+
+**lazy loading(지연 로딩) = 처음에 모든 코드를 내려받지 않고, 그 코드가 필요해지는 순간 내려받는 것**입니다. 번들러(Vite)는 `import('./파일')` 같은 **동적 import**를 만나면 그 모듈을 **별도 파일(청크, chunk)**로 나눕니다(코드 분할, code splitting). React에서는 `React.lazy`와 `Suspense`로 씁니다.
+
+```tsx
+// 5회차 앱(apps/course-mfe)의 App.tsx에 적용해 본다면 — 관리자만 쓰는 화면은 필요할 때 받는다
+import { lazy, Suspense } from 'react';
+const CourseFormPage = lazy(() => import('./pages/CourseFormPage'));   // 같은 앱 안의 파일
+
+// …
+<Suspense fallback={<CircularProgress />}>
+  <Routes>{/* /admin/courses/new → <CourseFormPage /> */}</Routes>
+</Suspense>
+```
+
+| 확인한 것 | 결과 |
+|---|---|
+| `npm run build` 결과물 | `dist/assets/index-….js`(약 496 kB, 나머지 전부)와 `dist/assets/CourseFormPage-….js`(약 6.7 kB)로 **같은 빌드 폴더 안에서** 나뉜다 |
+| 브라우저에서 `/courses`를 열 때 | `index-….js`만 받는다 |
+| 관리자가 **과정 등록**을 누를 때 | 그 순간 `CourseFormPage-….js`를 같은 서버(3001)에서 받는다 |
+
+> 💡 5회차 교재의 앱은 화면이 적어 lazy loading을 쓰지 않았습니다. 위 표는 비교를 위해 5회차 앱에 적용해 본 결과입니다.
+
+### ③ 둘은 무엇이 다른가: "React.lazy를 쓰면 MFE인가?" → 아니다
+
+| 비교 | lazy loading (하나의 앱) | 마이크로프론트엔드 (Module Federation) |
+|---|---|---|
+| 나누는 단위 | **파일**(청크) | **앱**(업무 영역, 보통 팀 단위) |
+| 소스와 빌드 | 하나의 프로젝트, **한 번** 빌드 | 앱마다 **따로** 빌드 |
+| 배포 | **함께** (청크도 같은 `dist`에) | 앱마다 **독립** 배포 |
+| 코드를 받는 곳 | 같은 서버 (`/assets/…`) | **다른 서버** (3001·3002의 `remoteEntry.js`) |
+| 버전이 정해지는 때 | 빌드할 때 모든 청크가 함께 정해짐 | 실행할 때 remote의 **지금 배포된 버전**을 받음 |
+| React·MUI | 번들러가 알아서 한 벌 | `shared` singleton을 **직접 맞춰야** 한 벌 (1-4) |
+| 실패 | 함께 배포되므로 드묾 | remote 서버가 꺼지면 그 화면만 실패 → 오류 경계 필요 |
+| 목적 | **첫 화면을 빠르게** (성능) | **팀과 배포를 독립적으로** (조직·운영) |
+| import 모양 | `import('./pages/CourseFormPage')` | `import('courseMfe/CourseFormPage')` |
+
+```mermaid
+flowchart LR
+    subgraph L["lazy loading"]
+        direction TB
+        L1["브라우저"] -- "① index.js" --> L2[":3001 (같은 앱)"]
+        L1 -- "② 필요할 때 CourseFormPage 청크" --> L2
+    end
+    subgraph M["마이크로프론트엔드"]
+        direction TB
+        M1["브라우저"] -- "① shell" --> M2[":3000 shell"]
+        M1 -- "② remoteEntry.js<br/>③ 공유 의존성 맞추기<br/>④ CourseFormPage" --> M3[":3001 course-mfe<br/>(따로 배포된 앱)"]
+    end
+```
+
+**관계 정리**: 마이크로프론트엔드는 lazy loading을 **수단으로 씁니다.** 6회차 shell의 `lazy(() => import('courseMfe/CourseFormPage'))`는 문법이 같지만, import 대상이 **다른 서버에 따로 배포된 앱**입니다. Module Federation이 이 import를 "remote의 `remoteEntry.js`를 받고 → 공유 의존성(React 등)을 맞추고 → 모듈을 가져오기"로 바꿔 줍니다. 반대로 lazy loading만 쓴 앱은 여전히 **하나의 앱**이고 마이크로프론트엔드가 아닙니다.
+
+| 문제 | 먼저 검토할 것 |
+|---|---|
+| "첫 화면이 느리다", "관리자 화면 코드까지 모두 받는다" | **lazy loading** (코드 분할). 구조는 그대로 |
+| "한 팀의 배포를 다른 팀이 기다린다", "화면 하나 고치는데 전체를 다시 배포한다" | **마이크로프론트엔드** (비용을 감수할 만한지 먼저 따진다) |
+
+> ✅ 이 교재 환경(Vite 8.3, React 18.3)에서 5회차 앱에 위 `React.lazy`를 적용해 빌드 결과물이 두 파일로 나뉘는 것, 브라우저(Chromium)가 `/courses`에서는 `index-….js`만 받고 **과정 등록**을 누를 때 `CourseFormPage-….js`를 받는 것을 확인했습니다. 6회차 course-mfe의 빌드 결과물에는 별도로 `remoteEntry.js`가 생깁니다.
 
 ---
 
@@ -1603,17 +1713,19 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 5. 켜진 플러그인이 쓰지 않는 세션에서도 사용량에 영향을 주는 이유는?
 6. 처음 보는 플러그인을 설치하기 전에 반드시 읽어야 할 파일 세 가지는?
 7. 진행 현황 아티팩트를 공유하기 전에 확인할 것 세 가지는?
+8. 5회차 앱의 관리자 화면을 `React.lazy`로 나중에 불러오게 바꾸면 마이크로프론트엔드가 된 것인가? 아니라면 무엇이 다른가?
 
 <details>
 <summary>정답 보기</summary>
 
 1. React가 shell과 remote에서 각각 로드되어 Hook 오류(`Invalid hook call`)가 나거나, 번들이 커지고 상태·컨텍스트(테마 등)가 공유되지 않는다
-2. api-client 재생성, shared·테마 정리, shell 라우팅 연결 중 두 가지. 모든 remote가 쓰는 공통 파일이라 동시에 고치면 충돌하고, 라우팅은 두 remote 결과가 있어야 가능하다
+2. 파일 옮기기(`git mv`)와 api-client·shell 공통 기반, 그리고 합치기·비교 중 두 가지. 여러 앱에 걸친 이동과 공통 파일은 동시에 고치면 충돌하고, 합치기·비교는 두 remote 결과가 있어야 가능하다
 3. 신청이 실제로 커밋된 뒤에만 알림을 남겨 롤백된 신청에 알림이 나가지 않게 하고, 알림 실패가 신청을 실패시키지 않게 하려고. 커밋 이후 시점에는 원래 트랜잭션이 끝났으므로 저장하려면 새 트랜잭션(`REQUIRES_NEW`)이 필요하다
 4. 이 저장소에만 해당하는 것(도메인 규칙, 이 저장소 경로에 묶인 훅, 프로젝트 MCP 접속 설정)은 프로젝트에, 여러 프로젝트에서 공통으로 쓰고 버전을 붙여 배포할 것은 플러그인에
 5. Claude가 스스로 부를 수 있는 스킬·에이전트·커맨드의 이름과 설명이 매 턴 컨텍스트에 들어가고, MCP 서버와 훅도 세션과 함께 동작하기 때문
 6. `hooks/hooks.json`, `.mcp.json`, `bin/` 안의 파일 (내 권한으로 코드를 실행하는 부분)
 7. 숫자가 근거 자료와 일치하는지, 실명·사번·접속 정보 같은 개인정보·비밀이 없는지, 운영 데이터가 아닌지 (그리고 공유 대상이 맞는지)
+8. 아니다. lazy loading은 **하나의 앱**을 파일(청크)로 나눠 필요할 때 받는 것이라 빌드·배포는 여전히 한 번이다. 마이크로프론트엔드는 **앱 자체**를 나눠 따로 빌드·배포하고 실행 중에 다른 서버에서 받아 합친다 (1-0의 비교 표). MFE는 lazy loading을 수단으로 쓸 뿐이다
 
 </details>
 
