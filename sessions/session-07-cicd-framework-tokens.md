@@ -569,6 +569,8 @@ flowchart LR
 3. **Runners** 목록에서 상태가 **Idle**(초록)인지 확인
 4. 이 PC에서 저장소의 `.ps1`이 실행되도록 실행 정책 확인: `Get-ExecutionPolicy -List` (Windows PC의 기본값은 스크립트를 막는 경우가 많다. 팀이 판단해 `RemoteSigned` 등으로)
 
+> 💡 **nginx를 쓸 수 없어 6회차 [Step 4-6 대안](./session-06-plugins-artifacts-mfe.md#step-4-6-대안-nginx를-쓸-수-없을-때-백엔드가-같은-폴더를-서비스)(백엔드가 정적 폴더 서비스)을 쓰는 팀**: 러너는 백엔드가 도는 PC에 설치하고, 아래 워크플로우의 배포 단계에 `-NginxRoot C:\eduhub-web`을, 스모크 테스트 주소를 `http://localhost:8080`으로 바꿉니다. 나머지(바뀐 앱 고르기, 승인, 롤백 절차)는 같습니다.
+
 > ⚠️ **self-hosted runner의 보안**: 러너는 그 PC에서 **워크플로우의 명령을 그대로 실행**합니다. GitHub 문서는 **공개 저장소에는 self-hosted runner를 쓰지 말라**고 안내합니다(누구나 PR로 코드를 실행시킬 수 있다). EduHub는 비공개 저장소이고, 이 워크플로우는 `main`에 대한 push와 수동 실행에서만 돌며, 배포 잡은 `staging` 승인을 거칩니다. 러너 PC에는 운영 비밀을 두지 않습니다.
 
 **② 워크플로우 작성 (Claude + 리뷰)** — 브랜치 `chore/frontend-deploy`, Plan 모드

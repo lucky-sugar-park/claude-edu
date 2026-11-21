@@ -18,7 +18,7 @@
 > - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 안내를 봅니다
 > - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나
 >
-> 🖥️ **슬라이드 덱(38장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(39장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -1325,6 +1325,53 @@ tasklist /fi "imagename eq nginx.exe"                              # nginx.exe 2
 
 > ⚠️ 처음 실행할 때 Windows 방화벽 창이 뜨면 **개인 네트워크만** 허용합니다. nginx 공식 문서는 Windows 버전을 성능·기능 제한이 있는 **베타 수준**으로 안내합니다. 교육·사내 스테이징에는 충분하지만, 실제 운영은 보통 Linux 서버(또는 사내 표준 웹 서버)에 같은 설정으로 둡니다. 포트는 IIS 등과 겹치지 않게 **8088**을 씁니다.
 
+> 🧭 **설치 직후 먼저 확인**: 설치 폴더에서 cmd로 `nginx -v`를 실행합니다. `nginx version: nginx/1.x.x` 한 줄이 바로 나와야 정상입니다. 이 명령은 설정·로그·포트를 쓰지 않으므로, 여기서 멈추면 nginx가 아니라 **PC 쪽에서 실행이 막힌 것**입니다. 이때는 nginx를 여러 번 실행하지 말고 아래 사례를 봅니다.
+
+#### 사례: 회사 PC에서 `nginx.exe`가 실행되지 않을 때 (실제로 겪은 일)
+
+| 보이는 증상 | 실제 의미 |
+|---|---|
+| 더블클릭하면 작업관리자에 `nginx.exe`가 생기고, 다시 실행할 때마다 늘어남 | 실행할 때마다 프로세스가 생기지만 **시작하지 못하고 붙잡혀** 남음 |
+| 브라우저가 응답하지 않음, `netstat -ano \| findstr LISTENING \| findstr ":80"`에 아무것도 없음 | 시작하지 못했으니 포트가 열리지 않음 |
+| `logs` 폴더에 `error.log`조차 생기지 않음 | nginx 코드가 실행되기도 전에 멈춤 |
+| `taskkill /f /im nginx.exe` → "실행 중인 작업 인스턴스가 없습니다" | 다른 프로그램이 그 프로세스를 붙잡고 있어 끝낼 수 없음 |
+| `nginx -v`조차 아무 출력 없이 멈춤 | **실행 자체가 바깥에서 붙잡힘** |
+
+**판단 방법** (PowerShell)
+
+```powershell
+Get-AuthenticodeSignature C:\nginx\nginx.exe | Select-Object Status   # NotSigned: nginx.org의 Windows 버전은 코드 서명이 없다
+Get-Item C:\nginx\nginx.exe -Stream * | Select-Object Stream          # 낯선 표시가 실행 파일에만 붙어 있는지 (설정 파일과 비교)
+Get-Item C:\nginx\conf\nginx.conf -Stream * | Select-Object Stream
+```
+
+- `Zone.Identifier`가 있으면 "인터넷에서 받은 파일" 표시입니다. 파일 속성의 **차단 해제**(또는 `Unblock-File`)로 지운 뒤 `nginx -v`를 다시 해 봅니다
+- 그런 표시가 없고, Windows가 기본으로 붙이지 않는 표시(이 사례에서는 `RVContext`)가 **실행 파일에만** 붙어 있으며 서명이 없다면, PC의 **보안 프로그램(백신·EDR 등)이 서명 없는 낯선 실행 파일을 붙잡고 있는 것**으로 봅니다. 사용자가 풀 문제가 아닙니다
+
+**하지 말 것**: 같은 실행 반복(붙잡힌 프로세스만 늘어남), 그 표시를 지우거나 보안 프로그램을 끄거나 직접 만든 인증서로 서명하기(회사 보안 정책 위반이 될 수 있음).
+
+**할 것: IT 담당자에게 허용 요청.** nginx.org는 Windows용 zip의 **PGP 서명(.asc)**을 함께 제공합니다. PGP 서명은 보안 프로그램의 차단을 풀어 주지는 않지만(보안 프로그램은 PGP를 보지 않는다), "공식 파일이고 바뀌지 않았다"는 **근거**가 됩니다.
+
+```bash
+# Git Bash(Git for Windows에 gpg가 들어 있다). 같은 버전의 zip과 zip.asc, 그리고
+# https://nginx.org/en/pgp_keys.html 의 서명 키 파일을 받은 폴더에서
+gpg --import <받은 키 파일>.key
+gpg --verify nginx-1.x.y.zip.asc nginx-1.x.y.zip
+#  → "Good signature from …" 이고, 출력의 Primary key fingerprint가 pgp_keys.html의 지문과 같으면 공식 파일
+#    ("This key is not certified with a trusted signature" 경고는 정상)
+```
+
+```powershell
+Get-FileHash .\nginx-1.x.y.zip -Algorithm SHA256
+Get-FileHash C:\nginx\nginx.exe -Algorithm SHA256
+```
+
+> IT 담당자에게: 교육 실습용 웹 서버 `nginx.exe`(nginx.org 공식 Windows 버전)를 실행하면 `nginx -v`조차 응답 없이 멈추고 프로세스가 종료되지 않으며 로그도 생기지 않습니다. 코드 서명은 없고(NotSigned), 실행 파일에만 보안 프로그램의 표시로 보이는 대체 데이터 스트림이 붙습니다. nginx.org의 PGP 서명으로 zip을 검증했습니다(Good signature, 키 지문 일치). zip과 `nginx.exe`의 SHA256은 아래와 같습니다. 이 파일(또는 실습 폴더)의 실행 허용을 요청드립니다.
+
+허용을 받기 전까지는 **[Step 4-6의 대안](#step-4-6-대안-nginx를-쓸-수-없을-때-백엔드가-같은-폴더를-서비스)**으로 같은 구성을 실습합니다. 이미 붙잡힌 nginx 프로세스는 해가 없고 다음 로그아웃·재부팅 때 정리됩니다.
+
+> ⚠️ 위 판단 명령과 증상은 실제 회사 PC에서 확인한 것입니다. PGP 검증 절차는 gpg의 표준 사용법이며, 이 교재 환경에서는 nginx.org에 접속할 수 없어 실제 파일로 실행해 보지 못했습니다.
+
 ### Step 4-2. nginx용으로 빌드하기 (`--mode nginx`)
 
 개발 서버에서는 remote가 `http://localhost:3001/remoteEntry.js`에 있지만, nginx에서는 같은 서버의 `/mfe/course/remoteEntry.js`에 있습니다. remote의 파일들도 자기 서브 폴더(`/mfe/course/`) 기준으로 서로를 찾아야 합니다(Vite의 `base`). **빌드 모드**로 나눠서, 개발 서버와 미리보기는 지금처럼 두고 `npm run build:nginx`일 때만 바꿉니다.
@@ -1563,9 +1610,68 @@ echo "배포 완료: $APP → $DEST"
 
 > ✅ 이 교재 환경에서는 Windows 대신 **Linux의 nginx 1.24**에 위 `nginx.conf`를 그대로 쓰고(시험 환경 때문에 로그·pid 위치와 실행 계정 줄만 추가), 같은 동작의 `deploy-frontend.sh`로 배포해 확인했습니다: 5회차와 같은 브라우저 20단계 4회 연속 통과, N2~N6(새로고침, 캐시 헤더, nginx·백엔드 재시작 없이 course-mfe만 교체, 롤백 후 이전 화면 복귀). 세 앱의 단위 테스트·타입 검사·`build:nginx`·기존 `build`도 통과했습니다. **Windows에서 nginx 설치·실행과 `deploy-frontend.ps1`은 실행해 보지 못했습니다**(이 환경에 Windows·PowerShell이 없음). 같은 단계를 bash로 옮긴 스크립트로 논리만 확인했으니, 처음 쓸 때는 N5·N6을 꼭 직접 해 봅니다.
 
+### Step 4-6. (대안) nginx를 쓸 수 없을 때: 백엔드가 같은 폴더를 서비스
+
+회사 보안 정책 등으로 nginx를 실행할 수 없으면, **이미 실행할 수 있는 Spring Boot 백엔드**가 같은 폴더를 서비스하게 합니다. 새 실행 파일이 없으므로 보안 프로그램에 걸리지 않습니다. **빌드(`build:nginx`), 폴더 구성, 배포 스크립트는 nginx와 똑같이** 쓰고, 백엔드에 두 가지만 더합니다.
+
+| | nginx (Step 4-1~4-5) | 대안: 백엔드가 서비스 |
+|---|---|---|
+| 주소 | http://localhost:8088 | http://localhost:8080 (API와 같은 서버) |
+| 폴더 | `C:\nginx\html\eduhub\shell\`, `…\mfe\course\`, `…\mfe\enrollment\` | 같은 구성, 예: `C:\eduhub-web\shell\`, `…\mfe\…` (**jar 밖** 폴더) |
+| 배포·롤백 | `deploy-frontend.ps1 -App …` | `deploy-frontend.ps1 -App … -NginxRoot C:\eduhub-web` (스크립트 그대로) |
+| 독립 배포 | 폴더만 교체, 재시작 없음 | 같음 (백엔드 재시작 없음) |
+| 캐시 규칙 | nginx 설정으로 조정 | Spring Security가 모든 응답에 `no-cache, no-store`를 붙여 **캐시가 되지 않음**(실습에는 문제없음) |
+| 실무에서 | 화면 배포를 웹 서버에 둔다 | 화면 파일이 백엔드 프로세스에 기대므로 **실습용 대안**으로 쓴다 |
+
+> ⚠️ 정적 폴더를 `src/main/resources/static`(jar 안)에 넣지 않습니다. 그러면 화면 하나를 고쳐도 백엔드를 다시 빌드·배포해야 해서 마이크로프론트엔드의 독립 배포가 사라집니다.
+
+**① 보안 설정: `/api` 밖(화면 파일)은 로그인 없이** — 5회차 Step 9-1의 `SecurityConfig`에 한 줄
+
+```java
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                .requestMatchers(r -> !r.getRequestURI().startsWith("/api/")).permitAll()   // 화면 파일(shell·remote)은 누구나. 보호는 /api에서
+                // … 나머지 규칙은 그대로 …
+```
+
+이 줄이 없으면 `anyRequest().authenticated()` 때문에 화면 파일까지 로그인을 요구해 첫 화면이 401이 됩니다. API 보호 규칙은 바뀌지 않습니다.
+
+**② 화면 주소로 새로고침해도 shell을 주는 컨트롤러** (nginx의 `try_files … /index.html` 역할)
+
+```java
+// web/SpaForwardController.java
+package com.example.eduhub.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+
+/** 화면 주소(/courses/1 등)로 새로고침·직접 접속하면 shell의 index.html을 돌려준다. /api, /mfe, 파일은 해당 없음 */
+@Controller
+class SpaForwardController {
+    @GetMapping({"/login", "/courses", "/courses/**", "/my/**", "/admin/**"})
+    String shell() { return "forward:/index.html"; }
+}
+```
+
+**③ 실행: 정적 폴더를 jar 밖으로 지정**
+
+```powershell
+# shell 폴더를 먼저, 그다음 /mfe/… 를 찾을 상위 폴더
+java -jar build\libs\eduhub-backend-0.0.1.jar --spring.profiles.active=dev `
+  "--spring.web.resources.static-locations=file:C:/eduhub-web/shell/,file:C:/eduhub-web/"
+```
+
+- `/`, `/assets/…`, `/index.html`은 첫 번째 위치(`shell\`)에서, `/mfe/course/…`는 두 번째 위치(`C:\eduhub-web\mfe\course\…`)에서 찾습니다
+- 두 번째 위치 때문에 `/shell/…`, `/mfe/course.prev/…` 같은 주소로도 파일이 보입니다. 화면 파일이라 비밀은 없지만, 실습용 대안으로만 씁니다
+
+**④ 배포와 확인**: 4-2의 `build:nginx`로 빌드하고 `deploy-frontend.ps1 -App <앱> -NginxRoot C:\eduhub-web`으로 배포한 뒤, Step 4-5의 확인 표를 **8080**에서 합니다(N4의 캐시 헤더만 다름).
+
+> ✅ 이 교재 환경에서 위 설정으로 Spring Boot(8080)가 nginx와 같은 폴더 구성(`shell/`, `mfe/course/`, `mfe/enrollment/`)을 서비스하게 하고, 5회차와 같은 브라우저 20단계 통과, `/courses/1` 새로고침, `/api/me` 401 유지, **백엔드 재시작 없이** course-mfe 교체와 롤백(배포 스크립트의 bash 버전)을 확인했습니다. Windows 경로(`file:C:/…`) 형식은 실행해 보지 못했습니다(Linux 경로로 확인).
+
 ```bash
 git switch -c chore/nginx-deploy
 git add frontend/apps/*/vite.config.ts frontend/apps/*/package.json deploy/nginx/nginx.conf scripts/deploy-frontend.ps1 scripts/deploy-frontend.sh
+# Step 4-6 대안을 썼다면 backend의 SecurityConfig.java, SpaForwardController.java도
 git commit -m "chore(frontend): nginx 배포 설정과 배포·롤백 스크립트"
 ```
 
@@ -1586,6 +1692,7 @@ git commit -m "chore(frontend): nginx 배포 설정과 배포·롤백 스크립�
 | 목록 화면만 비어 있고 콘솔에 `Element type is invalid` | `CourseListPage`는 3회차부터 **이름 있는 export**. `lazy(() => import(…).then((m) => ({ default: m.CourseListPage })))` |
 | 인터넷 예제를 따라 했더니 옵션 이름이 다름 (`remotes: { x: "http://…" }` 문자열만 등) | `@originjs/vite-plugin-federation` 예제가 섞임. `@module-federation/vite` 형식(`type`, `name`, `entry`)으로 통일 |
 | `git status`에 renamed가 아니라 deleted + new file | `git mv` 대신 파일을 지우고 새로 만듦. 이력이 끊기므로 `git mv`로 다시 하거나, 내용이 많이 바뀌기 전에 커밋 |
+| (nginx) `nginx -v`조차 멈춤, 끌 수 없는 `nginx.exe`가 쌓임, 로그 없음 | PC의 보안 프로그램이 서명 없는 실행 파일을 붙잡음 → 반복 실행 금지, IT에 허용 요청(Step 4-1의 사례), 그동안 Step 4-6 대안 |
 | (nginx) 첫 화면이 500, error.log에 `rewrite or internal redirection cycle` | shell 폴더가 비었거나 nginx가 읽을 수 없음 → `C:\nginx\html\eduhub\shell\index.html`이 있는지, 폴더 권한 확인 |
 | (nginx) 화면은 뜨는데 "화면을 불러오지 못했습니다" | remote를 `build:nginx`가 아니라 `build`로 빌드함(`base`가 `/`) 또는 `mfe\course` 폴더가 없음 → Network 탭에서 404인 주소 확인 |
 | (nginx) `/courses/1`에서 새로고침하면 404 | `location /`의 `try_files … /index.html` 빠짐 |
