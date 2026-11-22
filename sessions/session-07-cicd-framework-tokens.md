@@ -582,6 +582,8 @@ jobs:
           npm run build
 ```
 
+> 💡 **`runs-on: ubuntu-latest`는 "이 잡을 어느 컴퓨터에서 실행할지"입니다.** 배포 대상이 아니라, 테스트·빌드를 돌릴 **작업용 컴퓨터(러너)**를 고르는 줄입니다. `ubuntu-latest`는 GitHub가 잡마다 새로 만들어 주는 클라우드 Linux 가상 머신이라 우리가 준비할 것이 없습니다. 개발은 Windows에서 해도 CI를 Linux에서 돌리는 이유는 ① Testcontainers가 쓰는 Docker(리눅스 컨테이너)가 기본으로 있고 (Windows 클라우드 러너에서는 리눅스 컨테이너를 띄울 수 없다), ② 운영 서버도 대부분 Linux이며, ③ 시작이 빠르기 때문입니다. Windows에서만 생기는 문제까지 확인하려면 `runs-on: windows-latest` 잡을 하나 더 두고, 사내망 자원이 필요하면 self-hosted runner를 고릅니다 ([1-0 ②](#②-파이프라인을-돌리는-도구-github-actions와-jenkins)). 7-2·7-3에서도 **빌드는 `ubuntu-latest`, 배포만 스테이징 PC의 러너**에서 합니다.
+
 ```kotlin
 // backend/build.gradle.kts (발췌) — 서비스 계층 커버리지 70% (NFR-05)
 plugins { jacoco }
