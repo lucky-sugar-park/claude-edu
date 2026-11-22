@@ -350,7 +350,7 @@ export default function CourseApp() {
 }
 ```
 
-**host: `apps/shell/vite.config.ts`** (enrollment-mfe는 `remotes`에 같은 모양으로 3002를 추가)
+**host: `apps/shell/vite.config.ts`** (remote 두 개: course-mfe 3001, enrollment-mfe 3002)
 
 ```ts
 // apps/shell/vite.config.ts (host)
@@ -370,6 +370,11 @@ export default defineConfig({
           type: "module",                        // Vite remote는 ES 모듈
           name: "courseMfe",
           entry: "http://localhost:3001/remoteEntry.js",
+        },
+        enrollmentMfe: {
+          type: "module",
+          name: "enrollmentMfe",                 // enrollment-mfe의 federation name과 같아야 한다
+          entry: "http://localhost:3002/remoteEntry.js",
         },
       },
       shared: {
@@ -450,7 +455,7 @@ npm run preview --workspace apps/shell        # 3000 (다른 창)
 | Network 탭 | 3001에서 `remoteEntry.js`와 remote 코드만 받는다 | 개발 서버 모드에서는 이름에 `loadShare`가 들어간 작은 모듈이 3001에서 보이는데, React 자체가 아니라 **공유 React를 가리키는 연결 모듈**이다. 빌드 모드에서는 3001에서 React·MUI 파일을 받지 않는다 |
 | course-mfe를 끈 상태 | shell은 뜨고 그 자리에 MUI `Alert`가 나온다 | remote 하나가 죽어도 shell 전체가 깨지지 않는다 (`RemoteBoundary`) |
 
-> ✅ 이 교재 환경에서 위 설정 그대로 shell + course-mfe를 만들어 브라우저(Chromium)로 확인했습니다 (Vite 8.3, `@module-federation/vite` 1.24, `@vitejs/plugin-react` 6.3, React 18.3, MUI 6.5): 개발 서버 모드와 빌드·미리보기 모드 모두 위 표대로 동작했고, TypeScript 타입 검사도 통과했습니다. remote의 `shared`를 일부러 빼면 `Cannot read properties of null (reading 'useState')`로 화면이 실패하는 것도 확인했습니다 (React가 두 벌 로드됨). enrollment-mfe(3002)는 같은 방식이라 따로 만들어 보지는 않았습니다.
+> ✅ 이 교재 환경에서 위 설정 그대로 shell + course-mfe를 만들어 브라우저(Chromium)로 확인했습니다 (Vite 8.3, `@module-federation/vite` 1.24, `@vitejs/plugin-react` 6.3, React 18.3, MUI 6.5): 개발 서버 모드와 빌드·미리보기 모드 모두 위 표대로 동작했고, TypeScript 타입 검사도 통과했습니다. remote의 `shared`를 일부러 빼면 `Cannot read properties of null (reading 'useState')`로 화면이 실패하는 것도 확인했습니다 (React가 두 벌 로드됨). enrollment-mfe(3002) remote 설정은 같은 모양으로 Step 1~3의 세 앱(3000·3001·3002) 구성에서 함께 확인했습니다.
 
 > 💡 플러그인 버전이 오르면서 설정이 바뀌기도 합니다. Claude에게 설정을 맡길 때는 **"`@module-federation/vite`로, 설치된 버전의 README 기준으로"**라고 지정하고, 인터넷의 `@originjs/vite-plugin-federation` 예제(옵션 이름과 동작이 다르다)가 섞이지 않았는지 diff에서 확인합니다.
 
