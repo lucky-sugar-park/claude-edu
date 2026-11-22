@@ -18,7 +18,7 @@
 > - GitHub 저장소의 **Settings에 접근할 수 있는 권한**(팀에서 한 명 이상, 보통 저장소 관리자)
 > - 로컬에서 `cd backend && ./gradlew test`, `cd frontend && npm test`가 통과하는 상태
 > - Docker Desktop 실행 (Testcontainers, 이미지 빌드 확인용)
-> 🖥️ **슬라이드 덱(35장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(38장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -27,7 +27,7 @@
 | 시간 | 내용 | 형식 |
 |---|---|---|
 | 0:00 – 0:08 | 지난 회차 복습 & 과제 리뷰 | 강의 + 공유 |
-| 0:08 – 0:24 | 1. CI/CD 큰 그림과 환경 분리 완성 | 강의 |
+| 0:08 – 0:24 | 1. CI/CD 큰 그림(빌드 파이프라인, GitHub Actions vs Jenkins)과 환경 분리 완성 | 강의 |
 | 0:24 – 0:36 | 2. 사내 공통 모듈을 Claude가 따르게 하는 법 | 강의 |
 | 0:36 – 0:46 | 3. 토큰 최적화: 측정 → 개선 → 리포트 | 강의 |
 | 0:46 – 1:16 | 4. 따라하기 ①: CI, 필수 체크, 승인 배포, 프로필·비밀, 런북 | 실습 |
@@ -61,6 +61,163 @@
 # 1. CI/CD 큰 그림과 환경 분리 완성
 
 > 자세한 내용: [빌드·배포 파이프라인 모범 사례](../examples/28-build-deploy-pipeline.md), [개발자의 책임](../examples/27-developer-responsibility.md)
+
+---
+
+## 1-0. 개념 먼저: 빌드 파이프라인과 그것을 돌리는 도구
+
+### ① 빌드 파이프라인이란
+
+**빌드 파이프라인**은 코드가 바뀌었을 때 **정해진 단계를 정해진 순서대로 자동으로 거쳐** "배포해도 되는 결과물"을 만들고 배포까지 이어 주는 흐름입니다. 사람이 매번 손으로 빌드·테스트·복사하던 일을 **누가 해도, 언제 해도 똑같이** 되게 만드는 것이 목적입니다.
+
+| 용어 | 뜻 | EduHub |
+|---|---|---|
+| **CI** (Continuous Integration, 지속적 통합) | 코드를 합칠 때마다(PR) 자동으로 빌드·테스트해서 **깨진 코드가 `main`에 들어가지 못하게** 한다 | 모든 PR (필수 상태 체크) |
+| **CD** (Continuous Delivery, 지속적 전달) | `main`의 코드를 **언제든 배포할 수 있는 결과물**로 만들어 두고, 배포는 **사람이 승인**하면 자동으로 | ⭐ 스테이징 배포 (사람 승인 후 자동) |
+| CD (Continuous Deployment, 지속적 배포) | 테스트를 통과하면 **승인 없이** 운영까지 자동 반영 | 쓰지 않음 |
+
+```mermaid
+flowchart LR
+    SRC["① 소스<br/>PR · main 병합"] --> BLD["② 빌드<br/>컴파일 · 번들"]
+    BLD --> TST["③ 검사<br/>테스트 · 린트 · 커버리지"]
+    TST --> PKG["④ 패키징<br/>jar · 이미지 · 정적 파일<br/>(버전 태그)"]
+    PKG --> ART[("⑤ 결과물 보관<br/>이미지 레지스트리 ·<br/>아티팩트")]
+    ART --> STG["⑥ 스테이징 배포<br/>+ 스모크 테스트"]
+    STG --> GATE{"⑦ 👤 승인"}
+    GATE --> PRD["⑧ 운영 배포"]
+    BLD -. "실패" .-> FB["개발자에게 알림<br/>(PR에 ✗ 표시)"]
+    TST -. "실패" .-> FB
+    STG -. "실패" .-> RB["롤백<br/>이전 버전 결과물로"]
+```
+
+| 단계 | 하는 일 | 실패하면 |
+|---|---|---|
+| ①~③ 소스·빌드·검사 (**CI**) | 받은 코드를 깨끗한 환경에서 처음부터 빌드하고 테스트 | PR에 ✗, **병합 불가**. 빨리 알려 줄수록 고치기 싸다 (10분 이내 목표) |
+| ④~⑤ 패키징·보관 | 배포할 결과물을 **한 번만** 만들어 버전(커밋 SHA)을 붙여 보관 | 결과물이 없으니 배포 단계가 시작되지 않음 |
+| ⑥ 스테이징 배포 | 운영과 비슷한 환경에 **같은 결과물**을 배포하고 스모크 테스트 | 운영에 가기 전에 멈춤 → 이전 결과물로 롤백 |
+| ⑦~⑧ 승인·운영 배포 (**CD**) | 사람이 확인하고 승인하면 같은 결과물을 운영에 | 런북대로 롤백 (1-4) |
+
+**좋은 파이프라인의 원칙** (자세한 내용은 [모범 사례](../examples/28-build-deploy-pipeline.md))
+- **한 번 빌드, 여러 번 배포**: 스테이징에서 확인한 바로 그 결과물이 운영으로 간다. 환경마다 다시 빌드하면 "스테이징에서는 됐는데"가 생긴다
+- **빠른 피드백**: 오래 걸리는 검사는 뒤로, 자주 깨지는 검사는 앞으로
+- **파이프라인도 코드**: 설정 파일을 저장소에 두고 PR로 리뷰한다. 누가 언제 무엇을 바꿨는지 남는다
+- **문은 사람이 연다**: 운영으로 가는 승인, 비밀 값, 저장소 보호 규칙은 사람이 관리한다
+
+### ② 파이프라인을 돌리는 도구: GitHub Actions와 Jenkins
+
+위 단계 자체는 도구와 상관없습니다. **CI/CD 도구**는 이 단계들을 정의한 파일을 읽어 **언제(트리거), 어디서(실행 환경), 무엇을(단계), 누구 승인으로** 실행할지 관리하는 역할을 합니다.
+
+```mermaid
+flowchart LR
+    GIT["Git 저장소<br/>(코드 + 파이프라인 정의 파일)"] -- "이벤트<br/>PR · push · 수동 실행" --> TOOL
+    subgraph TOOL["CI/CD 도구 (오케스트레이터)"]
+        direction TB
+        T1["트리거 감지 · 단계 순서"]
+        T2["승인 · 비밀 값 · 로그 · 결과 보고"]
+    end
+    TOOL -- "작업 배정" --> R1["실행 환경 1<br/>(클라우드 러너)<br/>빌드 · 테스트"]
+    TOOL -- "작업 배정" --> R2["실행 환경 2<br/>(사내 PC · 서버)<br/>배포"]
+    R1 --> ART[("결과물")]
+    ART --> R2
+    R2 --> ENV["스테이징 · 운영"]
+    TOOL -. "✓ / ✗" .-> GIT
+```
+
+대표적인 도구가 **GitHub Actions**와 **Jenkins**입니다 (그 밖에 GitLab CI/CD, Azure Pipelines 등도 같은 역할). 먼저 각각이 무엇인지 봅니다.
+
+**GitHub Actions란**
+
+GitHub에 **들어 있는** CI/CD 기능입니다. 따로 설치할 것 없이 저장소에 `.github/workflows/` 폴더를 만들고 YAML 파일을 넣으면, GitHub가 그 파일을 읽어 정해진 때에 실행합니다. 결과는 PR 화면의 Checks와 Actions 탭에 바로 나옵니다.
+
+| 용어 | 뜻 |
+|---|---|
+| **workflow** (워크플로우) | `.github/workflows/*.yml` 파일 하나 = 파이프라인 하나 |
+| **trigger** (`on:`) | 언제 실행할지: PR, `main` push, 수동 실행(`workflow_dispatch`), 일정 등 |
+| **job** (잡) | 한 러너에서 실행되는 작업 묶음. 여러 job은 기본적으로 **동시에**, `needs:`로 순서를 정한다 |
+| **step** (스텝) | job 안의 한 단계. 명령(`run:`) 또는 action(`uses:`) |
+| **action** (액션) | 남이 만들어 둔 재사용 단계 (예: `actions/checkout` = 코드 받기). Marketplace에서 찾는다 |
+| **runner** (러너) | job을 실제로 실행하는 컴퓨터. GitHub가 주는 클라우드 러너(`ubuntu-latest` 등) 또는 우리 PC·서버에 설치한 **self-hosted runner** |
+
+```yaml
+# .github/workflows/ci.yml — 가장 작은 워크플로우 예
+name: CI
+on:
+  pull_request:                 # 트리거: PR이 열리거나 커밋이 추가되면
+jobs:
+  backend:                      # job 하나 = 러너 한 대에서 실행
+    runs-on: ubuntu-latest      # GitHub가 준비한 클라우드 러너
+    steps:
+      - uses: actions/checkout@v4          # action: 남이 만든 단계를 가져다 씀
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - run: ./gradlew test                # run: 명령 실행
+        working-directory: backend
+```
+
+**Jenkins란**
+
+**직접 설치해서 운영하는** 오픈소스 자동화 서버입니다 (Java로 만들어진, 오래되고 널리 쓰이는 CI/CD 도구). 회사 서버에 Jenkins를 띄우고, 웹 화면에서 저장소를 연결하면 저장소의 `Jenkinsfile`을 읽어 실행합니다. GitHub뿐 아니라 GitLab, Bitbucket, 사내 Git 등 어떤 저장소와도 쓸 수 있고, 수천 개의 **플러그인**으로 기능을 넓힙니다.
+
+| 용어 | 뜻 |
+|---|---|
+| **controller** (컨트롤러) | Jenkins 본체 서버. 작업 예약, 화면, 설정, 결과 보관 |
+| **agent** (에이전트) | 실제 빌드를 실행하는 컴퓨터. 레이블(예: `eduhub-staging`)로 골라 쓴다 (Actions의 러너에 해당) |
+| **pipeline / Jenkinsfile** | 파이프라인 정의. 저장소의 `Jenkinsfile`에 Groovy 기반 문법으로 쓴다 |
+| **stage / step** | 파이프라인의 단계(stage)와 그 안의 명령(step) (Actions의 job·step에 해당) |
+| **plugin** (플러그인) | Git 연동, 승인, 알림, 비밀 값 관리 등 대부분의 기능이 플러그인 |
+
+```groovy
+// Jenkinsfile — 위 GitHub Actions 예와 같은 일
+pipeline {
+  agent { label 'linux' }                 // 이 레이블이 붙은 에이전트에서 실행
+  stages {
+    stage('Checkout') { steps { checkout scm } }          // 저장소 코드 받기
+    stage('Backend test') {
+      steps { dir('backend') { sh './gradlew test' } }     // 명령 실행
+    }
+  }
+}
+```
+
+> ✅ 위 GitHub Actions 예는 actionlint 검사를 통과했습니다. ⚠️ Jenkinsfile 예는 Declarative Pipeline 문법으로 쓴 개념 예시이며, 교재 환경에서 Jenkins로 실행해 보지는 않았습니다 (실행하려면 Jenkins 서버와, 프로젝트의 JDK 21이 설치된 에이전트가 필요).
+
+두 도구를 나란히 놓으면 다음과 같습니다.
+
+| 비교 | GitHub Actions | Jenkins |
+|---|---|---|
+| 형태 | GitHub에 **내장된 서비스**. 설치할 서버 없음 | **직접 설치·운영**하는 오픈소스 서버 (Java) |
+| 파이프라인 정의 | 저장소의 `.github/workflows/*.yml` (YAML) | 저장소의 `Jenkinsfile` (Groovy 기반 DSL) |
+| 실행 환경 | GitHub 호스트 러너(클라우드) 또는 **self-hosted runner**(사내 PC·서버) | 컨트롤러 + **에이전트**(사내 서버·PC) |
+| 사람 승인 | Environments의 **필수 승인자** | `input` 단계 + 권한 설정 |
+| 비밀 값 | Secrets / Variables (저장소·환경별) | Credentials |
+| 확장 | Marketplace의 action | 플러그인 (매우 많음) |
+| PR 연동 | 기본 제공 (필수 상태 체크, PR 화면에 결과) | 플러그인·웹훅으로 연결 |
+| 운영 부담 | 낮음 (GitHub가 관리) | 높음 (서버·플러그인 업데이트, 백업, 보안 패치를 팀이) |
+| 잘 맞는 곳 | GitHub를 쓰는 팀, 빠르게 시작 | 사내망 안에서 **모든 것을 직접 통제**해야 하는 조직, 이미 Jenkins를 운영하는 회사, GitHub 외 저장소 |
+| 비용 | 요금제별 무료 사용량이 있고 초과분 과금 (요금 정책은 바뀌므로 도입 전에 GitHub 요금 안내 확인) | 소프트웨어 무료, 대신 서버·운영 인력 비용 |
+
+> 💡 어느 쪽이 "더 좋다"가 아니라 **조직의 환경에 맞는 쪽**을 고릅니다. 많은 회사가 이미 Jenkins를 운영하고 있고, 그런 곳에서는 오늘 배우는 내용을 Jenkinsfile로 옮기면 됩니다 (③의 대응표).
+
+### ③ EduHub는 왜 GitHub Actions인가
+
+1. **설치하고 운영할 서버가 없다**: Jenkins는 서버를 띄우고 플러그인·계정·백업·보안 업데이트를 관리해야 합니다. 수강생 대부분이 회사 Windows PC에서 실습하므로, 6회차에서 nginx·Docker를 실습에서 뺀 것과 같은 이유로 **추가 서버 없이** 갑니다
+2. **이미 GitHub에서 일하고 있다**: 2회차부터 저장소·PR·브랜치 보호를 GitHub에서 했습니다. 필수 상태 체크, 배포 승인(Environments), 비밀 값이 **PR 흐름 안에서 바로** 연결됩니다
+3. **Claude Code와 잘 맞는다**: 워크플로우가 저장소 안의 YAML이라 Claude가 작성하고 사람이 diff로 리뷰하며, actionlint로 미리 검사할 수 있습니다. 8회차의 헤드리스 실행·Claude Code GitHub 연동도 Actions 기준입니다
+4. **사내 PC 배포도 된다**: 프론트 배포처럼 사내 PC에 닿아야 하는 단계만 self-hosted runner로 돌립니다 (7-3). 러너가 GitHub에 먼저 접속해 일을 받으므로 들어오는 포트를 열 필요가 없습니다
+
+**Jenkins를 쓰는 회사라면** 개념은 그대로, 파일만 바뀝니다.
+
+| 오늘 만드는 것 (GitHub Actions) | Jenkins에서는 |
+|---|---|
+| `.github/workflows/*.yml`의 job | `Jenkinsfile`의 `stage` |
+| `on: pull_request` / `push` | Multibranch Pipeline + 저장소 웹훅 |
+| `runs-on: [self-hosted, windows, eduhub-staging]` | `agent { label 'eduhub-staging' }` |
+| `environment: staging` 필수 승인자 | `input` 단계(승인 버튼) + 승인 권한 |
+| `secrets` / `vars` | Credentials / 환경 변수 |
+| `workflow_dispatch` 입력(앱, rollback) | 매개변수가 있는 빌드 (`parameters`) |
+| 필수 상태 체크 | 저장소에 빌드 결과를 보고하는 플러그인 + 저장소의 보호 규칙 |
+
+> ⚠️ 이 교재의 예제와 검증은 GitHub Actions 기준입니다. Jenkins 대응표와 Jenkinsfile 예는 개념 대응이며, 교재 환경에서 Jenkins로 실행해 보지는 않았습니다.
 
 ---
 
