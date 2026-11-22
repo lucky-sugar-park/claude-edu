@@ -44,12 +44,12 @@
 ## 지난 회차 복습 & 과제 리뷰
 
 **7회차 핵심 3문장**
-1. 빌드는 **한 번**, 배포는 같은 이미지를 **여러 환경에**
+1. 빌드는 **한 번**, 배포는 같은 결과물(실습은 jar, 운영에서는 보통 컨테이너 이미지)을 **여러 환경에**
 2. 운영 배포는 **사람의 승인**과 파이프라인으로만. Claude Code는 파이프라인을 **만드는 것을 돕지만**, 운영에 직접 배포하지 않는다
 3. 런북은 **AI 없이 사람이 그대로 따라 할 수 있어야** 한다
 
 **과제 확인 (팀별 1분)**
-- [ ] 스테이징 자동 배포가 동작하는가? 마지막 배포 이미지 태그는?
+- [ ] 스테이징 자동 배포가 동작하는가? 지금 스테이징 버전(스테이징 PC의 `current.txt`)과 직전 버전은?
 - [ ] `docs/runbook.md`에 배포·롤백 절차가 명령어 수준으로 적혀 있는가?
 - [ ] 이번 주 `/usage` 기록과 토큰을 아낀 방법 1개
 
@@ -218,7 +218,7 @@ flowchart TB
       "Read(**/.env.*)",
       "Read(**/application-prod.yml)",
       "Bash(kubectl * --context prod*)",
-      "Bash(./scripts/deploy.sh prod*)"
+      "Bash(*deploy-backend*)"
     ],
     "disableBypassPermissionsMode": "disable"
   }
@@ -568,7 +568,7 @@ git push -u origin fix/nfr-03-security
 
 | 항목 | 규칙 |
 |---|---|
-| 시나리오 | 강사가 각 팀 스테이징에 **운영 장애처럼 보이는 버그**를 넣은 이미지를 배포합니다 (무엇인지 알려 주지 않음) |
+| 시나리오 | 강사가 각 팀 스테이징에 **운영 장애처럼 보이는 버그**를 넣은 버전을 배포합니다 (버그 커밋을 `main`에 병합 → 7회차 파이프라인이 배포. 무엇인지 알려 주지 않음) |
 | 시간 | **20분** 타임박스 (탐지·완화·수정·배포) + 사후 분석 10분 |
 | 금지 | Claude Code, 웹 Claude, 다른 AI 도구 (데스크톱 앱 종료) |
 | 허용 | IDE, 로그, `git`, 런북, CI/CD 파이프라인, 팀원과 대화, 공식 문서 검색 |
@@ -580,7 +580,7 @@ git push -u origin fix/nfr-03-security
 > - 특정 분류(`category=null`) 과정이 있으면 과정 목록이 500 (NPE)
 > - 신청 마감 시간 비교가 UTC/KST 차이로 9시간 어긋남
 > - 마이그레이션에서 `NOT NULL` 컬럼 추가로 신규 신청이 실패
-> 버그 커밋은 일반 기능 커밋처럼 보이게 메시지를 쓰고, 이전 정상 이미지 태그를 기록해 둡니다. 막힌 팀에는 5분마다 힌트 하나(로그 위치 → 패키지 → 클래스).
+> 버그 커밋은 일반 기능 커밋처럼 보이게 메시지를 쓰고, 이전 정상 버전(커밋 SHA 앞 12자리)을 기록해 둡니다. 막힌 팀에는 5분마다 힌트 하나(로그 위치 → 패키지 → 클래스).
 
 ---
 
@@ -590,7 +590,7 @@ git push -u origin fix/nfr-03-security
 flowchart TD
     D["🚨 장애 감지<br/>스테이징 오류·사용자 신고"] --> T["지휘: 타임라인 기록 시작<br/>(시각, 증상, 결정)"]
     T --> Q{"즉시 완화 가능?<br/>롤백·기능 플래그"}
-    Q -- 예 --> RB["런북대로 이전 이미지로 롤백<br/>→ 사용자 영향 차단 확인"]
+    Q -- 예 --> RB["런북대로 이전 버전으로 롤백<br/>→ 사용자 영향 차단 확인"]
     Q -- 아니오 --> AN
     RB --> AN["원인 위치 파악<br/>로그 → 구조 지식 → 최근 커밋 (git log, git diff)"]
     AN --> HF["hotfix/… 브랜치에서 최소 수정<br/>직접 빌드·테스트"]
@@ -604,18 +604,31 @@ flowchart TD
 
 **① 감지와 완화**: 런북의 롤백 절차를 그대로 실행합니다. 예 (팀 런북에 맞게):
 
+```powershell
+# 스테이징 PC: 지금 버전과 직전 정상 버전 확인
+Get-Content C:\eduhub-staging\backend\deploy-history.log -Tail 5
+Get-Content C:\eduhub-staging\backend\previous.txt
+```
+
 ```bash
-# 지금 배포된 이미지와 이전 정상 이미지 확인
-gh run list --workflow deploy.yml --limit 5
-# 런북의 롤백 명령 실행 (예: 이전 태그로 재배포 워크플로우 수동 실행)
-gh workflow run deploy.yml -f environment=staging -f image_tag=<이전-정상-태그>
+# 런북의 롤백 ① 파이프라인으로 (빌드 없이 직전 버전, staging 승인 후 실행)
+gh run list --workflow deploy-backend.yml --limit 5
+gh workflow run deploy-backend.yml -f rollback=true
+```
+
+```powershell
+# 런북의 롤백 ② 스테이징 PC에서 직접 (GitHub·러너 장애, 승인자 부재 시)
+.\scripts\deploy-backend.ps1 -Root C:\eduhub-staging\backend -Rollback
 ```
 
 **② 원인 위치 파악**: 2회차에 말한 "구조를 아는 개발자"의 시간입니다.
 
+```powershell
+# 스테이징 PC: 백엔드 로그에서 예외와 위치 찾기 (마지막 3건, 뒤 20줄까지)
+Select-String -Path C:\eduhub-staging\backend\logs\eduhub.log -Pattern "ERROR" -Context 0,20 | Select-Object -Last 3
+```
+
 ```bash
-# 로그에서 예외와 위치 찾기 (팀 환경에 맞는 로그 확인 방법 사용)
-docker logs eduhub-backend --since 15m 2>&1 | grep -n -A 20 "ERROR"
 # 최근 바뀐 것 보기
 git log --oneline -10
 git show <의심 커밋> --stat
@@ -640,7 +653,7 @@ git push -u origin hotfix/waiting-promotion
 | 시각 | 사건·결정 |
 |---|---|
 | 14:02 | 신고: 취소했는데 대기자가 확정되지 않음 |
-| 14:05 | 이전 이미지로 롤백 결정 → 14:08 롤백 완료, 정상 확인 |
+| 14:05 | 이전 버전으로 롤백 결정 → 14:08 롤백 완료, 정상 확인 |
 | 14:12 | 원인 위치: `EnrollmentService.cancel()`에서 `promoteNext` 호출 누락 (커밋 abc123) |
 | 14:16 | hotfix PR 병합, 14:19 재배포, 14:20 종료 선언 |
 
@@ -681,7 +694,7 @@ git push -u origin hotfix/waiting-promotion
 | 증상 | 원인과 해결 |
 |---|---|
 | 롤백 명령을 몰라 시간이 다 감 | 런북에 명령어가 없음 → 사후 분석의 1순위 개선 항목 |
-| 이전 정상 이미지 태그를 모름 | 배포 기록(Actions 실행 이력, 이미지 레지스트리) 확인. 배포마다 태그를 기록하도록 파이프라인 개선 |
+| 이전 정상 버전을 모름 | 스테이징 PC의 `previous.txt`·`deploy-history.log`, Actions 실행 이력 확인. 롤백은 한 단계만이므로 더 이전은 `-Version <버전>` |
 | 로그에 원인이 안 보임 | 로그 레벨·요청 ID 부족 → 후속 조치: 예외 로깅, 요청 추적 ID |
 | 고치다가 리팩터링까지 함 | 핫픽스는 **최소 수정**. 정리는 사후에 별도 PR |
 | 긴급 PR 리뷰를 건너뜀 | 긴급해도 리뷰 1명 + CI. 브랜치 보호가 막아 주는지 확인 |
