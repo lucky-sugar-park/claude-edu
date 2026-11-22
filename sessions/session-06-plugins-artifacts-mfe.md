@@ -767,33 +767,40 @@ git switch -c feature/mfe-split
 
 **① 파일 옮기기는 사람이 `git mv`로** (Claude에게 맡겨도 되지만, 무엇이 어디로 가는지는 1-5 표로 사람이 정한다). `git mv`로 옮기면 Git이 "이름 바뀜"으로 기록해 이력이 이어집니다.
 
+먼저 옮겨 넣을 하위 폴더 4개를 만듭니다. `git mv`는 대상 폴더를 만들어 주지 않으므로(여러 파일을 한 폴더로 옮길 때 폴더가 없으면 오류) **반드시 `git mv`보다 먼저** 합니다.
+
 ```bash
 cd frontend
+mkdir -p apps/shell/src/auth apps/shell/src/pages apps/enrollment-mfe/src/components apps/enrollment-mfe/src/pages
+```
+
+```powershell
+# Windows PowerShell (-Force: 이미 있어도 오류 없음, 중간 폴더도 함께 생성 = mkdir -p)
+cd frontend
+New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, apps/enrollment-mfe/src/components, apps/enrollment-mfe/src/pages
+```
+
+그다음 파일을 옮깁니다 (`frontend/`에서 계속).
+
+```bash
 # 토큰 처리 → api-client 패키지
 git mv apps/course-mfe/src/api/http.ts      packages/api-client/src/auth.ts
 git mv apps/course-mfe/src/api/http.test.ts packages/api-client/src/auth.test.ts
 git rm apps/course-mfe/src/api/clients.ts   # 인스턴스는 packages/api-client/src/index.ts가 만든다
 # 로그인·레이아웃·라우팅·테마 → shell (2회차 뼈대)
-mkdir -p apps/shell/src/auth apps/shell/src/pages
 git mv apps/course-mfe/src/auth/AuthContext.tsx apps/course-mfe/src/auth/AuthContext.test.tsx \
        apps/course-mfe/src/auth/RequireAuth.tsx apps/shell/src/auth/
 cp apps/course-mfe/src/setupTests.ts apps/shell/src/     # 테스트 설정은 course-mfe도 쓰므로 복사
 git mv apps/course-mfe/src/auth/LoginPage.tsx apps/shell/src/pages/
 git mv -f apps/course-mfe/src/main.tsx apps/course-mfe/src/App.tsx apps/course-mfe/src/theme.ts apps/shell/src/   # -f: 뼈대 파일 덮어쓰기
 # 신청 화면 → enrollment-mfe (2회차 뼈대)
-mkdir -p apps/enrollment-mfe/src/components apps/enrollment-mfe/src/pages
 git mv apps/course-mfe/src/enrollment/EnrollButton.tsx apps/course-mfe/src/enrollment/EnrollButton.test.tsx apps/enrollment-mfe/src/components/
 git mv apps/course-mfe/src/enrollment/MyEnrollmentsPage.tsx apps/course-mfe/src/enrollment/RosterPage.tsx \
        apps/course-mfe/src/enrollment/RosterPage.test.tsx apps/enrollment-mfe/src/pages/
 git status        # renamed: 로 보이는지 확인
 ```
 
-```powershell
-# Windows PowerShell: 위 명령을 그대로 쓰되, 줄 끝에 \ 가 있는 명령은 한 줄로 이어 쓰고,
-# mkdir -p 두 줄 대신 아래 한 줄로 git mv가 옮겨 넣을 하위 폴더 4개를 미리 만든다
-# (git mv는 대상 폴더를 만들어 주지 않는다. -Force: 이미 있어도 오류 없음, 중간 폴더도 함께 생성 = mkdir -p)
-New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, apps/enrollment-mfe/src/components, apps/enrollment-mfe/src/pages
-```
+> Windows PowerShell에서도 위 명령을 그대로 씁니다. 줄 끝에 `\`가 있는 두 명령만 `\`를 지우고 한 줄로 이어 씁니다 (`git mv`, `git rm`, `cp`는 PowerShell에서도 동작).
 
 이 상태에서는 세 앱 모두 빌드되지 않습니다(옮긴 파일의 import가 깨짐). Step 1에서 **api-client와 shell**을, Step 2에서 두 remote를 고칩니다.
 
