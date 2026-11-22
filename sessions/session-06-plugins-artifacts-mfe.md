@@ -34,7 +34,7 @@
 | 0:53 – 1:33 | 4. 따라하기 ①: 5회차 앱을 MFE로 쪼개기 (워크트리 병렬 세션) | 실습 |
 | 1:33 – 1:45 | 5. 따라하기 ②: FR-09 알림 (커밋 이후 이벤트) | 실습 |
 | 1:45 – 1:57 | 6. 따라하기 ③: 팀 플러그인 만들기·배포·설치 | 실습 |
-| — | 4. 따라하기 ① Step 4: 한 주소로 배포 (운영 구성 이해 + `run\web` 실습) | **과제** (시간이 남으면 수업 중, 7회차 전 필수) |
+| — | 4. 따라하기 ① Step 4: 한 주소로 배포 (운영 구성 이해 + `run\web` 실습, 선택: nginx로 80번도) | **과제** (시간이 남으면 수업 중, 7회차 전 필수) |
 | — | 7. 따라하기 ④: 주간 진행 현황 아티팩트 | **과제** (시간이 남으면 수업 중) |
 | 1:57 – 2:00 | 9. 정리, 과제 안내 | 강의 |
 
@@ -1500,7 +1500,7 @@ flowchart LR
 | 배포·롤백 | `deploy-frontend.ps1 -WebRoot <웹 서버 폴더>` | **같은 스크립트** (기본 `run\web`) |
 | 7회차 자동 배포 | 웹 서버 폴더를 교체 | 스테이징 PC의 화면 폴더를 교체 (워크플로우 같음) |
 
-> 💡 그래서 이 실습으로 익히는 것(앱별 폴더, 한 주소의 경로 규칙, 캐시 규칙, 폴더 교체·롤백)은 운영에서 **웹 서버만 바뀌고 그대로** 쓰입니다.
+> 💡 그래서 이 실습으로 익히는 것(앱별 폴더, 한 주소의 경로 규칙, 캐시 규칙, 폴더 교체·롤백)은 운영에서 **웹 서버만 바뀌고 그대로** 쓰입니다. IT 허용으로 `nginx.exe`가 동작하는 PC라면, 같은 `run\web`을 nginx로도 서비스해 80(nginx)과 8080(백엔드)을 함께 쓸 수 있습니다 → [Step 4-7](#step-4-7-선택-nginx도-함께-같은-runweb을-80번-포트로).
 
 <details>
 <summary>사례: 회사 PC에서 <code>nginx.exe</code>가 실행되지 않았던 일 (증상, 판단 방법, IT 요청)</summary>
@@ -1831,6 +1831,123 @@ git add .gitignore frontend/apps/*/vite.config.ts frontend/apps/*/package.json \
 git commit -m "chore: 한 주소 배포 구성(run/web 서비스, build:deploy, 배포·롤백 스크립트)"
 ```
 
+### Step 4-7. (선택) nginx도 함께: 같은 `run\web`을 80번 포트로
+
+Step 4-2의 사례처럼 회사 PC에서는 보안 프로그램 때문에 `nginx.exe`가 실행되지 않을 수 있습니다. **IT가 `nginx.exe`를 허용(예외 등록)해 nginx가 동작하는 PC**라면, 지금까지 만든 것을 **하나도 바꾸지 않고** nginx를 앞에 둘 수 있습니다. nginx가 **같은 `run\web` 폴더**를 읽기 때문에, 빌드(`build:deploy`)와 배포 스크립트(`deploy-frontend.ps1`)도 그대로입니다.
+
+> ⚠️ **보안 프로그램(백신·EDR)을 끄고 실습하지 않습니다.** 잠깐 꺼서 동작을 확인하는 것과, 꺼 둔 채 쓰는 것은 다릅니다. 회사 보안 정책 위반이고, 그 사이 PC가 보호받지 못합니다. nginx가 막히면 Step 4-2의 사례처럼 `nginx.exe`의 경로·SHA256 해시·PGP 서명 검증 결과를 근거로 **IT에 예외 등록을 요청**하고, 허용되기 전까지는 Step 4-2~4-6의 방식(8080)으로 실습합니다.
+
+```mermaid
+flowchart LR
+    U1["브라우저<br/>http://localhost (80)"] --> NG["nginx :80<br/>화면 파일 · 캐시 규칙 · 새로고침"]
+    U2["브라우저<br/>http://localhost:8080"] --> BE["Spring Boot :8080<br/>화면 파일 + API"]
+    NG -- "/api/…" --> BE
+    NG -- "읽기" --> W["run\web\<br/>shell · mfe\course · mfe\enrollment"]
+    BE -- "읽기" --> W
+    D["deploy-frontend.ps1<br/>(폴더 교체 한 번)"] -. "두 주소 모두 바로 바뀜" .-> W
+```
+
+| 주소 | 화면을 주는 것 | `/api` | 쓰임 |
+|---|---|---|---|
+| **http://localhost** (80) | **nginx** (Step 4-1의 운영 설정과 같은 규칙) | nginx가 8080으로 전달 | **운영과 같은 구성**을 그대로 체험 |
+| http://localhost:8080 | Spring Boot (`FrontendResourceConfig`) | 같은 서버 | 지금까지처럼. nginx가 없어도 동작 |
+
+두 주소가 **같은 폴더**를 보므로, 배포·롤백을 한 번 하면 두 주소 모두 바뀝니다. 백엔드의 화면 서비스까지 끄고 nginx만 화면을 주게 하려면(운영과 완전히 같은 모양) 백엔드를 `EDUHUB_WEB_ROOT`를 빈 값으로 두고 실행합니다(Step 4-4). 그러면 8080은 API만 응답하고 화면은 404입니다.
+
+**① nginx 준비**
+
+1. nginx 공식 사이트의 Windows 배포판(zip)을 받아 `C:\nginx`에 풉니다 (받은 zip의 PGP 서명 확인은 Step 4-2의 사례)
+2. `C:\nginx\conf\nginx.conf`를 아래 내용으로 바꿉니다. **저장소 위치가 다르면 `C:/work/eduhub` 두 곳만** 내 경로로 바꿉니다 (nginx 설정에서는 Windows 경로도 `/`로 씁니다)
+
+```nginx
+# C:\nginx\conf\nginx.conf — EduHub 실습: run\web을 80번으로, /api는 8080 백엔드로 (규칙은 Step 4-1의 운영 설정과 같다)
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+
+    server {
+        listen       80;            # 80이 이미 쓰이고 있으면 8088 등으로 (아래 ③)
+        server_name  localhost;
+
+        # shell: 저장소의 run\web\shell (저장소 위치에 맞게)
+        root   "C:/work/eduhub/run/web/shell";
+        index  index.html;
+
+        # remote: /mfe/course/… → run\web\mfe\course\…
+        location /mfe/ {
+            root  "C:/work/eduhub/run/web";
+            location ~ /remoteEntry\.js$ { add_header Cache-Control "no-cache"; }
+            location ~ /assets/          { add_header Cache-Control "public, max-age=31536000, immutable"; }
+        }
+
+        location /assets/ {
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # API는 8080의 백엔드로 (같은 주소라 CORS가 필요 없다)
+        location /api/ {
+            proxy_pass         http://127.0.0.1:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+        }
+
+        # 화면 주소(/courses/1 등)는 shell의 index.html로 (새로고침 대비)
+        location / {
+            add_header Cache-Control "no-cache";
+            try_files  $uri $uri/ /index.html;
+        }
+    }
+}
+```
+
+**② 실행과 중지** (PowerShell, `C:\nginx`에서)
+
+```powershell
+cd C:\nginx
+.\nginx.exe -t                        # 설정 검사: "syntax is ok", "test is successful"
+start .\nginx.exe                     # 시작 (창이 뜨지 않고 백그라운드에서 돈다)
+.\nginx.exe -s reload                 # 설정을 바꾼 뒤 다시 읽기 (화면 배포에는 필요 없음)
+.\nginx.exe -s stop                   # 중지
+tasklist /fi "imagename eq nginx.exe" # 실행 중인지 (보통 2개: 관리 + 작업 프로세스)
+Get-Content .\logs\error.log -Tail 20 # 문제가 있을 때
+```
+
+- 백엔드는 지금처럼 `backend` 폴더에서 실행합니다 (Step 4-6). nginx는 백엔드보다 먼저 켜도 됩니다. 백엔드가 꺼져 있으면 화면은 뜨고 `/api`만 `502 Bad Gateway`입니다
+- 처음 실행할 때 **Windows 방화벽** 창이 뜨면, 실습용 PC라면 "개인 네트워크"만 허용합니다 (다른 PC에서 접속할 필요가 없으면 허용하지 않아도 localhost는 동작)
+
+**③ 80번 포트가 이미 쓰이고 있을 때**
+
+```powershell
+netstat -ano | findstr ":80 " | findstr LISTENING     # 마지막 숫자가 PID
+tasklist /fi "pid eq <PID>"
+```
+
+- PID `4`(System)이면 IIS나 Windows의 HTTP 서비스가 80을 쓰는 중입니다. 끄지 말고 nginx의 `listen`을 `8088` 같은 다른 포트로 바꾸고 `http://localhost:8088`로 확인합니다
+- 1024보다 작은 포트라도 Windows에서는 관리자 권한 없이 열 수 있지만, 회사 정책상 막혀 있으면 8088을 씁니다
+
+**④ 확인** (Step 4-6의 N1~N6을 `http://localhost`에서 한 번 더)
+
+| # | 할 일 | 기대 결과 |
+|---|---|---|
+| G1 | http://localhost 에서 5회차 6-2 확인 표 | 8080에서와 같은 결과 |
+| G2 | `/courses/1`에서 새로고침 | 상세 화면 그대로 (nginx의 `try_files`) |
+| G3 | `(Invoke-WebRequest -UseBasicParsing http://localhost/mfe/course/remoteEntry.js).Headers['Cache-Control']` | `no-cache` (해시 이름의 `assets/` 파일은 `public, max-age=31536000, immutable`) |
+| G4 | `deploy-frontend.ps1 -App course-mfe` (Step 4-5 그대로) → 두 주소 새로고침 | **nginx도 백엔드도 다시 시작하지 않고** 80과 8080 모두 바뀐 화면 |
+| G5 | `deploy-frontend.ps1 -App course-mfe -Rollback` | 두 주소 모두 이전 화면 |
+| G6 | 백엔드를 끄고 http://localhost/courses | 화면은 뜨고 데이터만 실패 (`/api` 502). 화면과 API가 분리된 것을 눈으로 확인 |
+
+> 💡 **7회차 자동 배포와의 관계**: 7-3의 워크플로우는 `FRONTEND_WEB_ROOT`(= `run\web`) 폴더를 교체하므로 nginx를 써도 **바꿀 것이 없습니다.** 스모크 테스트를 nginx 주소로 하고 싶으면 staging 환경 변수 `APP_URL`만 `http://localhost`로 바꿉니다.
+
+> ✅ 이 교재 환경(Linux, nginx 1.24)에서 위와 같은 규칙의 설정(경로만 Linux 형식)으로 확인했습니다: 80과 8080이 같은 `run/web`을 서비스, 두 주소 모두 브라우저 20단계 통과, 캐시 헤더(80·8080 같음), 배포 스크립트로 course-mfe 교체 → **두 주소 모두 즉시 새 버전, 롤백도 두 주소 동시에**(nginx·백엔드 재시작 없음), 백엔드 중지 시 80의 화면 200·`/api` 502, `EDUHUB_WEB_ROOT`를 빈 값으로 두면 8080 화면 404·API 200이고 80은 정상. ⚠️ Windows용 nginx로 이 설정 파일을 실행해 보지는 못했습니다 (Windows 경로를 `/`로 쓰는 것과 `start nginx`는 nginx Windows 문서의 방식).
+
 ---
 
 ## 4-4. 자주 겪는 문제
@@ -1854,7 +1971,11 @@ git commit -m "chore: 한 주소 배포 구성(run/web 서비스, build:deploy, 
 | (배포) `/courses/1`에서 새로고침하면 404 | `SpaForwardController`의 경로 목록에 그 화면 주소가 없음 |
 | (배포) 배포했는데 예전 화면 | 브라우저 캐시 → N4의 `no-cache` 확인, 강력 새로고침(Ctrl+F5) |
 | (배포) 화면 하나만 고쳤는데 백엔드를 다시 빌드해야 함, jar가 커짐 | 화면 파일을 `src/main/resources/static`에 넣음 → jar 밖 `run\web`으로 |
-| (참고) 회사 PC에서 `nginx.exe`가 `nginx -v`조차 멈춤 | 보안 프로그램이 서명 없는 실행 파일을 붙잡음 → Step 4-2의 사례. 실습은 nginx 없이 진행 |
+| (참고) 회사 PC에서 `nginx.exe`가 `nginx -v`조차 멈춤 | 보안 프로그램이 서명 없는 실행 파일을 붙잡음 → Step 4-2의 사례. **보안 프로그램을 끄지 말고** IT에 예외 등록 요청, 허용 전까지는 8080으로 실습 |
+| (nginx) http://localhost 가 `403 Forbidden` 또는 `404` | `root` 경로가 실제 `run\web\shell`과 다름(저장소 위치 확인, `/`로 썼는지), 또는 아직 배포 전 → `logs\error.log`에 찾으려 한 경로가 나온다 |
+| (nginx) 화면은 뜨는데 데이터가 안 나오고 `/api`가 `502 Bad Gateway` | 백엔드(8080)가 꺼져 있음 → Step 4-6처럼 실행 |
+| (nginx) `bind() to 0.0.0.0:80 failed` | 80을 다른 프로그램이 사용 중 → Step 4-7 ③, `listen 8088`로 |
+| (nginx) 설정을 바꿨는데 그대로 | `.\nginx.exe -s reload`를 안 함 (화면 배포에는 필요 없고, nginx.conf를 바꿨을 때만) |
 | 워크트리에서 백엔드 연결 실패 | 워크트리에 `.env`가 없음. 필요한 파일을 복사하거나 `.worktreeinclude` 설정 확인 |
 | 두 세션이 같은 파일을 고쳐 병합 충돌 | 공통 파일 작업을 Step 1에서 먼저 끝내지 않음. 충돌 해결 후 다음부터 순서 지키기 |
 | 사용량이 평소보다 빨리 소진 | 병렬 세션은 각자 사용. 끝난 세션은 정리하고 병렬 수를 줄인다 |

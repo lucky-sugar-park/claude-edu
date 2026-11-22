@@ -916,7 +916,7 @@ jobs:
 5. **Environment variables**에 등록
    - `BACKEND_ROOT`: 스테이징 PC의 백엔드 폴더 (예: `C:\eduhub-staging\backend`)
    - `FRONTEND_WEB_ROOT`: 화면 폴더 (예: `C:\eduhub-staging\web`. 백엔드 배포가 이 값을 백엔드 설정에도 넣는다)
-   - `APP_URL`: 스모크 테스트 주소 (예: `http://localhost:8080`)
+   - `APP_URL`: 스모크 테스트 주소 (예: `http://localhost:8080`. 6회차 Step 4-7처럼 nginx를 함께 쓰면 `http://localhost`)
 
 > ⚠️ 비공개 저장소에서 Environments의 필수 승인자를 쓸 수 있는지도 요금제에 따라 다를 수 있습니다 (GitHub 문서 확인 필요). 쓸 수 없으면 배포 워크플로우를 **수동 실행(`workflow_dispatch`) 전용**으로 만들고, 실행 권한을 가진 사람이 승인 역할을 합니다.
 
