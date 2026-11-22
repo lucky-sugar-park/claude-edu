@@ -243,26 +243,36 @@ flowchart TB
 | **버전** | 도구의 입력·결과 형식을 바꾸면 버전을 올리고 변경 기록 | 그 도구를 쓰는 에이전트·프롬프트가 조용히 깨지지 않게 |
 | **테스트** | 계약 테스트(입력 검사·결과 형식), **평가 질문 세트**("1라인 지금 어때?" → 이 도구를 고르고 이 값을 답하는가) | 도구가 많아질수록 "에이전트가 올바른 도구를 고르는가"가 품질의 핵심 |
 
-### ③ 키트로 만든 도구는 이렇게 생긴다 (설계 예시)
+### ③ 예시: 실제로 만든 키트 `mfg-tool-kit`
 
-예제 34의 [`ToolSupport`](../examples/34-manufacturing-ai-agent-mcp.md#6-5-공통-도우미-toolsupportjava)(결과·오류 만들기, 인자 꺼내기)가 바로 키트의 씨앗입니다. 팀마다 이것을 복사해 쓰는 대신, 플랫폼 팀이 규칙까지 넣어 **라이브러리로** 배포합니다.
+예제 34의 [`ToolSupport`](../examples/34-manufacturing-ai-agent-mcp.md#6-5-공통-도우미-toolsupportjava)(결과·오류 만들기, 인자 꺼내기)가 바로 키트의 씨앗입니다. 팀마다 이것을 복사해 쓰는 대신, 플랫폼 팀이 규칙까지 넣어 **라이브러리로** 배포합니다. 이 교재에는 MCP Java SDK 위에 만든 **실행되는 키트와, 그것으로 만든 생산팀 도구 서버**가 있습니다 → [예제 36: mfg-tool-kit](../examples/36-mfg-tool-kit.md).
 
 ```java
-// 설계 예시 (개념 코드): 키트(mfg-tool-kit)를 쓰는 생산팀의 도구 하나
-// 키트가 대신 해 주는 것: 이름 규칙 검사, 설명 4요소 검사, 라인 ID 형식 검사, 읽기 전용 표시,
-//                      결과를 {data, meta} 형식으로, 건수 제한, 감사 로그, 예외 → isError 결과
+// 생산팀이 키트로 만드는 도구 하나 (예제 36의 MesLineTools.java)
+// 키트가 대신 해 주는 것: 이름 규칙 검사, 설명 4요소 검사·조립, 라인 ID 형식 검사, 읽기 전용 표시,
+//                      결과를 {data, meta} 형식으로, 건수 제한, 마스킹, 감사 로그, 예외 → 표준 오류
 SyncToolSpecification lineStatus = MfgTool.readOnly("mes_get_line_status")
         .title("생산 라인 현황")
-        .returns("진행 중 작업지시, 오늘 양품·불량 수량과 불량률, 설비별 상태, 오늘 비가동 시간")
-        .whenToUse("'지금 1라인 어때?', '2라인 설비 멈췄어?' 같은 질문")
-        .param(MfgParams.lineId())                       // 공통 입력 타입 (형식 검사 포함)
-        .units(Map.of("downtime", "분", "defectRate", "%"))
+        .returns("라인 하나의 오늘 양품·불량 수량, 불량률, 비가동 시간")
+        .whenToUse("'지금 1라인 어때?', '오늘 2라인 불량률은?' 같은 질문")
+        .param(MfgParams.lineId())                        // 공통 입력 타입 (형식 검사 포함)
+        .units(Map.of("todayDefectRate", "%", "todayDowntime", "분"))
         .source("MES")
-        .handler(args -> mesDb.lineStatus(args.lineId())) // 팀이 쓰는 것은 업무 로직뿐
+        .handler(args -> mes.lineStatus(args.lineId()))   // 팀이 쓰는 것은 업무 로직뿐
         .build();
 ```
 
-> 💡 위 코드는 키트의 **모양을 보여 주는 설계 예시**이며 실행해 본 코드가 아닙니다 (`MfgTool`, `MfgParams`는 플랫폼 팀이 만들 키트의 가상 API). 실제로 동작하는 도구 코드는 예제 34의 6장에 있고, 키트는 그 공통 부분을 모아 규칙을 더한 것입니다.
+에이전트가 받는 결과 (실제 실행):
+
+```json
+{"data":{"lineId":"L1","lineName":"조립 1라인","todayGoodQty":631,"todayDefectQty":20,"todayDefectRate":3.1,"todayDowntime":40},
+ "meta":{"tool":"mes_get_line_status","source":"MES","asOf":"2026-11-22T21:50:51+09:00","units":{"todayDefectRate":"%","todayDowntime":"분"}}}
+```
+
+- 표준을 어긴 도구(`updateLineSpeed`, 설명 없음)는 **만드는 순간 실패**하고, 원가 같은 필드는 `mask(...)`로 `"***"`, 긴 목록은 `maxRows`로 잘리고, 모든 호출이 감사 로그에 남습니다
+- MCP 통신·입력 스키마 검사·서버 실행은 MCP Java SDK가 그대로 합니다. 키트는 그 위에 회사 규칙만 얹습니다
+
+> ✅ 예제 36의 키트(테스트 6개)와 도구 서버(표준 강제 테스트 2개)를 교재 환경에서 빌드하고, 실제 MCP 클라이언트로 stdio 연결해 도구 목록·호출·오류·감사 로그를 확인했습니다 (Java 21, MCP Java SDK 2.1.0).
 
 ### ④ 표준을 지키게 하는 법: 7회차 6단계 장치를 그대로
 
@@ -272,7 +282,7 @@ SyncToolSpecification lineStatus = MfgTool.readOnly("mes_get_line_status")
 | ② 스킬 | `mfg-tool` 스킬: 새 도구 만들기 절차, 설명 작성법, 템플릿 |
 | ③ 참조 코드 | 플랫폼 팀이 만든 모범 도구 하나 (예: `mes_get_line_status`) |
 | ④ 소스·문서 | 키트 소스와 사용 문서 (7회차처럼 소스를 Claude가 읽을 수 있게) |
-| ⑤ 강제 | ArchUnit: "도구 클래스는 `MfgTool`로만 만든다", "DB는 읽기 전용 DataSource만"; CI의 계약 테스트·평가 질문 세트 |
+| ⑤ 강제 | ArchUnit: "도구는 `MfgTool`로만 만든다(MCP SDK의 `Tool`·`CallToolResult` 직접 사용 금지)", "`System.out` 금지" (예제 36의 `ToolKitRulesTest`), "DB는 읽기 전용 DataSource만"; CI의 계약 테스트·평가 질문 세트 |
 | ⑥ 배포 | 키트는 사내 저장소(없으면 7회차 예제 35의 방법), 스킬·CLAUDE.md는 **플러그인**(6회차)으로 각 팀에 |
 
 여기에 **승인된 도구 서버 목록**(어떤 MCP 서버를 어떤 에이전트가 쓸 수 있는지)을 더하면 3장의 거버넌스와 이어집니다.
