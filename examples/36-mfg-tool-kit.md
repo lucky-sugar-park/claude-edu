@@ -969,7 +969,28 @@ public class SmokeTest {
 
 </details>
 
-Claude Code에 등록하는 방법은 예제 34와 같습니다 ([7장](./34-manufacturing-ai-agent-mcp.md#7-claude-code또는-다른-mcp-클라이언트에-등록하기)): `claude mcp add mes-tools -- java -jar <경로>/mes-line-tools.jar`.
+Claude Code에 등록하는 방법은 예제 34와 같습니다 ([7장](./34-manufacturing-ai-agent-mcp.md#7-claude-code또는-다른-mcp-클라이언트에-등록하기)). 키트가 이름 규칙을 지키게 하므로 권한 규칙도 `mcp__<서버>__<시스템>_…` 모양으로 일정해집니다.
+
+```json
+{
+  "mcpServers": {
+    "mes-tools": {
+      "type": "stdio",
+      "command": "java",
+      "args": ["-Dstderr.encoding=UTF-8", "-jar", "tools/mes-line-tools/build/libs/mes-line-tools.jar"],
+      "env": { "MFG_AUDIT_LOG": "${MFG_AUDIT_LOG}" }
+    }
+  }
+}
+```
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__mes-tools__mes_get_line_status", "mcp__mes-tools__mes_list_defects", "mcp__mes-tools__mes_get_work_order"]
+  }
+}
+```
 
 ---
 
