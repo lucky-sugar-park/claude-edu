@@ -14,10 +14,10 @@
 > **관련 모듈**: 16(사내 커스텀 프레임워크 적용), 19(토큰 사용량 최적화) + EduHub CI/CD
 > **사전 준비**
 > - 6회차 과제 PR이 `main`에 병합되어 있을 것 (MFE 분리, 알림, **한 주소 배포 구성**)
-> - **스테이징 PC**(팀에 한 대, 수업 중 켜 둘 Windows PC): 백엔드를 dev 프로필로 실행하고 화면 폴더(예: `C:\eduhub-staging\web`)를 `EDUHUB_WEB_ROOT`로 지정 ([6회차 Step 4](./session-06-plugins-artifacts-mfe.md#step-4-한-주소로-배포하기-운영-구성과-실습-구성)), Git for Windows 설치. 7-3의 자동 배포가 이 PC에서 실행됩니다
+> - **스테이징 PC**(팀에 한 대, 수업 중 켜 둘 Windows PC): JDK 21, Git for Windows, 스테이징 DB(이 PC의 PostgreSQL 또는 강사가 제공하는 교육용 DB). 백엔드(7-2)와 화면(7-3, [6회차 Step 4](./session-06-plugins-artifacts-mfe.md#step-4-한-주소로-배포하기-운영-구성과-실습-구성)의 구성)의 자동 배포가 이 PC에서 실행됩니다
 > - GitHub 저장소의 **Settings에 접근할 수 있는 권한**(팀에서 한 명 이상, 보통 저장소 관리자)
 > - 로컬에서 `cd backend && ./gradlew test`, `cd frontend && npm test`가 통과하는 상태
-> - Docker Desktop 실행 (Testcontainers, 이미지 빌드 확인용)
+> - (Testcontainers를 쓰는 팀) 로컬에 Docker Desktop. 스테이징 배포에는 Docker를 쓰지 않습니다
 > 🖥️ **슬라이드 덱(38장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
@@ -197,7 +197,7 @@ jobs:
 | 도구 준비 | `setup-java` 등이 매번 내려받음 | 인터넷이 막혀 있으면 JDK·Node 등을 **러너 PC에 미리 설치** |
 | 관리 | GitHub | 우리 팀 (러너 업데이트, 작업 폴더 정리, 계정 권한) |
 
-> ⚠️ self-hosted runner는 **비공개 저장소에서만** 씁니다 (공개 저장소에서는 누구나 PR로 우리 PC에서 코드를 실행시킬 수 있다). 사내 프록시가 있으면 러너에 프록시를 설정해야 하고, `actions/checkout` 같은 action도 러너가 GitHub에서 내려받으므로 `github.com` 접속이 막혀 있으면 동작하지 않습니다. actionlint를 쓰면 `.github/actionlint.yaml`에 이름표(`eduhub-ci`)를 등록합니다. 실제 러너 설치와 배포 예는 [7-3](#7-3-프론트엔드를-스테이징-pc에-자동-배포-self-hosted-runner)에서 합니다.
+> ⚠️ self-hosted runner는 **비공개 저장소에서만** 씁니다 (공개 저장소에서는 누구나 PR로 우리 PC에서 코드를 실행시킬 수 있다). 사내 프록시가 있으면 러너에 프록시를 설정해야 하고, `actions/checkout` 같은 action도 러너가 GitHub에서 내려받으므로 `github.com` 접속이 막혀 있으면 동작하지 않습니다. actionlint를 쓰면 `.github/actionlint.yaml`에 이름표(`eduhub-ci`)를 등록합니다. 실제 러너 설치는 [7-1](#7-1-github-환경과-스테이징-pc-준비-사람이-직접), 배포 예는 7-2(백엔드)와 7-3(프론트)에서 합니다.
 
 **Jenkins란**
 
@@ -279,21 +279,21 @@ flowchart TD
     end
     CI --> REV{"동료 리뷰 승인<br/>+ 필수 체크 통과"}
     REV -- "Squash merge" --> MAIN["main"]
-    MAIN --> IMG["이미지 빌드<br/>커밋 SHA 태그"]
+    MAIN --> IMG["jar 빌드 (한 번)<br/>eduhub-커밋SHA.jar"]
     IMG --> APPROVE{"👤 스테이징 배포 승인<br/>(필수 승인자)"}
     APPROVE --> STG["스테이징 배포<br/>+ 스모크 테스트"]
     STG -. "이번 과정에서는 하지 않음" .-> PROD["운영 배포<br/>(사람 승인 + 파이프라인만)"]
-    STG -. "문제 발생" .-> RB["롤백: 이전 태그로 재배포<br/>(런북대로 사람이 실행 가능)"]
+    STG -. "문제 발생" .-> RB["롤백: 보관된 이전 jar로<br/>(런북대로 사람이 실행 가능)"]
 ```
 
 | 단계 | 자동/수동 | EduHub에서 지킬 것 |
 |---|---|---|
 | CI | 자동 | 10분 이내. 실패하면 병합 불가 (**필수 상태 체크**) |
 | 리뷰·병합 | 사람 | 동료 리뷰 1명 이상, Squash merge |
-| 이미지 빌드 | 자동 | **한 번 빌드한 이미지**를 모든 환경에 그대로. 환경마다 다시 빌드하지 않음 |
-| 스테이징 배포 | **사람 승인 후 자동** | GitHub Environments의 필수 승인자 |
-| 운영 배포 | 사람 승인 + 파이프라인 | 이번 과정에서는 구조만 설계하고 실행하지 않음 |
-| 롤백 | 사람이 실행 가능 | 런북의 명령 그대로, 이전 이미지 태그로 재배포 |
+| 백엔드 빌드 | 자동 | **한 번 빌드한 jar**(운영에서는 보통 컨테이너 이미지)를 모든 환경에 그대로. 환경마다 다시 빌드하지 않음 (7-0) |
+| 스테이징 배포 | **사람 승인 후 자동** | GitHub Environments의 필수 승인자, 스테이징 PC의 self-hosted runner가 실행 (7-1, 7-2) |
+| 운영 배포 | 사람 승인 + 파이프라인 | 이번 과정에서는 구조만 설계하고 실행하지 않음 (`production` 환경과 운영 러너, 7-0) |
+| 롤백 | 사람이 실행 가능 | 런북의 명령 그대로, 스테이징 PC에 보관된 이전 jar로 (`-Rollback`, `-Version`) |
 | 프론트(MFE) 배포 | **사람 승인 후 자동** | **바뀐 앱만** 빌드해 화면 폴더를 교체(6회차 Step 4의 스크립트, 운영에서는 웹 서버의 폴더), 직전 버전은 보관해 롤백 (7-3) |
 
 ---
@@ -302,7 +302,7 @@ flowchart TD
 
 | 일 | Claude Code | 사람 |
 |---|---|---|
-| 워크플로우·Dockerfile·배포 스크립트 **작성** | ⭕ Plan 모드로 계획 후 작은 단위로 | 계획 검토, diff 리뷰 |
+| 워크플로우·배포 스크립트 **작성** | ⭕ Plan 모드로 계획 후 작은 단위로 | 계획 검토, diff 리뷰 |
 | CI 실패 **원인 분석** | ⭕ 로그 요약, 수정 제안 | 수정 여부 판단 |
 | 저장소 **설정**(보호 규칙, Environments, 시크릿 등록) | ✕ | ⭕ GitHub 화면에서 직접 |
 | 스테이징·운영 배포 **승인** | ✕ | ⭕ |
@@ -356,8 +356,8 @@ flowchart LR
 | 런북 절 | 내용 | 확인 방법 |
 |---|---|---|
 | 로컬 빌드 | 백엔드·프론트 빌드와 테스트 명령 | 팀원이 문서만 보고 실행 |
-| 배포 | 이미지 태그 확인 → 배포 워크플로우 실행(또는 `scripts/deploy.sh`) → 스모크 테스트 | 스테이징에서 한 번 실행 |
-| 롤백 | 이전 태그 찾기 → 그 태그로 재배포 | 스테이징에서 한 번 실행 |
+| 배포 | 배포할 버전(커밋 SHA) 확인 → 배포 워크플로우 승인(또는 스테이징 PC에서 `scripts\deploy-backend.ps1`) → 스모크 테스트 | 스테이징에서 한 번 실행 |
+| 롤백 | `previous.txt`·`deploy-history.log`로 이전 버전 확인 → `-Rollback`(한 단계) 또는 `-Version <버전>` | 스테이징에서 한 번 실행 |
 | 수동 핫픽스 | `hotfix/*` 브랜치 → 최소 수정 → 로컬 빌드·테스트 → 긴급 리뷰 → 병합 → 배포 | 8주차 "AI 없이 핫픽스 훈련"에서 사용 |
 | 연락처·권한 | 승인자, 시크릿 관리자, 장애 연락 경로 | — |
 
@@ -522,7 +522,7 @@ git switch -c chore/ci-pipeline
 - frontend 잡: Node LTS, npm 캐시, npm ci → npm run lint → npm test -- --ci → npm run build
 - 최상단 permissions: contents: read, 같은 브랜치 중복 실행 취소(concurrency)
 - 서비스 계층 커버리지 70% 미만이면 실패하도록 JaCoCo 설정
-[하지 않는 것] 배포, 이미지 빌드, Claude 자동 리뷰 (다음 단계와 다음 주에 한다)
+[하지 않는 것] 배포, 배포용 jar 빌드, Claude 자동 리뷰 (다음 단계와 다음 주에 한다)
 [완료 기준] 로컬에서 같은 명령(./gradlew spotlessCheck test jacocoTestCoverageVerification, npm ci && npm run lint && npm test -- --ci && npm run build)이 통과
 [진행 방식] 만들 파일 목록, 잡 구조, 바꿀 build.gradle.kts 부분만 먼저 보여줘. 외부 액션은 이름과 버전을 표로 정리해줘.
 ```
@@ -683,8 +683,8 @@ CI가 한 번 성공한 뒤에 설정합니다 (체크 이름이 목록에 나�
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Bash(./scripts/deploy.sh prod*)",
-      "Edit(./.github/workflows/deploy.yml)"
+      "Bash(*deploy-backend*)",
+      "Bash(*deploy-frontend*)"
     ],
     "ask": [
       "Edit(./.github/workflows/**)",
@@ -706,46 +706,540 @@ CI가 한 번 성공한 뒤에 설정합니다 (체크 이름이 목록에 나�
 
 ## Step 7. 승인 후에만 실행되는 스테이징 배포
 
-### 7-1. GitHub에서 환경 만들기 (사람이 직접)
+### 7-0. 운영에서는 이렇게: 한 번 빌드한 결과물을 스테이징 → 운영으로
+
+실습에 들어가기 전에, 실제 운영에서 흔히 쓰는 구성을 먼저 봅니다. 백엔드는 **컨테이너 이미지**로 한 번 만들고, 같은 이미지를 **스테이징에서 확인한 뒤 운영으로** 내보냅니다. 각 환경에는 그 환경 안에 설치한 **self-hosted runner**(또는 운영 쪽 배포 도구)가 있어, GitHub가 사내망 안으로 들어오지 않습니다.
+
+```mermaid
+flowchart LR
+    M["main 병합"] --> B["build (클라우드 러너)<br/>컨테이너 이미지 :커밋 SHA"]
+    B --> REG[("이미지 레지스트리<br/>ghcr.io · 사내 레지스트리")]
+    REG --> AS{"👤 staging 승인<br/>(Environment: staging)"}
+    subgraph STG["스테이징 망"]
+        RS["러너 labels: eduhub-staging"] --> SS["스테이징 서버<br/>docker · Kubernetes"]
+    end
+    AS --> RS
+    SS --> AP{"👤 production 승인<br/>(Environment: production)"}
+    subgraph PRD["운영 망"]
+        RP["러너 labels: eduhub-prod"] --> PS["운영 서버 여러 대"]
+    end
+    AP --> RP
+    SS -. "문제 발생" .-> RB["이전 이미지 태그로 재배포"]
+```
+
+| 구성 요소 | 맡는 일 |
+|---|---|
+| **컨테이너 이미지** | jar와 JDK, 실행 설정까지 한 덩어리. 어느 서버에서도 똑같이 실행된다. 태그는 커밋 SHA |
+| **이미지 레지스트리** | 이미지를 버전별로 보관. 롤백 = 이전 태그로 다시 실행 |
+| **Environments** (`staging`, `production`) | 환경마다 **필수 승인자, 비밀 값(Secrets), 변수(Variables), 배포 가능한 브랜치**가 따로. 잡에 `environment:`를 쓰면 그 환경의 승인과 값이 적용된다 |
+| **러너 이름표** (`eduhub-staging`, `eduhub-prod`) | 어느 환경의 러너에서 실행할지 고른다 (아래 질문 참고) |
+| **승격(promotion)** | `deploy-production`은 `needs: deploy-staging` → 스테이징에서 확인한 **같은 이미지**만 운영으로 |
+
+**질문: self-hosted runner를 내려받아 실행할 때, 스테이징용·운영용을 골라서 쓸 수 있나?**
+
+네. 러너를 **등록할 때 붙이는 이름표(label)**로 구분하고, 워크플로우의 `runs-on`이 그 이름표로 러너를 고릅니다.
+
+```powershell
+# 스테이징 서버(또는 스테이징 PC)에서 — 러너 폴더에서 실행 (토큰은 Settings → Actions → Runners → New self-hosted runner 화면에 나온다)
+.\config.cmd --url https://github.com/<조직>/<저장소> --token <등록 토큰> --name staging-01 --labels eduhub-staging --runasservice
+# 운영 서버에서 — 다른 컴퓨터, 다른 이름표
+.\config.cmd --url https://github.com/<조직>/<저장소> --token <등록 토큰> --name prod-01 --labels eduhub-prod --runasservice
+```
+
+```yaml
+jobs:
+  deploy-staging:
+    runs-on: [self-hosted, windows, eduhub-staging]   # 이 이름표가 붙은 러너만 이 잡을 받는다
+    environment: staging
+  deploy-production:
+    needs: deploy-staging
+    runs-on: [self-hosted, windows, eduhub-prod]
+    environment: production
+```
+
+- 이름표는 등록할 때 묻는 질문에 답하거나 `--labels`로 주고, 나중에 **Settings → Actions → Runners → 러너 선택**에서 더하거나 뺄 수 있습니다. `self-hosted`, `windows`, `x64`는 자동으로 붙습니다
+- **러너 하나에 두 이름표를 다 붙이면** 스테이징·운영 잡을 모두 받으므로 구분이 안 됩니다. 환경마다 **다른 컴퓨터에 따로** 설치하는 것이 기본입니다 (한 컴퓨터에 폴더를 나눠 두 개 등록할 수도 있지만, 운영과 스테이징이 같은 컴퓨터에 있게 되므로 권하지 않습니다)
+- ⚠️ **이름표는 고르는 수단이지 보안 장치가 아닙니다.** 워크플로우 파일을 고칠 수 있는 사람은 누구나 `runs-on: [self-hosted, eduhub-prod]`라고 쓸 수 있습니다. 그래서 운영에서는 함께 씁니다: `production` 환경의 **필수 승인자와 비밀 값**(승인 전에는 비밀 값이 전달되지 않음), 조직의 **러너 그룹**으로 운영 러너를 쓸 수 있는 저장소·워크플로우 제한(요금제에 따라 다름), `.github/workflows/`의 CODEOWNERS 리뷰, 운영 러너는 전용 계정·최소 권한
+
+**실습은 이렇게 합니다: jar + 스테이징 PC 한 대**
+
+| | 운영 (위 그림) | 실습 (7-1 ~ 7-3) |
+|---|---|---|
+| 결과물 | 컨테이너 이미지 | **jar** (`eduhub-<커밋 SHA 12자리>.jar`) |
+| 보관 | 이미지 레지스트리 | 스테이징 PC의 `releases\` 폴더(최근 5개) + Actions 결과물(30일) |
+| 실행 | docker · Kubernetes | Windows **작업 스케줄러**가 `java -jar current.jar` 실행 |
+| 환경 | `staging` → `production` (러너·승인 따로) | `staging` 하나 (러너 이름표 `eduhub-staging`) |
+| 롤백 | 이전 이미지 태그로 | 보관된 이전 jar로 (`-Rollback`, `-Version`) |
+| 비밀 값 | Environment 시크릿 → 컨테이너 환경 변수 | Environment 시크릿 → 스테이징 PC의 설정 파일 |
+
+> 💡 **왜 실습에서 Docker를 쓰지 않나**: 회사 Windows PC에서 Docker Desktop은 WSL2·가상화 설정이 필요하고, 일정 규모 이상의 회사는 유료 구독이며, 보안 정책상 설치할 수 없는 경우도 많습니다(6회차에서 nginx를 실습에서 뺀 것과 같은 이유). **한 번 빌드·승인·같은 결과물 배포·한 단계 롤백**이라는 핵심은 jar로도 똑같이 익힐 수 있고, 운영에서는 결과물과 실행 방식만 바뀝니다.
+
+### 7-1. GitHub 환경과 스테이징 PC 준비 (사람이 직접)
+
+**① `staging` 환경 만들기**
 
 1. **Settings** → **Environments** → **New environment** → 이름 `staging`
 2. **Required reviewers**에 팀원 1~2명 지정
 3. 배포 가능한 브랜치를 `main`으로 제한
-4. **Environment secrets**에 스테이징 접속 정보 등록 (강사가 제공하는 교육용 값. 운영 값은 절대 쓰지 않음)
+4. **Environment secrets**에 스테이징 값 등록 (강사가 제공하는 교육용 값. 운영 값은 절대 쓰지 않음). 이름은 Step 6의 `application-staging.yml` 변수와 같게
+   - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`: 스테이징 DB
+   - `EDUHUB_JWT_SECRET`: 32바이트 이상의 임의 문자열
+5. **Environment variables**에 등록
+   - `BACKEND_ROOT`: 스테이징 PC의 백엔드 폴더 (예: `C:\eduhub-staging\backend`)
+   - `FRONTEND_WEB_ROOT`: 화면 폴더 (예: `C:\eduhub-staging\web`. 백엔드 배포가 이 값을 백엔드 설정에도 넣는다)
+   - `APP_URL`: 스모크 테스트 주소 (예: `http://localhost:8080`)
 
 > ⚠️ 비공개 저장소에서 Environments의 필수 승인자를 쓸 수 있는지도 요금제에 따라 다를 수 있습니다 (GitHub 문서 확인 필요). 쓸 수 없으면 배포 워크플로우를 **수동 실행(`workflow_dispatch`) 전용**으로 만들고, 실행 권한을 가진 사람이 승인 역할을 합니다.
 
-### 7-2. 배포 워크플로우 작성 (Claude + 리뷰)
+**② 스테이징 PC에 self-hosted runner 설치**
+
+**왜 self-hosted runner인가**: GitHub가 제공하는 러너(`ubuntu-latest` 등)는 인터넷 위의 임시 컴퓨터라 **사내 PC에 jar를 놓고 실행하거나 화면 폴더를 바꿀 수 없습니다.** 스테이징 PC에 러너 프로그램을 설치하면, 그 PC가 GitHub에 **먼저 접속해 일감을 받아 오므로**(바깥으로 나가는 HTTPS만 사용) 방화벽에 들어오는 포트를 열 필요가 없습니다. 빌드는 GitHub의 러너에서 하고, **배포(파일 교체·재시작)만** 이 PC에서 합니다.
+
+1. 스테이징 PC에서 저장소 **Settings** → **Actions** → **Runners** → **New self-hosted runner** → **Windows**, **x64**
+2. 화면에 나온 명령을 PowerShell에서 그대로 실행합니다 (러너 내려받기 → `.\config.cmd --url … --token …`). 설정 중 질문에서
+   - **labels**에 `eduhub-staging` 추가 (워크플로우가 이 이름표로 이 PC를 고른다. 7-0의 질문 참고)
+   - **서비스로 실행**: 예. 실행 계정은 `C:\eduhub-staging` 아래에만 쓰기 권한이 있는 **전용 계정**(예: `eduhub-runner`)을 권장 (관리자 계정 ✕)
+3. **Runners** 목록에서 상태가 **Idle**(초록)인지 확인
+4. 이 PC에서 저장소의 `.ps1`이 실행되도록 실행 정책 확인: `Get-ExecutionPolicy -List` (Windows PC의 기본값은 스크립트를 막는 경우가 많다. 팀이 판단해 `RemoteSigned` 등으로)
+
+> ⚠️ **self-hosted runner의 보안**: 러너는 그 PC에서 **워크플로우의 명령을 그대로 실행**합니다. GitHub 문서는 **공개 저장소에는 self-hosted runner를 쓰지 말라**고 안내합니다(누구나 PR로 코드를 실행시킬 수 있다). EduHub는 비공개 저장소이고, 배포 워크플로우는 `main`에 대한 push와 수동 실행에서만 돌며, 배포 잡은 `staging` 승인을 거칩니다. 러너 PC에는 운영 비밀을 두지 않습니다.
+
+**③ 백엔드를 실행할 작업 등록 (한 번만)**
+
+1. 스테이징 PC에 **JDK 21** 설치 (`java -version`으로 확인)와 스테이징 DB 준비 (스테이징 PC의 PostgreSQL 또는 강사가 제공하는 교육용 DB)
+2. 6회차에서 손으로 띄워 둔 백엔드가 있으면 끕니다 (8080을 함께 쓸 수 없다)
+3. **관리자 PowerShell**에서 저장소의 `scripts\register-backend-task.ps1`을 실행합니다 (7-2에서 Claude와 함께 만든 뒤 실행해도 된다)
+
+```powershell
+.\scripts\register-backend-task.ps1 -Root C:\eduhub-staging\backend -User eduhub-runner
+```
+
+작업 스케줄러에 `EduHubBackend` 작업이 생기고, PC가 켜지면 `java -jar C:\eduhub-staging\backend\current.jar --spring.profiles.active=staging`을 실행합니다(죽으면 1분 뒤 다시 시작). 처음에는 jar가 없으므로 7-2의 첫 배포가 jar를 놓고 작업을 시작합니다.
+
+> 💡 **왜 작업 스케줄러인가**: 러너가 실행한 프로세스는 **잡이 끝나면 함께 정리**됩니다. 그래서 배포 잡이 `java -jar`를 직접 띄우면 배포가 끝나는 순간 백엔드도 꺼집니다. Windows 기본 기능인 작업 스케줄러가 백엔드를 실행하면 잡과 상관없이 계속 돌고, PC를 재시작해도 다시 켜집니다. 별도 프로그램(서비스 래퍼 등)을 설치하지 않아도 됩니다.
+
+### 7-2. 백엔드 배포 워크플로우 작성 (Claude + 리뷰)
 
 새 브랜치 `chore/staging-deploy`에서 Plan 모드로 지시합니다.
 
 ```text
-[목표] main에 병합되면 백엔드 이미지를 한 번 빌드하고, 사람 승인 후 스테이징에 배포하는 워크플로우를 만들려고 해.
-[위치] .github/workflows/deploy.yml (새 파일), backend/Dockerfile (새 파일), scripts/deploy.sh (새 파일)
+[목표] main에 backend가 바뀌어 병합되면 jar를 한 번 빌드하고, 사람 승인 후 스테이징 PC에 배포하는 워크플로우를 만들려고 해
+[위치] .github/workflows/deploy-backend.yml, scripts/deploy-backend.ps1, scripts/register-backend-task.ps1 (모두 새 파일)
 [범위]
-- build-image 잡: backend 멀티 스테이지 Dockerfile, 이미지 태그는 커밋 SHA 앞 12자리, GitHub Container Registry(ghcr.io)에 푸시
-- deploy-staging 잡: environment: staging (필수 승인자 설정됨), scripts/deploy.sh staging <태그> 실행 후 스모크 테스트(/api/health)
-- workflow_dispatch 입력 image_tag: 롤백할 때 이전 태그로 재배포
-- scripts/deploy.sh: 사람이 로컬에서도 같은 명령으로 실행할 수 있게. 환경 이름이 staging이 아니면 즉시 실패
-- 권한은 잡별 최소 권한 (packages: write는 build-image에만)
-[하지 않는 것] 운영(production) 배포 잡, 운영 시크릿
-[완료 기준] 로컬에서 docker build 성공, scripts/deploy.sh에 --dry-run 옵션으로 실행할 명령을 출력
-[진행 방식] 계획과 각 잡의 권한 표를 먼저 보여줘
+- build 잡(ubuntu): bootJar → eduhub-<커밋 SHA 앞 12자리>.jar로 이름을 바꿔 결과물(backend-jar, 30일)로 업로드
+- deploy 잡: runs-on [self-hosted, windows, eduhub-staging], environment: staging (필수 승인자 설정됨).
+  결과물을 받아 deploy-backend.ps1 -Jar … -Root (staging 변수 BACKEND_ROOT) 실행 후 스모크 테스트(APP_URL의 /api/health, /api/v1/courses)
+- workflow_dispatch 입력: rollback(직전 버전으로), version(보관된 특정 버전으로). 둘 다 빌드 없이
+- deploy-backend.ps1: <Root>\releases에 버전별 jar 보관(최근 5개), 작업 스케줄러 작업 EduHubBackend를 멈추고 current.jar를
+  바꾼 뒤 다시 시작, /api/health가 응답하지 않으면 이전 버전과 이전 설정으로 자동 복구. 롤백은 한 단계만.
+  staging 비밀 값(DB_URL, DB_USERNAME, DB_PASSWORD, EDUHUB_JWT_SECRET)과 EDUHUB_WEB_ROOT가 넘어오면 <Root>\config\application.properties로 쓴다
+  (넘어오지 않으면 기존 파일 그대로 → 사람이 런북대로 실행할 때도 같은 스크립트)
+- register-backend-task.ps1: 사람이 한 번 실행. java -jar <Root>\current.jar --spring.profiles.active=staging, 작업 폴더 <Root>
+- 권한 최소(contents: read), 배포는 동시에 하나만(concurrency, 중간에 취소하지 않음), 입력값·비밀 값은 env로 넘긴다
+[하지 않는 것] 운영(production) 배포 잡, 운영 시크릿, Docker
+[완료 기준] actionlint 통과. Windows가 아니면 같은 순서의 bash 판(scripts/deploy-backend.sh)으로 배포·롤백·자동 복구를 실제로 실행해 본 결과 표
+[진행 방식] 잡 구성과 각 잡이 어디서(어느 러너) 도는지, 스테이징 PC의 폴더 구조를 먼저 보여줘
 ```
+
+**스테이징 PC의 폴더** (`BACKEND_ROOT`)
+
+```text
+C:\eduhub-staging\backend\
+  current.jar            ← 작업 스케줄러가 실행하는 jar (배포 때 교체)
+  current.txt            ← 지금 버전 (커밋 SHA 12자리)
+  previous.txt           ← 직전 버전 (-Rollback이 이리로 간다)
+  broken.txt             ← 마지막으로 실패했거나 롤백으로 내린 버전
+  releases\eduhub-<버전>.jar   ← 최근 5개 (+ 현재·직전은 항상 남김)
+  config\application.properties ← staging 비밀 값 (배포가 쓴다. 저장소에 없음)
+  logs\eduhub.log        ← 백엔드 로그
+  deploy-history.log     ← 언제 무엇을 배포·롤백했는지 한 줄씩
+```
+
+**기대하는 결과** — 아래 세 파일은 actionlint로 검사했고, 같은 순서의 bash 판으로 실제 백엔드(staging 프로필, PostgreSQL)를 배포·롤백했습니다 (끝의 ✅)
+
+<details>
+<summary>.github/workflows/deploy-backend.yml</summary>
+
+```yaml
+# .github/workflows/deploy-backend.yml — 백엔드 jar를 한 번 빌드하고, 사람 승인 후 스테이징 PC에 배포
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**', 'scripts/deploy-backend.ps1']
+  workflow_dispatch:
+    inputs:
+      rollback:
+        description: '빌드하지 않고 스테이징 PC에 보관된 직전 버전으로 되돌리기'
+        type: boolean
+        default: false
+      version:
+        description: '빌드하지 않고 보관된 특정 버전(커밋 SHA 앞 12자리)으로 배포 (두 단계 이상 전으로 갈 때)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-staging
+  cancel-in-progress: false            # 배포 도중에 끊지 않는다
+
+jobs:
+  build:
+    # 롤백·특정 버전 배포는 빌드하지 않는다
+    if: ${{ !inputs.rollback && inputs.version == '' }}
+    runs-on: ubuntu-latest             # 빌드는 GitHub 클라우드 러너 (테스트는 PR의 CI가 이미 통과)
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - id: ver
+        run: echo "version=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - name: Build jar (eduhub-<커밋 SHA 12자리>.jar)
+        working-directory: backend
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          ./gradlew bootJar
+          mkdir -p ../dist
+          jar=$(find build/libs -name '*.jar' ! -name '*-plain.jar' | head -n 1)
+          cp "$jar" "../dist/eduhub-$VERSION.jar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: dist/*.jar
+          retention-days: 30
+
+  deploy:
+    needs: build
+    # 빌드가 성공했거나, 롤백·특정 버전이라 빌드를 건너뛴 경우
+    if: >-
+      always() &&
+      (needs.build.result == 'success' || (needs.build.result == 'skipped' && (inputs.rollback || inputs.version != '')))
+    runs-on: [self-hosted, windows, eduhub-staging]   # 스테이징 PC의 러너 (7-3의 프론트 배포와 같은 PC)
+    environment: staging                 # 필수 승인자가 승인해야 실행된다 (Step 7-1). 아래 vars·secrets도 이 환경의 값
+    steps:
+      - uses: actions/checkout@v4        # scripts/deploy-backend.ps1을 쓰려고
+      - if: ${{ needs.build.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: artifacts
+      - name: Deploy, roll back, or redeploy a kept version
+        shell: powershell
+        env:
+          ROOT: ${{ vars.BACKEND_ROOT }}                # 예: C:\eduhub-staging\backend
+          APP_URL: ${{ vars.APP_URL }}                  # 예: http://localhost:8080
+          ROLLBACK: ${{ inputs.rollback }}
+          VERSION: ${{ inputs.version }}
+          # 스테이징 비밀 값: 스크립트가 <ROOT>\config\application.properties로 쓴다 (화면에는 *** 로 가려짐)
+          # 이름은 Step 6의 application-staging.yml 변수와 같다
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          EDUHUB_JWT_SECRET: ${{ secrets.EDUHUB_JWT_SECRET }}
+          EDUHUB_WEB_ROOT: ${{ vars.FRONTEND_WEB_ROOT }}  # 프론트 배포(7-3)와 같은 화면 폴더
+        run: |
+          if (-not $env:ROOT) { throw "staging 환경 변수 BACKEND_ROOT가 없습니다" }
+          $health = "$($env:APP_URL)/api/health"
+          if ($env:ROLLBACK -eq 'true') { .\scripts\deploy-backend.ps1 -Rollback -Root $env:ROOT -HealthUrl $health }
+          elseif ($env:VERSION) { .\scripts\deploy-backend.ps1 -Version $env:VERSION -Root $env:ROOT -HealthUrl $health }
+          else { .\scripts\deploy-backend.ps1 -Jar (Get-Item artifacts\eduhub-*.jar).FullName -Root $env:ROOT -HealthUrl $health }
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Smoke test
+        shell: powershell
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          ROOT: ${{ vars.BACKEND_ROOT }}
+        run: |
+          foreach ($path in '/api/health', '/api/v1/courses') {
+            $r = Invoke-WebRequest -UseBasicParsing "$($env:APP_URL)$path"
+            if ($r.StatusCode -ne 200) { throw "$path -> $($r.StatusCode)" }
+            Write-Host "OK $path"
+          }
+          Write-Host "지금 버전: $(Get-Content (Join-Path $env:ROOT 'current.txt'))"
+```
+
+</details>
+
+<details>
+<summary>scripts/deploy-backend.ps1</summary>
+
+```powershell
+# scripts/deploy-backend.ps1 — 백엔드 jar를 스테이징 PC에 배포(교체)하거나 되돌린다 (Windows PowerShell 5.1 이상)
+# 사용:
+#   .\scripts\deploy-backend.ps1 -Jar <eduhub-<버전>.jar>      새 버전 배포
+#   .\scripts\deploy-backend.ps1 -Rollback                     직전 버전으로 (한 단계)
+#   .\scripts\deploy-backend.ps1 -Version <버전>                보관된 특정 버전으로 (두 단계 이상 전)
+# 백엔드는 작업 스케줄러 작업(register-backend-task.ps1로 한 번 등록)이 <Root>\current.jar를 실행한다.
+param(
+    [string]$Jar,
+    [switch]$Rollback,
+    [string]$Version,
+    [string]$Root = (Join-Path $PSScriptRoot '..\run\backend'),   # 예: C:\eduhub-staging\backend
+    [string]$TaskName = 'EduHubBackend',
+    [string]$HealthUrl = 'http://localhost:8080/api/health',
+    [int]$Keep = 5                                                 # releases에 남길 버전 수
+)
+$ErrorActionPreference = 'Stop'
+$releases = Join-Path $Root 'releases'
+$current = Join-Path $Root 'current.jar'
+$cfg = Join-Path $Root 'config\application.properties'
+New-Item -ItemType Directory -Force -Path $releases, (Join-Path $Root 'logs'), (Join-Path $Root 'config') | Out-Null
+
+function Read-Mark([string]$Name) { $f = Join-Path $Root $Name; if (Test-Path $f) { (Get-Content $f -Raw).Trim() } else { '' } }
+function Write-Mark([string]$Name, [string]$Value) {
+    $f = Join-Path $Root $Name
+    if ($Value) { Set-Content -Path $f -Value $Value -Encoding ASCII } elseif (Test-Path $f) { Remove-Item $f }
+}
+function Release-Path([string]$Ver) { Join-Path $releases "eduhub-$Ver.jar" }
+function Test-Up { try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 $HealthUrl).StatusCode -eq 200 } catch { $false } }
+
+# 배포 파이프라인이 staging 환경의 비밀 값을 넘겨주면 설정 파일로 쓴다 (없으면 기존 파일 그대로).
+# 작업 폴더가 <Root>라서 Spring Boot가 <Root>\config\application.properties를 자동으로 읽는다
+function Write-Config {
+    if (-not $env:EDUHUB_JWT_SECRET) { return }
+    if (Test-Path $cfg) { Copy-Item $cfg "$cfg.prev" -Force }     # 실패하면 되돌리도록 이전 파일을 남긴다
+    # application-staging.yml의 ${DB_URL} 같은 변수를 이 파일이 채운다. 넘어온 값만 쓴다 (빈 값은 기본값을 덮어 기동 실패)
+    # properties 형식이라 \ 는 \\ 로 (C:\eduhub-staging\web 같은 경로)
+    $lines = foreach ($k in 'DB_URL', 'DB_USERNAME', 'DB_PASSWORD', 'EDUHUB_JWT_SECRET', 'EDUHUB_WEB_ROOT') {
+        $v = [Environment]::GetEnvironmentVariable($k)
+        if ($v) { "$k=$($v -replace '\\', '\\')" }
+    }
+    Set-Content -Path $cfg -Value $lines -Encoding UTF8
+}
+
+# 실행 중인 백엔드를 멈추고 <Ver>의 jar로 바꿔 다시 켠다. 성공하면 $true
+function Switch-To([string]$Ver) {
+    $jarPath = Release-Path $Ver
+    if (-not (Test-Path $jarPath)) { throw "보관된 버전이 없습니다: $jarPath" }
+    Stop-ScheduledTask -TaskName $TaskName
+    for ($i = 0; (Test-Up) -and $i -lt 30; $i++) { Start-Sleep 1 }   # 이전 프로세스가 끝날 때까지
+    if (Test-Up) { throw "백엔드가 멈추지 않습니다 (작업 '$TaskName'이 아닌 다른 프로세스가 8080을 쓰는지 확인)" }
+    for ($i = 1; $i -le 10; $i++) {                                  # Windows가 jar를 잠깐 잠그고 있을 수 있다
+        try { Copy-Item $jarPath $current -Force; break } catch { if ($i -eq 10) { throw }; Start-Sleep 1 }
+    }
+    Start-ScheduledTask -TaskName $TaskName
+    for ($i = 0; $i -lt 120; $i++) {
+        if (Test-Up) { return $true }
+        # 프로세스가 이미 끝났으면(잘못된 jar, 설정 오류) 기다리지 않고 실패
+        if ($i -ge 5 -and (Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') { return $false }
+        Start-Sleep 1
+    }
+    return $false
+}
+
+function Log([string]$Text) {
+    Add-Content -Path (Join-Path $Root 'deploy-history.log') -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Text" -Encoding UTF8
+    Write-Host $Text
+}
+
+$old = Read-Mark 'current.txt'
+if ($Rollback) {
+    $target = Read-Mark 'previous.txt'
+    if (-not $target) { throw '되돌릴 이전 버전이 없습니다 (롤백은 한 단계만. 더 이전은 -Version <버전>)' }
+} elseif ($Version) {
+    $target = $Version
+} else {
+    if (-not $Jar -or -not (Test-Path $Jar)) { throw "배포할 jar가 없습니다: $Jar" }
+    $name = Split-Path $Jar -Leaf
+    if ($name -notmatch '^eduhub-(.+)\.jar$') { throw "jar 이름은 eduhub-<버전>.jar 이어야 합니다: $name" }
+    $target = $Matches[1]
+    Copy-Item $Jar (Release-Path $target) -Force
+}
+
+Write-Config
+if (Switch-To $target) {
+    Write-Mark 'current.txt' $target
+    if ($Rollback) { Write-Mark 'previous.txt' ''; Write-Mark 'broken.txt' $old }   # 롤백은 한 단계만
+    else { Write-Mark 'broken.txt' ''; if ($old -and $old -ne $target) { Write-Mark 'previous.txt' $old } }
+    Log "배포 완료: $target (이전: $(if ($old) { $old } else { '없음' }))$(if ($Rollback) { ' [롤백]' })"
+} else {
+    Write-Mark 'broken.txt' $target
+    if ($old -and $old -ne $target) {
+        Log "실패: $target 이(가) $HealthUrl 에 응답하지 않아 $old 로 되돌립니다. 로그: $Root\logs\eduhub.log"
+        if ($env:EDUHUB_JWT_SECRET -and (Test-Path "$cfg.prev")) { Copy-Item "$cfg.prev" $cfg -Force }   # 설정도 이전 것으로
+        if (-not (Switch-To $old)) { Log "되돌린 $old 도 응답하지 않습니다. 런북의 수동 절차로 확인하세요" }
+    } else {
+        Log "실패: $target 이(가) $HealthUrl 에 응답하지 않습니다 (되돌릴 이전 버전 없음). 로그: $Root\logs\eduhub.log"
+    }
+    exit 1
+}
+
+# 오래된 버전 정리: 최근 $Keep개와 현재·직전 버전은 남긴다
+$protect = @((Read-Mark 'current.txt'), (Read-Mark 'previous.txt')) | Where-Object { $_ } | ForEach-Object { "eduhub-$_.jar" }
+Get-ChildItem $releases -Filter 'eduhub-*.jar' | Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip $Keep | Where-Object { $protect -notcontains $_.Name } | Remove-Item
+```
+
+</details>
+
+<details>
+<summary>scripts/register-backend-task.ps1</summary>
+
+```powershell
+# scripts/register-backend-task.ps1 — 스테이징 PC에서 사람이 한 번만 실행: 백엔드를 실행할 작업 스케줄러 작업을 등록한다
+# 관리자 PowerShell에서: .\scripts\register-backend-task.ps1 -Root C:\eduhub-staging\backend -User <러너 서비스 계정>
+# PC가 켜지면 자동으로 시작하고, 죽으면 1분 뒤 다시 시작한다. 배포 스크립트는 이 작업을 멈추고(Stop) 켠다(Start).
+param(
+    [string]$Root = (Join-Path $PSScriptRoot '..\run\backend'),
+    [string]$TaskName = 'EduHubBackend',
+    [string]$JavaExe = (Get-Command java.exe).Source,      # JDK 21의 java.exe
+    [string]$SpringProfile = 'staging',
+    [Parameter(Mandatory = $true)][string]$User             # self-hosted runner 서비스와 같은 계정을 권장
+)
+$ErrorActionPreference = 'Stop'
+$Root = (New-Item -ItemType Directory -Force -Path $Root).FullName
+New-Item -ItemType Directory -Force -Path (Join-Path $Root 'releases'), (Join-Path $Root 'logs'), (Join-Path $Root 'config') | Out-Null
+
+$argLine = "-jar `"$Root\current.jar`" --spring.profiles.active=$SpringProfile --logging.file.name=`"$Root\logs\eduhub.log`""
+$action = New-ScheduledTaskAction -Execute $JavaExe -Argument $argLine -WorkingDirectory $Root
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew `
+    -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+$cred = Get-Credential -UserName $User -Message "작업을 실행할 계정($User)의 비밀번호"
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
+    -User $cred.UserName -Password $cred.GetNetworkCredential().Password -RunLevel Limited -Force | Out-Null
+Write-Host "등록 완료: 작업 '$TaskName' → $JavaExe $argLine (작업 폴더 $Root)"
+Write-Host "처음 한 번은 jar가 없으므로 배포 스크립트(deploy-backend.ps1 -Jar ...)로 첫 버전을 배포하세요."
+```
+
+</details>
+
+<details>
+<summary>scripts/deploy-backend.sh (같은 순서의 bash 판, Linux·macOS에서 배포 순서를 시험할 때)</summary>
+
+```bash
+#!/usr/bin/env bash
+# scripts/deploy-backend.sh — deploy-backend.ps1과 같은 순서(Linux·macOS용, 교재 검증용).
+# 작업 스케줄러 대신 pid 파일로 백엔드를 멈추고 켠다.
+# 사용: scripts/deploy-backend.sh --jar <eduhub-<버전>.jar> | --rollback | --version <버전>
+#       환경 변수 BACKEND_ROOT(기본: 프로젝트 루트의 run/backend), HEALTH_URL, JAVA_OPTS_EXTRA
+set -euo pipefail
+ROOT="${BACKEND_ROOT:-$(cd "$(dirname "$0")/.." && pwd)/run/backend}"
+HEALTH_URL="${HEALTH_URL:-http://localhost:8080/api/health}"
+KEEP="${KEEP:-5}"
+mkdir -p "$ROOT/releases" "$ROOT/logs" "$ROOT/config"
+
+mode=deploy; jar=""; version=""
+case "${1:-}" in
+  --jar) jar="$2" ;;
+  --rollback) mode=rollback ;;
+  --version) mode=version; version="$2" ;;
+  *) echo "사용: $0 --jar <파일> | --rollback | --version <버전>" >&2; exit 2 ;;
+esac
+
+mark() { [ -f "$ROOT/$1" ] && cat "$ROOT/$1" || true; }
+set_mark() { if [ -n "$2" ]; then printf '%s\n' "$2" > "$ROOT/$1"; else rm -f "$ROOT/$1"; fi; }
+up() { curl -fsS -m 3 "$HEALTH_URL" >/dev/null 2>&1; }
+log() { printf '%s %s\n' "$(date '+%F %T')" "$1" >> "$ROOT/deploy-history.log"; echo "$1"; }
+
+CFG="$ROOT/config/application.properties"
+SECRET_VARS="DB_URL DB_USERNAME DB_PASSWORD EDUHUB_JWT_SECRET EDUHUB_WEB_ROOT"
+write_config() {   # 비밀 값이 넘어오면 설정 파일로 (없으면 기존 파일 그대로). 실패하면 되돌리도록 이전 파일을 남긴다
+  [ -n "${EDUHUB_JWT_SECRET:-}" ] || return 0
+  [ -f "$CFG" ] && cp "$CFG" "$CFG.prev"
+  # application-staging.yml의 ${DB_URL} 같은 변수를 이 파일이 채운다. 넘어온 값만 쓴다
+  for k in $SECRET_VARS; do [ -n "${!k:-}" ] && printf '%s=%s\n' "$k" "${!k}"; done > "$CFG"
+}
+
+stop_backend() {
+  if [ -f "$ROOT/backend.pid" ]; then kill "$(cat "$ROOT/backend.pid")" 2>/dev/null || true; rm -f "$ROOT/backend.pid"; fi
+  for _ in $(seq 30); do up || return 0; sleep 1; done
+  echo "백엔드가 멈추지 않습니다 (다른 프로세스가 8080을 쓰는지 확인)" >&2; exit 1
+}
+start_backend() {   # 작업 폴더를 ROOT로: Spring Boot가 ROOT/config/application.properties를 읽는다
+  (cd "$ROOT" || exit 1
+   # 배포에 쓴 비밀 값 환경 변수는 넘기지 않는다: 설정 파일만 쓰게 (Windows 작업 스케줄러와 같은 조건)
+   # shellcheck disable=SC2086
+   nohup env $(printf -- '-u %s ' $SECRET_VARS) \
+     java -jar current.jar --spring.profiles.active="${SPRING_PROFILE:-staging}" --logging.file.name="$ROOT/logs/eduhub.log" >/dev/null 2>&1 &
+   echo $! > "$ROOT/backend.pid")   # java 프로세스의 pid
+}
+switch_to() {   # 성공하면 0
+  local src="$ROOT/releases/eduhub-$1.jar"
+  [ -f "$src" ] || { echo "보관된 버전이 없습니다: $src" >&2; exit 1; }
+  stop_backend
+  cp "$src" "$ROOT/current.jar"
+  start_backend
+  for _ in $(seq 120); do
+    up && return 0
+    kill -0 "$(cat "$ROOT/backend.pid")" 2>/dev/null || return 1   # 프로세스가 이미 죽었으면 바로 실패
+    sleep 1
+  done
+  return 1
+}
+
+old="$(mark current.txt)"
+case $mode in
+  rollback) target="$(mark previous.txt)"
+            [ -n "$target" ] || { echo "되돌릴 이전 버전이 없습니다 (롤백은 한 단계만. 더 이전은 --version <버전>)" >&2; exit 1; } ;;
+  version)  target="$version" ;;
+  deploy)   [ -f "$jar" ] || { echo "배포할 jar가 없습니다: $jar" >&2; exit 1; }
+            name="$(basename "$jar")"
+            [[ $name =~ ^eduhub-(.+)\.jar$ ]] || { echo "jar 이름은 eduhub-<버전>.jar 이어야 합니다: $name" >&2; exit 1; }
+            target="${BASH_REMATCH[1]}"
+            cp "$jar" "$ROOT/releases/$name" ;;
+esac
+
+write_config
+if switch_to "$target"; then
+  set_mark current.txt "$target"
+  if [ $mode = rollback ]; then set_mark previous.txt ""; set_mark broken.txt "$old"
+  else set_mark broken.txt ""; [ -n "$old" ] && [ "$old" != "$target" ] && set_mark previous.txt "$old"; fi
+  log "배포 완료: $target (이전: ${old:-없음})$([ $mode = rollback ] && echo ' [롤백]' || true)"
+else
+  set_mark broken.txt "$target"
+  if [ -n "$old" ] && [ "$old" != "$target" ]; then
+    log "실패: $target 이(가) $HEALTH_URL 에 응답하지 않아 $old 로 되돌립니다. 로그: $ROOT/logs/eduhub.log"
+    [ -f "$CFG.prev" ] && [ -n "${EDUHUB_JWT_SECRET:-}" ] && cp "$CFG.prev" "$CFG"   # 설정도 이전 것으로
+    switch_to "$old" || log "되돌린 $old 도 응답하지 않습니다. 런북의 수동 절차로 확인하세요"
+  else
+    log "실패: $target 이(가) $HEALTH_URL 에 응답하지 않습니다 (되돌릴 이전 버전 없음). 로그: $ROOT/logs/eduhub.log"
+  fi
+  exit 1
+fi
+
+# 오래된 버전 정리: 최근 KEEP개와 현재·직전 버전은 남긴다
+cur="$(mark current.txt)"; prev="$(mark previous.txt)"
+ls -t "$ROOT"/releases/eduhub-*.jar | tail -n +$((KEEP + 1)) | while read -r f; do
+  case "$(basename "$f")" in "eduhub-$cur.jar"|"eduhub-$prev.jar") ;; *) rm -f "$f" ;; esac
+done
+```
+
+</details>
 
 **검토 포인트**
 
 | 볼 것 | 이유 |
 |---|---|
-| `deploy-staging`에 `environment: staging`이 있는가 | 이것이 승인 게이트. 빠지면 병합 즉시 배포된다 |
-| 이미지를 환경마다 다시 빌드하지 않는가 | "한 번 빌드, 여러 번 배포" |
-| `scripts/deploy.sh`가 운영 환경을 거부하는가 | 실수 방지 |
-| 컨테이너를 root가 아닌 사용자로 실행하는가 | 기본 보안 |
-| 외부 액션 버전이 고정되어 있는가 | 공급망 보안 |
+| `deploy`에 `environment: staging`이 있는가 | 이것이 승인 게이트. 빠지면 병합 즉시 배포된다. 비밀 값도 이 환경에서만 나온다 |
+| 빌드는 `ubuntu-latest`, 배포만 `self-hosted`인가 | 사내 PC에서는 꼭 필요한 일만 |
+| 롤백·특정 버전 배포가 **다시 빌드하지 않는가** | "한 번 빌드, 여러 번 배포". 같은 jar를 다시 쓴다 |
+| 헬스 체크 실패 시 **이전 jar와 이전 설정으로** 되돌리는가 | 잘못된 설정 값으로 되돌린 버전까지 죽는 것을 막는다 |
+| 비밀 값이 `run:`에 `${{ }}`로 직접 들어가지 않고 `env`로 넘어가는가 | 로그 노출·명령 주입 방지 |
+| 스크립트가 `.env`나 설정 파일 내용을 출력하지 않는가 | 로그에 비밀 값이 남지 않게 |
 
-✅ **확인**: PR 병합 후 **Actions** 탭에서 `deploy-staging` 잡이 **승인 대기(Waiting)** 상태로 멈추는지 봅니다. 지정된 승인자가 **Review deployments**에서 승인하면 실행됩니다.
+✅ **확인** (스테이징 PC, 브라우저와 Actions 화면)
 
-> 💬 **강사 노트:** 교육 환경에 실제 스테이징 서버가 없으면 `scripts/deploy.sh`는 `--dry-run`으로 명령만 출력하게 두고, **승인 게이트가 동작하는 것**까지 확인합니다. 핵심은 배포 자체보다 "사람의 승인 없이는 아무것도 나가지 않는 구조"입니다.
+| # | 할 일 | 기대 결과 |
+|---|---|---|
+| B1 | backend를 바꾼 PR 병합 | `build` 성공 후 `deploy`가 **승인 대기(Waiting)** |
+| B2 | 승인자가 **Review deployments**에서 승인 | 배포·스모크 통과, `current.txt`가 이번 커밋 SHA 12자리 |
+| B3 | **Run workflow** → `rollback` ✔ | 빌드 없이 직전 버전으로, `deploy-history.log`에 `[롤백]` |
+| B4 | **Run workflow** → `version`에 두 번 전 버전 | 보관된 jar로 배포 |
+| B5 | (선택) staging 시크릿 `DB_URL`을 일부러 틀리게 → 다시 배포 | 배포 실패, **이전 버전이 그대로 응답**. 시크릿을 고치고 다시 |
+
+> 💬 **강사 노트:** 교육 환경에 스테이징 PC를 준비하지 못한 팀은 `deploy` 잡이 **승인 대기에서 멈추는 것**까지 확인하고(러너가 없으면 `Waiting for a runner`), 배포 순서는 로컬에서 `bash scripts/deploy-backend.sh --jar …`로 직접 실행해 봅니다. 핵심은 "사람의 승인 없이는 아무것도 나가지 않는 구조"와 "되돌릴 수 있는 배포"입니다.
+
+> ✅ 교재 환경(Linux)에서 bash 판으로 실제 백엔드(staging 프로필, PostgreSQL 16)를 배포해 확인했습니다: 첫 배포 → 새 버전 → 깨진 jar는 이전 버전으로 자동 복구 → 잘못된 `DB_URL`은 **이전 버전·이전 설정**으로 자동 복구 → 롤백 → 한 번 더 롤백은 거부 → `--version`으로 특정 버전 → 비밀 값 없이 실행하면 기존 설정 유지 → 오래된 버전 정리(현재·직전은 남김). 워크플로우 3개 파일은 actionlint 통과. ⚠️ Windows 작업 스케줄러·PowerShell 스크립트·실제 Actions와 러너는 실행해 보지 못했습니다 (특히 러너 계정이 다른 계정으로 등록한 작업을 멈추고 시작할 권한 → 막히면 [4-9](#4-9-자주-겪는-문제)).
 
 ### 7-3. 프론트엔드를 스테이징 PC에 자동 배포 (self-hosted runner)
 
@@ -762,21 +1256,7 @@ flowchart LR
     DSP["수동 실행<br/>rollback=true"] -.-> AP
 ```
 
-**왜 self-hosted runner인가**: GitHub가 제공하는 러너(`ubuntu-latest` 등)는 인터넷 위의 임시 컴퓨터라 **사내 PC의 화면 폴더에 파일을 놓을 수 없습니다.** 스테이징 PC에 러너 프로그램을 설치하면, 그 PC가 GitHub에 **먼저 접속해 일감을 받아 오므로**(바깥으로 나가는 HTTPS만 사용) 방화벽에 들어오는 포트를 열 필요가 없습니다. 빌드는 GitHub의 러너에서 하고, **파일 교체만** 이 PC에서 합니다.
-
-**① runner 설치와 환경 변수 (사람이 직접)**
-
-1. 스테이징 PC에서 저장소 **Settings** → **Actions** → **Runners** → **New self-hosted runner** → **Windows**, **x64**
-2. 화면에 나온 명령을 PowerShell에서 그대로 실행합니다 (러너 내려받기 → `.\config.cmd --url … --token …`). 설정 중 질문에서
-   - **labels**에 `eduhub-staging` 추가 (워크플로우가 이 이름표로 이 PC를 고른다)
-   - **서비스로 실행**: 예. 실행 계정은 화면 폴더(`C:\eduhub-staging\web`)에만 쓰기 권한이 있는 **전용 계정**을 권장 (관리자 계정 ✕)
-3. **Runners** 목록에서 상태가 **Idle**(초록)인지 확인
-4. 이 PC에서 저장소의 `.ps1`이 실행되도록 실행 정책 확인: `Get-ExecutionPolicy -List` (Windows PC의 기본값은 스크립트를 막는 경우가 많다. 팀이 판단해 `RemoteSigned` 등으로)
-5. **Settings** → **Environments** → `staging` → **Environment variables**에 두 값 추가
-   - `FRONTEND_WEB_ROOT`: 백엔드가 서비스하는 화면 폴더 (예: `C:\eduhub-staging\web`. 백엔드는 `EDUHUB_WEB_ROOT`를 같은 값으로 실행)
-   - `APP_URL`: 스모크 테스트 주소 (예: `http://localhost:8080`)
-
-> ⚠️ **self-hosted runner의 보안**: 러너는 그 PC에서 **워크플로우의 명령을 그대로 실행**합니다. GitHub 문서는 **공개 저장소에는 self-hosted runner를 쓰지 말라**고 안내합니다(누구나 PR로 코드를 실행시킬 수 있다). EduHub는 비공개 저장소이고, 이 워크플로우는 `main`에 대한 push와 수동 실행에서만 돌며, 배포 잡은 `staging` 승인을 거칩니다. 러너 PC에는 운영 비밀을 두지 않습니다.
+**① 준비**: 7-1에서 설치한 스테이징 PC의 러너(`eduhub-staging`)와 `staging` 환경 변수(`FRONTEND_WEB_ROOT`, `APP_URL`)를 그대로 씁니다. 추가로 할 일은 없습니다.
 
 **② 워크플로우 작성 (Claude + 리뷰)** — 브랜치 `chore/frontend-deploy`, Plan 모드
 
@@ -1047,16 +1527,16 @@ git switch main
 
 ```text
 [목표] docs/runbook.md를 작성하려고 해. 사람이 AI 없이 그대로 따라 할 수 있어야 해.
-[위치] .github/workflows/ci.yml, .github/workflows/deploy.yml, scripts/deploy.sh, backend/, frontend/
-[범위] 절: 로컬 빌드·테스트 / 스테이징 배포 / 롤백(이전 태그 찾기 포함) / 프론트(화면 폴더) 배포와 롤백(7-4의 절차: 평소 배포, 판단 기준, 롤백 A·B·C, 롤백 후 할 일) / 수동 핫픽스 절차 / 필요한 권한과 승인자
+[위치] .github/workflows/ci.yml, .github/workflows/deploy-backend.yml, .github/workflows/deploy-frontend.yml, scripts/, backend/, frontend/
+[범위] 절: 로컬 빌드·테스트 / 백엔드 스테이징 배포(승인, 스테이징 PC 폴더 구조, 사람이 직접 하는 방법) / 백엔드 롤백(previous.txt·deploy-history.log로 버전 찾기, -Rollback·-Version) / 프론트(화면 폴더) 배포와 롤백(7-4의 절차: 평소 배포, 판단 기준, 롤백 A·B·C, 롤백 후 할 일) / 수동 핫픽스 절차 / 필요한 권한과 승인자
 [하지 않는 것] 실제 시크릿 값, 운영 접속 정보
 [완료 기준] 모든 명령은 복사해서 바로 실행할 수 있는 코드 블록, 각 절 끝에 "확인 방법" 한 줄
 ```
 
 ✅ **확인 (팀원 교대)**: Claude를 쓰지 않은 **다른 팀원**이 런북만 보고 다음을 실행합니다.
 1. 로컬 빌드·테스트
-2. `scripts/deploy.sh staging <태그> --dry-run`
-3. 롤백할 이전 태그 찾기
+2. 스테이징 PC에서 `deploy-history.log`로 지금 버전과 직전 버전 찾기
+3. 스테이징 PC에서 `.\scripts\deploy-backend.ps1 -Root C:\eduhub-staging\backend -Rollback`으로 롤백하고, `-Version <원래 버전>`으로 되돌려 놓기
 
 막히는 곳이 있으면 런북을 **직접** 고칩니다. 이것이 1회차 원칙 ②를 매주 점검하는 방법입니다.
 
@@ -1071,10 +1551,13 @@ git switch main
 | 필수 상태 체크 목록에 잡 이름이 없음 | 해당 잡이 한 번도 실행되지 않음. PR로 한 번 실행한 뒤 다시 설정 |
 | 커버리지 기준 때문에 계속 실패 | 기준을 낮추기 전에 부족한 클래스 확인. 테스트 보강은 별도 PR로 |
 | 배포 잡이 승인 없이 실행됨 | 잡에 `environment: staging`이 빠졌거나 환경에 필수 승인자가 설정되지 않음 |
-| ghcr.io 푸시 권한 오류 | 잡의 `permissions`에 `packages: write`가 없음 |
-| (프론트) deploy 잡이 `Waiting for a runner…`에서 멈춤 | 스테이징 PC의 러너가 꺼져 있거나 이름표가 다름 → Settings → Actions → Runners에서 상태와 `eduhub-staging` 이름표 확인 |
-| (프론트) deploy가 `staging 환경 변수 FRONTEND_WEB_ROOT가 없습니다` | Environments → staging → Environment variables에 `FRONTEND_WEB_ROOT`, `APP_URL` 추가 (7-3 ①의 5) |
-| (프론트) `…ps1 cannot be loaded because running scripts is disabled` | 러너 PC의 PowerShell 실행 정책 → 7-3 ①의 4 |
+| (백엔드) `Stop-ScheduledTask`·`Start-ScheduledTask`가 `액세스가 거부되었습니다` | 러너 계정이 작업을 다룰 권한이 없음 → 작업을 러너 계정으로 등록했는지(`-User`) 확인. 그래도 막히면 IT와 상의 (교재 환경에서 확인하지 못한 부분) |
+| (백엔드) `백엔드가 멈추지 않습니다` | 작업 스케줄러가 아닌 다른 프로세스가 8080을 씀 (6회차에 손으로 띄운 백엔드 등) → 그 프로세스를 끄고 다시 |
+| (백엔드) `… 응답하지 않아 … 로 되돌립니다` | 새 버전이 기동에 실패 → `BACKEND_ROOT\logs\eduhub.log`의 ERROR. 흔한 원인: staging 시크릿 이름(`DB_URL` 등)이 `application-staging.yml`과 다름, `EDUHUB_JWT_SECRET`이 32바이트 미만 |
+| (백엔드) `staging 환경 변수 BACKEND_ROOT가 없습니다` | Environments → staging → Environment variables에 `BACKEND_ROOT` 추가 (7-1 ①의 5) |
+| deploy 잡이 `Waiting for a runner…`에서 멈춤 | 스테이징 PC의 러너가 꺼져 있거나 이름표가 다름 → Settings → Actions → Runners에서 상태와 `eduhub-staging` 이름표 확인 |
+| (프론트) deploy가 `staging 환경 변수 FRONTEND_WEB_ROOT가 없습니다` | Environments → staging → Environment variables에 `FRONTEND_WEB_ROOT`, `APP_URL` 추가 (7-1 ①의 5) |
+| `…ps1 cannot be loaded because running scripts is disabled` | 러너 PC의 PowerShell 실행 정책 → 7-1 ②의 4 |
 | (프론트) deploy에서 `빌드 결과가 없습니다: artifacts\frontend-…` | 결과물 이름·경로가 어긋남 → build의 `name`과 deploy의 `pattern`, 로그의 실제 폴더 확인 |
 | (프론트) 프론트를 고쳤는데 배포가 안 돎 | `paths: frontend/**` 밖만 바뀌었거나, `changes`가 `[]`를 냈음 → changes 잡 로그 확인 |
 | (프론트) 롤백이 `되돌릴 이전 버전이 없습니다`로 실패 | 이미 한 번 롤백했거나 첫 배포였음. 롤백은 한 단계만 → 7-4 ③-B(revert) 또는 C-2 |
@@ -1429,7 +1912,7 @@ PR의 CI가 실패하면 Claude가 로그를 읽고 원인을 **PR 코멘트로�
 1. 체크(잡) 이름은 한 번 이상 실행된 뒤에야 설정 화면의 목록에 나타나기 때문
 2. 배포 잡의 `environment: staging`(필수 승인자가 지정된 GitHub Environment). 빠지면 `main`에 병합되는 즉시 승인 없이 배포된다
 3. 값이 없으면 기동이 실패해 실수를 바로 알 수 있다. 기본값이 있으면 엉뚱한 DB(예: 로컬 값)에 조용히 붙을 수 있고, 기본값 자체가 비밀 노출이 될 수 있다
-4. Claude를 쓰지 않은 다른 팀원이 런북만 보고 빌드·(드라이런)배포·롤백 태그 찾기를 실제로 실행해 성공했을 때
+4. Claude를 쓰지 않은 다른 팀원이 런북만 보고 빌드, 배포할 버전 찾기, 스테이징 롤백을 실제로 실행해 성공했을 때
 5. CLAUDE.md는 매 세션 읽히므로 길면 토큰 비용이 계속 들고 중요한 규칙이 묻힌다. 스킬은 평소 이름과 설명만 로드되고 필요할 때만 본문을 읽는다
 6. CLAUDE.md는 강제력이 없는 지침(부탁), ArchUnit은 어기면 테스트가 실패하는 강제. CLAUDE.md로 미리 알려 실수를 줄이고, 테스트로 실수를 확실히 잡는다. 테스트는 사람이 쓴 코드에도 적용된다
 7. 품질 지표(테스트 첫 통과, 재지시 횟수, 리뷰 수정 수). 사용량이 줄어도 재작업이 늘면 작업 완료당 비용은 오히려 커지기 때문
@@ -1442,6 +1925,7 @@ PR의 CI가 실패하면 Claude가 로그를 읽고 원인을 **PR 코멘트로�
 ## 8-3. 과제 (다음 회차 전까지)
 
 - [ ] 따라하기 ①의 PR 3개(CI, 프로필·비밀, 스테이징 배포) 병합, `main` 필수 체크 동작 확인
+- [ ] 7-2 백엔드 배포 B1~B4(승인 대기, 배포, 롤백, 특정 버전)를 스테이징 PC에서 확인하고 `deploy-history.log`를 PR에 붙이기
 - [ ] 7-3 프론트 자동 배포(`chore/frontend-deploy`) 병합 후 D1~D3(바뀐 앱만 배포, 승인, 롤백)을 직접 확인하고 Actions 화면 캡처를 PR에
 - [ ] 7-4 절차를 `docs/runbook.md`에 옮기고, **다른 팀원**이 런북만 보고 롤백(A)과 revert PR(B)을 한 번씩 해 보기
 - [ ] `docs/runbook.md`를 **Claude를 쓰지 않은 팀원**이 실행해 보고 고친 내용을 PR로
