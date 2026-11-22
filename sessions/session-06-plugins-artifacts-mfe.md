@@ -789,7 +789,9 @@ git status        # renamed: 로 보이는지 확인
 ```
 
 ```powershell
-# Windows PowerShell: 위 명령을 그대로 쓰되, 줄 끝의 \ 대신 한 줄로 쓰고 mkdir -p 대신
+# Windows PowerShell: 위 명령을 그대로 쓰되, 줄 끝에 \ 가 있는 명령은 한 줄로 이어 쓰고,
+# mkdir -p 두 줄 대신 아래 한 줄로 git mv가 옮겨 넣을 하위 폴더 4개를 미리 만든다
+# (git mv는 대상 폴더를 만들어 주지 않는다. -Force: 이미 있어도 오류 없음, 중간 폴더도 함께 생성 = mkdir -p)
 New-Item -ItemType Directory -Force apps/shell/src/auth, apps/shell/src/pages, apps/enrollment-mfe/src/components, apps/enrollment-mfe/src/pages
 ```
 
