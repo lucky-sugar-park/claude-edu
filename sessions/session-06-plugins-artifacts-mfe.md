@@ -272,6 +272,9 @@ flowchart LR
 
 ## 1-4. Vite로 Module Federation 구성하기 (실습 기준)
 
+> 📌 **이 절의 위치**: 1-4는 Module Federation **설정 방법을 익히는 작은 데모**입니다 (shell 하나 + remote 두 개, remote마다 화면 하나만 노출). 5회차 EduHub 앱을 쪼개는 작업이 아니므로, 직접 해 볼 때는 EduHub의 `frontend/`가 아닌 **빈 연습 폴더**(예: `mf-demo/`)에서 합니다 (EduHub `frontend/apps/course-mfe`에는 5회차 앱이 있어 덮어쓰게 된다).
+> EduHub를 실제로 나누는 순서는 **1-5**(무엇이 어디로 가나) → **따라하기 ① Step 1**(shell과 공통 기반을 먼저, 혼자) → **Step 2**(course-mfe와 enrollment-mfe를 병렬 세션으로 **동시에**) → **Step 3**(합치고 쪼개기 전과 비교)입니다. shell → course → enrollment 순으로 하나씩 떼어 내는 방식이 아닙니다.
+
 **왜 Vite인가?** 새로 시작하는 React 프로젝트는 대부분 Vite를 씁니다 (개발 서버 시작과 화면 갱신이 빠르고 설정이 짧다. React 공식 문서도 Create React App 대신 Vite 같은 빌드 도구를 안내한다). Module Federation은 원래 Webpack 5의 기능이지만, 지금은 **Module Federation 공식 조직이 만든 Vite 플러그인 `@module-federation/vite`**로 같은 구조를 만들 수 있습니다.
 
 | 선택지 | 특징 | EduHub |
@@ -291,10 +294,10 @@ flowchart LR
 | 개발 서버 포트 | `devServer: { port: 3001 }` | `server: { port: 3001, strictPort: true }` (+ `preview`도 같은 포트) |
 | 원격 모듈의 타입 | 직접 선언 | 직접 선언 (`remotes.d.ts`), 플러그인의 타입 생성은 `dts: false`로 끈다 |
 
-**설치** (`frontend/`의 npm workspaces 기준, shell과 각 remote에 같은 버전으로)
+**설치** (연습 폴더의 npm workspaces 기준, shell과 각 remote에 같은 버전으로)
 
 ```bash
-cd frontend
+cd mf-demo      # package.json: { "private": true, "workspaces": ["apps/*"] }
 npm install --workspace apps/shell --workspace apps/course-mfe --workspace apps/enrollment-mfe react@18 react-dom@18 @mui/material @emotion/react @emotion/styled
 npm install -D --workspace apps/shell --workspace apps/course-mfe --workspace apps/enrollment-mfe vite @vitejs/plugin-react @module-federation/vite typescript @types/react@18 @types/react-dom@18
 ```
@@ -350,6 +353,55 @@ export default function CourseApp() {
 }
 ```
 
+**두 번째 remote: `apps/enrollment-mfe/vite.config.ts`, `apps/enrollment-mfe/src/EnrollmentApp.tsx`** (course-mfe와 같은 모양. 다른 것은 `name`·포트·`exposes`뿐)
+
+```ts
+// apps/enrollment-mfe/vite.config.ts (remote) — course-mfe와 같은 모양, 다른 것은 이름·포트·노출 모듈
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { federation } from "@module-federation/vite";
+
+export default defineConfig({
+  server: { port: 3002, strictPort: true },
+  preview: { port: 3002, strictPort: true },
+  plugins: [
+    react(),
+    federation({
+      name: "enrollmentMfe",                     // shell의 remotes 키와 같아야 한다
+      filename: "remoteEntry.js",
+      exposes: { "./EnrollmentApp": "./src/EnrollmentApp.tsx" },
+      shared: {
+        react: { singleton: true, requiredVersion: "^18.0.0" },
+        "react-dom": { singleton: true, requiredVersion: "^18.0.0" },
+        "@mui/material": { singleton: true },
+        "@emotion/react": { singleton: true },
+      },
+      dts: false,
+    }),
+  ],
+});
+```
+
+```tsx
+import { useState } from "react";
+import { Button, Stack, Typography, useTheme } from "@mui/material";
+
+// shell이 불러가는 두 번째 remote 화면. course-mfe와 마찬가지로 shell의 테마를 그대로 쓴다
+export default function EnrollmentApp() {
+  const [count, setCount] = useState(0);
+  const theme = useTheme();
+  return (
+    <Stack spacing={1}>
+      <Typography variant="h5" id="enrollment-title">내 신청 내역 (enrollment-mfe)</Typography>
+      <Typography id="enrollment-theme-color">테마 색: {theme.palette.primary.main}</Typography>
+      <Button variant="outlined" id="enrollment-btn" onClick={() => setCount(count + 1)}>클릭 {count}</Button>
+    </Stack>
+  );
+}
+```
+
+각 remote의 `src/main.tsx`는 단독 실행용(개발 편의)이며 shell에서 불러갈 때는 쓰이지 않습니다.
+
 **host: `apps/shell/vite.config.ts`** (remote 두 개: course-mfe 3001, enrollment-mfe 3002)
 
 ```ts
@@ -392,31 +444,36 @@ export default defineConfig({
 **host에서 remote 불러오기: `apps/shell/src/remotes.d.ts`, `apps/shell/src/main.tsx`**
 
 ```ts
-// remote 모듈의 타입 선언 (TypeScript가 'courseMfe/CourseApp'을 알게 한다)
+// remote 모듈의 타입 선언 (TypeScript가 'courseMfe/CourseApp', 'enrollmentMfe/EnrollmentApp'을 알게 한다)
 declare module "courseMfe/CourseApp" {
   const CourseApp: React.ComponentType;
   export default CourseApp;
+}
+declare module "enrollmentMfe/EnrollmentApp" {
+  const EnrollmentApp: React.ComponentType;
+  export default EnrollmentApp;
 }
 ```
 
 ```tsx
 import { Component, lazy, Suspense, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { Alert, CircularProgress, Container, createTheme, ThemeProvider } from "@mui/material";
+import { Alert, CircularProgress, Container, createTheme, Stack, ThemeProvider } from "@mui/material";
 
 // 테마는 shell 한 곳에서만 정의한다
 const theme = createTheme({ palette: { primary: { main: "#B5591C" } } });
 
 // remote는 실행 중에 네트워크로 불러온다 → lazy + Suspense
 const CourseApp = lazy(() => import("courseMfe/CourseApp"));
+const EnrollmentApp = lazy(() => import("enrollmentMfe/EnrollmentApp"));
 
-// remote를 못 불러와도 shell 전체가 깨지지 않게
-class RemoteBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+// remote를 못 불러와도 shell 전체가 깨지지 않게. remote마다 따로 감싸서 하나가 죽어도 다른 하나는 보인다
+class RemoteBoundary extends Component<{ name: string; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
     return this.state.failed
-      ? <Alert severity="error" id="remote-error">과정 화면을 불러오지 못했습니다. course-mfe(3001)가 실행 중인지 확인하세요.</Alert>
+      ? <Alert severity="error" className="remote-error">{this.props.name} 화면을 불러오지 못했습니다. 해당 remote가 실행 중인지 확인하세요.</Alert>
       : this.props.children;
   }
 }
@@ -424,11 +481,18 @@ class RemoteBoundary extends Component<{ children: ReactNode }, { failed: boolea
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider theme={theme}>
     <Container>
-      <RemoteBoundary>
-        <Suspense fallback={<CircularProgress />}>
-          <CourseApp />
-        </Suspense>
-      </RemoteBoundary>
+      <Stack spacing={4}>
+        <RemoteBoundary name="course-mfe(3001)">
+          <Suspense fallback={<CircularProgress />}>
+            <CourseApp />
+          </Suspense>
+        </RemoteBoundary>
+        <RemoteBoundary name="enrollment-mfe(3002)">
+          <Suspense fallback={<CircularProgress />}>
+            <EnrollmentApp />
+          </Suspense>
+        </RemoteBoundary>
+      </Stack>
     </Container>
   </ThemeProvider>,
 );
@@ -437,25 +501,27 @@ createRoot(document.getElementById("root")!).render(
 **실행**
 
 ```bash
-cd frontend
-npm run dev --workspace apps/course-mfe     # 3001 (먼저)
-npm run dev --workspace apps/shell          # 3000 (다른 창) → http://localhost:3000
+cd mf-demo
+npm run dev --workspace apps/course-mfe       # 3001 (먼저)
+npm run dev --workspace apps/enrollment-mfe   # 3002 (다른 창)
+npm run dev --workspace apps/shell            # 3000 (다른 창) → http://localhost:3000
 
 # 배포와 같은 결과물로 확인할 때
-npm run build --workspace apps/course-mfe && npm run build --workspace apps/shell
-npm run preview --workspace apps/course-mfe   # 3001
-npm run preview --workspace apps/shell        # 3000 (다른 창)
+npm run build --workspace apps/course-mfe && npm run build --workspace apps/enrollment-mfe && npm run build --workspace apps/shell
+npm run preview --workspace apps/course-mfe       # 3001
+npm run preview --workspace apps/enrollment-mfe   # 3002 (다른 창)
+npm run preview --workspace apps/shell            # 3000 (다른 창)
 ```
 
 | 확인할 것 | 정상 | 의미 |
 |---|---|---|
-| 화면 | shell 안에 "과정 목록 (course-mfe)"이 보인다 | remote를 실행 중에 불러왔다 |
-| 테마 색 | remote 화면에 shell 테마 색(`#B5591C`)이 나온다 | `@mui/material`·`@emotion/react`를 **같은 인스턴스**로 공유한다 (remote가 테마를 만들지 않아도 된다) |
-| 버튼 클릭 | 숫자가 올라간다 | remote의 React Hook이 shell의 React로 동작한다 (**React 한 벌**) |
-| Network 탭 | 3001에서 `remoteEntry.js`와 remote 코드만 받는다 | 개발 서버 모드에서는 이름에 `loadShare`가 들어간 작은 모듈이 3001에서 보이는데, React 자체가 아니라 **공유 React를 가리키는 연결 모듈**이다. 빌드 모드에서는 3001에서 React·MUI 파일을 받지 않는다 |
-| course-mfe를 끈 상태 | shell은 뜨고 그 자리에 MUI `Alert`가 나온다 | remote 하나가 죽어도 shell 전체가 깨지지 않는다 (`RemoteBoundary`) |
+| 화면 | shell 안에 "과정 목록 (course-mfe)"과 "내 신청 내역 (enrollment-mfe)"이 함께 보인다 | remote 두 개를 실행 중에 각각 불러왔다 |
+| 테마 색 | 두 remote 화면 모두 shell 테마 색(`#B5591C`)이 나온다 | `@mui/material`·`@emotion/react`를 **같은 인스턴스**로 공유한다 (remote가 테마를 만들지 않아도 된다) |
+| 버튼 클릭 | 두 버튼 모두 숫자가 올라간다 | remote의 React Hook이 shell의 React로 동작한다 (**React 한 벌**) |
+| Network 탭 | 3001·3002에서 각각 `remoteEntry.js`와 remote 코드만 받는다 | 개발 서버 모드에서는 이름에 `loadShare`가 들어간 작은 모듈이 3001·3002에서 보이는데, React 자체가 아니라 **공유 React를 가리키는 연결 모듈**이다. 빌드 모드에서는 3001·3002에서 React·MUI 파일을 받지 않는다 |
+| enrollment-mfe(또는 course-mfe)를 끈 상태 | shell은 뜨고 **끈 remote 자리에만** MUI `Alert`가 나오며, 다른 remote 화면은 그대로 보인다 | remote마다 `RemoteBoundary`로 따로 감쌌기 때문에 하나가 죽어도 shell과 다른 remote는 깨지지 않는다 |
 
-> ✅ 이 교재 환경에서 위 설정 그대로 shell + course-mfe를 만들어 브라우저(Chromium)로 확인했습니다 (Vite 8.3, `@module-federation/vite` 1.24, `@vitejs/plugin-react` 6.3, React 18.3, MUI 6.5): 개발 서버 모드와 빌드·미리보기 모드 모두 위 표대로 동작했고, TypeScript 타입 검사도 통과했습니다. remote의 `shared`를 일부러 빼면 `Cannot read properties of null (reading 'useState')`로 화면이 실패하는 것도 확인했습니다 (React가 두 벌 로드됨). enrollment-mfe(3002) remote 설정은 같은 모양으로 Step 1~3의 세 앱(3000·3001·3002) 구성에서 함께 확인했습니다.
+> ✅ 이 교재 환경에서 위 설정 그대로 shell + course-mfe를 만들어 브라우저(Chromium)로 확인했습니다 (Vite 8.3, `@module-federation/vite` 1.24, `@vitejs/plugin-react` 6.3, React 18.3, MUI 6.5): 개발 서버 모드와 빌드·미리보기 모드 모두 위 표대로 동작했고, TypeScript 타입 검사도 통과했습니다. remote의 `shared`를 일부러 빼면 `Cannot read properties of null (reading 'useState')`로 화면이 실패하는 것도 확인했습니다 (React가 두 벌 로드됨). enrollment-mfe(3002)를 추가한 세 앱 구성도 위 코드 그대로 개발 서버 모드·빌드 모드에서 확인했습니다 (두 remote 화면·테마 색·버튼 동작, 3002에서 React·MUI 파일을 받지 않음, enrollment-mfe만 끄면 그 자리에만 `Alert`가 나오고 과정 화면은 그대로).
 
 > 💡 플러그인 버전이 오르면서 설정이 바뀌기도 합니다. Claude에게 설정을 맡길 때는 **"`@module-federation/vite`로, 설치된 버전의 README 기준으로"**라고 지정하고, 인터넷의 `@originjs/vite-plugin-federation` 예제(옵션 이름과 동작이 다르다)가 섞이지 않았는지 diff에서 확인합니다.
 
