@@ -154,6 +154,51 @@ jobs:
         working-directory: backend
 ```
 
+위 예는 GitHub가 준비한 **클라우드 러너**(`ubuntu-latest`)에서 돕니다. 그런데 테스트나 배포에 **사내망 안의 자원**(사내 DB, 사내 패키지 저장소, 배포할 PC·서버)이 필요하면, 인터넷에 있는 클라우드 러너는 거기에 닿지 못합니다. 이때는 사내 PC·서버에 **self-hosted runner**를 설치하고 `runs-on`으로 그 러너를 고릅니다.
+
+```mermaid
+flowchart LR
+    subgraph GH["GitHub (인터넷)"]
+        Q["워크플로우 실행 대기열"]
+    end
+    subgraph IN["사내망 (GitHub에서 들어올 수 없음)"]
+        R["self-hosted runner<br/>(사내 PC·서버)"]
+        T["사내 자원<br/>DB · 패키지 저장소 · 배포 대상"]
+    end
+    R -- "① 먼저 접속: 할 일 있나요? (HTTPS, 사내 → 밖)" --> Q
+    Q -- "② 작업 전달 (같은 연결로 응답)" --> R
+    R -- "③ 사내망 안에서 실행" --> T
+    R -- "④ 결과·로그 보고" --> Q
+```
+
+```yaml
+# .github/workflows/ci.yml — GitHub에서 접속할 수 없는 사내망에서 실행할 때 (self-hosted runner)
+name: CI
+on:
+  pull_request:
+jobs:
+  backend:
+    # 사내 PC·서버에 설치한 러너에서 실행. 러너가 GitHub에 먼저 접속해 일을 받아 오므로
+    # GitHub → 사내로 들어오는 포트는 필요 없다 (사내 → github.com HTTPS만 열려 있으면 된다)
+    runs-on: [self-hosted, windows, eduhub-ci]   # 러너를 설치할 때 붙인 이름표
+    steps:
+      - uses: actions/checkout@v4                # 코드 받기 (러너가 GitHub에서 내려받음)
+      # setup-java는 인터넷에서 JDK를 내려받는다. 사내망에서 막히면 러너 PC에 JDK 21을 미리 설치하고 이 단계를 뺀다
+      - run: java -version                       # 미리 설치한 JDK 확인
+      - run: .\gradlew.bat test                  # Windows 러너: gradlew.bat (기본 셸은 PowerShell)
+        working-directory: backend
+```
+
+| | 클라우드 러너 (`ubuntu-latest`) | self-hosted runner |
+|---|---|---|
+| 어디서 도나 | GitHub가 준비한 인터넷의 가상 머신 (작업마다 새로) | **우리가 설치한** 사내 PC·서버 (계속 같은 컴퓨터) |
+| 사내 자원 접근 | ✕ | ⭕ |
+| 필요한 네트워크 | — | 사내 → `github.com` 방향 HTTPS만 (**들어오는 포트 불필요**) |
+| 도구 준비 | `setup-java` 등이 매번 내려받음 | 인터넷이 막혀 있으면 JDK·Node 등을 **러너 PC에 미리 설치** |
+| 관리 | GitHub | 우리 팀 (러너 업데이트, 작업 폴더 정리, 계정 권한) |
+
+> ⚠️ self-hosted runner는 **비공개 저장소에서만** 씁니다 (공개 저장소에서는 누구나 PR로 우리 PC에서 코드를 실행시킬 수 있다). 사내 프록시가 있으면 러너에 프록시를 설정해야 하고, `actions/checkout` 같은 action도 러너가 GitHub에서 내려받으므로 `github.com` 접속이 막혀 있으면 동작하지 않습니다. actionlint를 쓰면 `.github/actionlint.yaml`에 이름표(`eduhub-ci`)를 등록합니다. 실제 러너 설치와 배포 예는 [7-3](#7-3-프론트엔드를-스테이징-pc에-자동-배포-self-hosted-runner)에서 합니다.
+
 **Jenkins란**
 
 **직접 설치해서 운영하는** 오픈소스 자동화 서버입니다 (Java로 만들어진, 오래되고 널리 쓰이는 CI/CD 도구). 회사 서버에 Jenkins를 띄우고, 웹 화면에서 저장소를 연결하면 저장소의 `Jenkinsfile`을 읽어 실행합니다. GitHub뿐 아니라 GitLab, Bitbucket, 사내 Git 등 어떤 저장소와도 쓸 수 있고, 수천 개의 **플러그인**으로 기능을 넓힙니다.
@@ -179,7 +224,7 @@ pipeline {
 }
 ```
 
-> ✅ 위 GitHub Actions 예는 actionlint 검사를 통과했습니다. ⚠️ Jenkinsfile 예는 Declarative Pipeline 문법으로 쓴 개념 예시이며, 교재 환경에서 Jenkins로 실행해 보지는 않았습니다 (실행하려면 Jenkins 서버와, 프로젝트의 JDK 21이 설치된 에이전트가 필요).
+> ✅ 위 GitHub Actions 예 두 개(클라우드 러너, self-hosted runner)는 actionlint 검사를 통과했습니다 (실제 러너에서 실행해 보지는 않았습니다). ⚠️ Jenkinsfile 예는 Declarative Pipeline 문법으로 쓴 개념 예시이며, 교재 환경에서 Jenkins로 실행해 보지는 않았습니다 (실행하려면 Jenkins 서버와, 프로젝트의 JDK 21이 설치된 에이전트가 필요).
 
 두 도구를 나란히 놓으면 다음과 같습니다.
 
