@@ -502,7 +502,7 @@ Get-Content C:\eduhub-staging\backend\deploy-history.log -Tail 1                
 
 Claude는 공개된 Spring, React 코드로 학습했습니다. 그래서 사내 공통 모듈이 있어도 **표준 방식으로 쓰거나, 그럴듯한 사내 API를 지어내기도** 합니다.
 
-이번 회차에서는 실습을 위해 저장소 안에 **가상의 사내 공통 모듈 `corp-common`**을 두고 진행합니다.
+이번 회차에서는 실습을 위해 저장소 안에 **가상의 사내 공통 모듈 `corp-common`**을 두고 진행합니다. 전체 소스와 Maven 저장소 없이 공유하는 방법은 [예제 35](../examples/35-corp-common-library.md)에 있습니다.
 
 | 구성 요소 | 사내 규칙 | Claude가 흔히 하는 실수 |
 |---|---|---|
@@ -511,7 +511,7 @@ Claude는 공개된 Spring, React 코드로 학습했습니다. 그래서 사내
 | **에러 코드** `ErrorCode` | `도메인_의미` 이름, HTTP 상태와 메시지를 함께 정의 | 문자열 메시지 하드코딩, 상태 코드 임의 지정 |
 | **사내 인증 필터** `CorpAuthFilter` | 사용자 정보는 `CurrentUser`로만 꺼냄 | 요청 본문의 `userId`를 그대로 믿음 (2회차 2-3 사례 ④) |
 
-> 💡 EduHub에는 5회차 [Step 9-1](./session-05-hooks-and-mcp.md#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에)에서 만든 JWT 인증과 `CurrentUser.from(jwt)`가 이미 있습니다. 이번 회차의 가상 사내 모듈은 "회사가 정한 `CurrentUser`를 반드시 쓴다"는 규칙을 Claude가 따르게 하는 연습이므로, 실습에서는 5회차의 `CurrentUser`를 `corp-common`의 것으로 옮겼다고 가정합니다 (인증 필터의 실제 구현은 회사마다 SSO 연동 방식에 따라 다르다).
+> 💡 EduHub에는 5회차 [Step 9-1](./session-05-hooks-and-mcp.md#step-9-1-인증-기반-만들기-nfr-03--fr-07-전에)에서 만든 JWT 인증과 `CurrentUser.from(jwt)`가 이미 있습니다. `corp-common`은 **같은 모양의 `CurrentUser`**(사번·이름·역할, `from(jwt)`, `isAdmin()`)를 제공하고, 컨트롤러 메서드에 `CurrentUser user` 파라미터를 두면 로그인 토큰에서 자동으로 채워 줍니다. 그래서 Step 5에서 EduHub의 `auth.CurrentUser`를 지우고 공통 모듈의 것으로 바꿉니다. 인증 필터 자체(`CorpAuthFilter`)는 회사마다 SSO 연동 방식이 달라 실습에서는 5회차의 JWT 인증을 그대로 씁니다.
 
 ```java
 // corp-common (가상) — 사내 공통 모듈의 핵심 API
@@ -553,7 +553,7 @@ flowchart LR
 | ① CLAUDE.md | 항상 알아야 할 규칙과 "어디를 보면 되는지" | 신입 온보딩 한 장 | ⭕ |
 | ② 스킬 | 상세 사용법, 템플릿 | 업무 매뉴얼 | ⭕ |
 | ③ 참조 코드 | "이렇게 만들면 된다"는 모범 구현 | 선배가 만든 예제 | ⭕ |
-| ④ 소스·문서 접근 | 존재 여부를 직접 확인 | 사내 위키 검색 | 설명만 |
+| ④ 소스·문서 접근 | 존재 여부를 직접 확인 | 사내 위키 검색 | ⭕ (`libs/corp-common` 소스를 Claude가 직접 읽는다) |
 | ⑤ 강제 | 어기면 테스트·훅이 실패 | 출입 통제 | ⭕ |
 | ⑥ 플러그인 | 프레임워크 팀이 전사 배포 | 표준 도구 키트 | 6회차 복습 |
 
@@ -996,7 +996,7 @@ name: Deploy backend
 on:
   push:
     branches: [main]
-    paths: ['backend/**', 'scripts/deploy-backend.ps1']
+    paths: ['backend/**', 'libs/**', 'scripts/deploy-backend.ps1']   # libs: 사내 공통 모듈(따라하기 ②)
   workflow_dispatch:
     inputs:
       rollback:
@@ -1710,25 +1710,58 @@ git switch main
 
 ## Step 1. 공통 모듈 가져오기
 
-강사가 제공하는 `corp-common` 소스를 저장소의 `libs/corp-common/`에 복사하고 Gradle 멀티 모듈로 연결합니다 (실제 회사에서는 사내 Maven 저장소의 의존성으로 가져옵니다).
+실제 회사라면 공통 모듈을 **사내 Maven 저장소**(Nexus 등)에서 의존성으로 받습니다. 사내 저장소가 없고 공개 Maven Central에도 올릴 수 없다면, 공통 모듈 소스를 **같은 저장소의 `libs/corp-common/`에 두고 Gradle composite build(`includeBuild`)로 연결**하는 것이 가장 간단합니다. 서버도 업로드도 필요 없고, CI도 그대로 돌며, Claude가 공통 모듈 소스를 직접 읽을 수 있습니다(장치 ④). 다른 방법(공유 폴더를 Maven 저장소처럼 쓰기 등)과 비교는 [예제 35의 2장](../examples/35-corp-common-library.md#2-maven-저장소-없이-공유하는-방법)에 있습니다.
+
+```mermaid
+flowchart LR
+    subgraph REPO["EduHub 저장소"]
+        BE["backend/<br/>settings.gradle.kts: includeBuild(../libs/corp-common)<br/>build.gradle.kts: com.example.corp:corp-common:1.0.0"]
+        CC["libs/corp-common/<br/>독립 Gradle 빌드"]
+    end
+    BE -- "같은 좌표를 소스 빌드로 대체" --> CC
+    LATER[("나중에 사내 Maven 저장소가 생기면<br/>repositories 주소만 추가, includeBuild 삭제")] -. "코드 변경 없음" .-> BE
+```
 
 ```bash
 git switch main && git pull
 git switch -c feature/corp-common
 ```
 
-```kotlin
-// settings.gradle.kts
-include("backend", "libs:corp-common")
+**① 공통 모듈 소스 넣기**: [예제 35의 4장](../examples/35-corp-common-library.md#4-전체-소스) 파일들을 `libs/corp-common/`에 만듭니다. 강사가 배포본을 주면 그대로 복사하고, 아니면 Claude에게 맡겨도 됩니다 (회사에서 공통 모듈 소스를 받아 오는 단계를 대신하는 것이므로 **내용을 고치지 않고 그대로** 만들게 합니다).
 
-// backend/build.gradle.kts (발췌)
-dependencies {
-    implementation(project(":libs:corp-common"))
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
-}
+```text
+examples/35-corp-common-library.md의 4장 "전체 소스"에 있는 파일들을 libs/corp-common/ 아래에 경로 그대로, 내용도 그대로 만들어줘.
+내용을 고치거나 파일을 더하지 마. 끝나면 cd backend && ./gradlew :corp-common:test 가 통과하는지 보여줘.
 ```
 
-> 💡 이 정도 연결은 **직접** 하는 편이 빠릅니다. Gradle 구성을 직접 만져 봐야 빌드가 깨졌을 때도 직접 고칠 수 있습니다.
+**② backend에 연결 (사람이 직접)**
+
+```kotlin
+// backend/settings.gradle.kts (끝에 추가)
+// 사내 공통 모듈: Maven 저장소 대신 같은 저장소의 소스를 함께 빌드 (Gradle composite build)
+// dependencies의 com.example.corp:corp-common 을 이 빌드의 결과로 자동 대체한다
+includeBuild("../libs/corp-common")
+```
+
+```kotlin
+// backend/build.gradle.kts (dependencies에 추가)
+implementation("com.example.corp:corp-common:1.0.0")
+testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+```
+
+✅ **확인**
+
+```bash
+cd backend
+./gradlew dependencies --configuration runtimeClasspath | grep corp-common
+#   +--- com.example.corp:corp-common:1.0.0 -> project :corp-common   ← libs의 소스로 대체됨
+./gradlew :corp-common:test      # 공통 모듈 테스트 5개
+./gradlew test                   # 기존 EduHub 테스트 (아직 아무것도 바꾸지 않았으므로 그대로 통과)
+```
+
+> 💡 이 정도 연결은 **직접** 하는 편이 빠릅니다. Gradle 구성을 직접 만져 봐야 빌드가 깨졌을 때도 직접 고칠 수 있습니다. 공통 모듈이 들어오면 `libs/**`가 바뀌어도 백엔드가 다시 배포돼야 하므로, 7-2의 `deploy-backend.yml` `paths`에 `libs/**`가 있는지 확인합니다.
+
+> ✅ 교재 환경(Gradle 8.14, Java 21, Spring Boot 3.5)에서 이 연결과 Step 4·5의 흐름을 확인했습니다: 의존성 대체, 공통 모듈 테스트 5개 통과, `CorpRulesTest`가 전환 전 코드의 위반 목록을 보여 줌, 전환한 API가 실제 서버에서 `ApiResponse` 모양과 `COURSE_NOT_FOUND`(404)로 응답, bootJar에 `corp-common-1.0.0.jar` 포함 ([예제 35의 6장](../examples/35-corp-common-library.md#6-확인한-것)).
 
 ---
 
@@ -1742,7 +1775,7 @@ dependencies {
 - 업무 오류는 도메인별 `ErrorCode` enum + `throw new BizException(ErrorCode.XXX)`
 - 현재 사용자는 `CurrentUser`로만 얻는다. 요청 본문의 userId를 믿지 않는다
 - 사용법은 `corp-api` 스킬과 `reference/backend/CourseApiReference.java`를 본다
-- corp-common에 없는 API를 추측해서 쓰지 않는다. 없으면 질문한다
+- 소스는 `libs/corp-common`. 없는 API를 추측해서 쓰지 않는다. 소스에서 확인하고, 없으면 질문한다
 ```
 
 ---
@@ -1784,7 +1817,19 @@ description: EduHub 백엔드에서 Controller, Service, 예외, 에러 코드�
 
 ```java
 // backend/src/test/java/com/example/eduhub/architecture/CorpRulesTest.java
-@AnalyzeClasses(packages = "com.example.eduhub")
+package com.example.eduhub.architecture;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+
+import com.example.corp.common.api.ApiResponse;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+import org.springframework.web.bind.annotation.RestController;
+
+@AnalyzeClasses(packages = "com.example.eduhub", importOptions = ImportOption.DoNotIncludeTests.class)
 class CorpRulesTest {
 
     @ArchTest
@@ -1821,7 +1866,8 @@ class CorpRulesTest {
 ```text
 [목표] CorpRulesTest가 실패하는 기존 컨트롤러와 예외 처리를 corp-common 규칙으로 전환해줘.
 [위치] ./gradlew test --tests "*CorpRulesTest" 실패 목록의 클래스들
-[범위] course, enrollment 패키지의 Controller와 Service의 예외 처리
+[범위] course, enrollment 패키지의 Controller와 Service의 예외 처리. auth.CurrentUser는 지우고 corp-common의 CurrentUser로
+       (컨트롤러는 @AuthenticationPrincipal Jwt 대신 CurrentUser 파라미터). 응답 모양이 바뀐 API의 기존 테스트는 JSON 경로만 $.data… 로
 [하지 않는 것] API 경로·요청 형식 변경, 업무 로직 변경, CorpRulesTest 수정
 [완료 기준] ./gradlew test 전체 통과 (CorpRulesTest 포함), 프론트 API 클라이언트 재생성 필요 여부 보고
 [진행 방식] 클래스별 변경 계획을 먼저 보여줘
@@ -1889,7 +1935,7 @@ exit 0
 ## 5-7. 커밋과 PR
 
 ```bash
-git add libs settings.gradle.kts backend .claude/skills reference
+git add libs backend .claude/skills reference
 git status                     # .env, build/ 가 없는지 확인
 git commit -m "feat(common): corp-common 공통 모듈 적용과 아키텍처 규칙 테스트 추가"
 git push -u origin feature/corp-common
