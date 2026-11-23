@@ -408,6 +408,127 @@ createRoot(document.getElementById('root')!).render(<CourseDetail />);
 
 > ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 위 코드를 빌드해, 컴포넌트 파일을 다른 포트(4174)에서 제공하고 HTML 호스트·React 호스트 두 곳에서 위 표대로 동작하는 것을 확인했습니다 (콘솔 오류 없음, TypeScript 검사 통과).
 
+**Web Component는 어디로 배포되나: 정적 JS 파일 하나**
+
+빌드 결과는 **JavaScript 파일**(위 예에서는 `eduhub-enroll-button.js` 하나)입니다. 정적 파일을 내줄 수 있는 곳이면 어디든 올릴 수 있고, 쓰는 쪽은 **그 파일의 주소만** 알면 됩니다.
+
+| 배포 위치 | 예 |
+|---|---|
+| EduHub 구성 그대로 | `run\web\wc\enroll-button\eduhub-enroll-button.js` → `/wc/enroll-button/eduhub-enroll-button.js` (아래 설정 한 줄씩) |
+| 웹 서버·CDN | nginx 폴더, 오브젝트 스토리지(S3 등) + CDN, 사내 정적 파일 서버 |
+| 쓰는 페이지와 **다른 서버** | 가능. 단 `<script type="module">`은 다른 출처의 파일을 받을 때 **CORS 허용 헤더**(`Access-Control-Allow-Origin`)가 필요하다 (위 예는 4174 포트에서 이 헤더를 붙여 제공) |
+
+```text
+run\web\
+  shell\                       ← /
+  mfe\course\, mfe\enrollment\ ← /mfe/…        (Module Federation remote)
+  wc\enroll-button\            ← /wc/enroll-button/…   (Web Component)
+```
+
+```java
+// Step 4-4의 FrontendResourceConfig.addResourceHandlers()에 한 줄 추가 (8080)
+registry.addResourceHandler("/wc/**").addResourceLocations(root + "wc/").setCacheControl(NO_CACHE);
+```
+
+```nginx
+# Step 4-7의 nginx.conf server 블록에 추가 (80)
+location /wc/ {
+    root  "C:/work/eduhub/run/web";
+    add_header Cache-Control "no-cache";
+}
+```
+
+- Module Federation의 `remoteEntry.js`와 같은 자리입니다. 차이는 MF의 진입 파일이 "공유 의존성을 맞추고 모듈을 넘겨주는" 파일이라면, Web Component의 파일은 "**태그를 등록하는**" 스크립트라는 점입니다
+- 배포·롤백은 Step 4-5와 같은 방식(폴더 통째로 교체, 직전 버전 보관)입니다. 진입 파일 이름이 바뀌지 않으므로 `no-cache`로 둡니다. 쓰는 쪽이 버전을 고정해야 하면 주소에 버전을 넣습니다 (`/wc/enroll-button/1.2.0/eduhub-enroll-button.js`)
+
+> ✅ 위 두 설정을 교재 환경의 백엔드(8080)와 Linux nginx(80)에 넣어, 두 주소 모두 `/wc/enroll-button/eduhub-enroll-button.js`를 200·`no-cache`로 주고 같은 주소의 페이지에서 태그가 그려지는 것(CORS 없이)을 브라우저로 확인했습니다. 교재의 기본 구성(Step 4-4, 4-7)에는 이 줄이 없으며, Web Component를 함께 배포할 때만 추가합니다.
+
+**브라우저에서는 어떻게 연결되나: 태그 이름표와 "업그레이드"**
+
+핵심은 페이지마다 하나씩 있는 **태그 이름표**(`CustomElementRegistry`)입니다. 브라우저는 처음 보는 태그도 일단 만들어 두었다가, 스크립트가 이름표에 클래스를 등록하는 순간 **이미 있던 태그를 그 클래스로 바꿉니다**(업그레이드).
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant H as 쓰는 페이지 (HTML·React)
+    participant S as 정적 파일 서버 (/wc/…)
+    participant R as 태그 이름표 (CustomElementRegistry)
+    B->>H: HTML 읽기
+    Note over B: eduhub-enroll-button 태그 → 일단 평범한 HTMLElement (:not(:defined), 안쪽 비어 있음)
+    B->>S: GET /wc/enroll-button/eduhub-enroll-button.js
+    S-->>B: 파일 (React 포함)
+    B->>R: customElements.define("eduhub-enroll-button", 클래스)
+    R-->>B: 이미 있던 태그를 업그레이드
+    Note over B: constructor → attributeChangedCallback(초기 속성) → connectedCallback → Shadow DOM + React 그리기
+    H->>B: setAttribute("remaining", "1")
+    Note over B: attributeChangedCallback → 다시 그리기
+    B-->>H: CustomEvent "enroll-requested"
+    Note over B: 그 뒤에 만드는 태그(HTML, createElement, React)는 처음부터 이 클래스
+```
+
+<details>
+<summary>확인용 페이지: 컴포넌트 파일을 0.5초 늦게 불러와 업그레이드와 콜백 순서를 기록</summary>
+
+```html
+<!doctype html><html><head><meta charset="utf-8">
+<style> eduhub-enroll-button:not(:defined) { visibility: hidden; } </style></head>
+<body>
+<eduhub-enroll-button id="a" session-id="1" remaining="2"></eduhub-enroll-button>
+<x-trace id="t" foo="1"></x-trace>
+<script>
+  window.log = [];
+  const a = document.getElementById('a');
+  log.push('정의 전: ' + JSON.stringify({ 클래스: a.constructor.name, defined: a.matches(':defined'), shadowRoot: !!a.shadowRoot, 등록: !!customElements.get('eduhub-enroll-button') }));
+  // 콜백 순서를 보기 위한 작은 요소
+  class XTrace extends HTMLElement {
+    static observedAttributes = ['foo'];
+    constructor() { super(); log.push('x-trace: constructor'); }
+    connectedCallback() { log.push('x-trace: connectedCallback'); }
+    attributeChangedCallback(n, o, v) { log.push(`x-trace: attributeChangedCallback(${n}: ${o} → ${v})`); }
+    disconnectedCallback() { log.push('x-trace: disconnectedCallback'); }
+  }
+  customElements.define('x-trace', XTrace);
+  document.getElementById('t').setAttribute('foo', '2');
+  document.getElementById('t').remove();
+  // 0.5초 뒤에야 컴포넌트 파일을 불러온다 (느린 네트워크·나중 로드 흉내)
+  setTimeout(async () => {
+    customElements.whenDefined('eduhub-enroll-button').then(() => log.push('whenDefined 완료'));
+    await import('http://localhost:4174/eduhub-enroll-button.js');
+    await new Promise(r => setTimeout(r, 100));
+    log.push('정의 후: ' + JSON.stringify({ 클래스: a.constructor.name, defined: a.matches(':defined'), shadowRoot: !!a.shadowRoot, 내용: a.shadowRoot && a.shadowRoot.querySelector('.info')?.textContent }));
+    const b = document.createElement('eduhub-enroll-button'); b.setAttribute('session-id', '9'); b.setAttribute('remaining', '5'); document.body.append(b);
+    await new Promise(r => setTimeout(r, 100));
+    log.push('나중에 만든 태그: ' + b.shadowRoot.querySelector('.info').textContent);
+    window.done = true;
+  }, 500);
+</script></body></html>
+```
+
+</details>
+
+**실제 실행 결과** (Chromium)
+
+```text
+정의 전: {"클래스":"HTMLElement","defined":false,"shadowRoot":false,"등록":false}
+x-trace: constructor
+x-trace: attributeChangedCallback(foo: null → 1)
+x-trace: connectedCallback
+x-trace: attributeChangedCallback(foo: 1 → 2)
+x-trace: disconnectedCallback
+whenDefined 완료
+정의 후: {"클래스":"m","defined":true,"shadowRoot":true,"내용":"회차 1 · 남은 자리 2"}
+나중에 만든 태그: 회차 9 · 남은 자리 5
+```
+
+- 스크립트보다 태그가 **먼저** 있어도 됩니다. 정의되는 순간 이미 있던 태그가 업그레이드됩니다 (`"m"`은 빌드 때 줄여진 클래스 이름)
+- 초기 속성의 `attributeChangedCallback`이 `connectedCallback`보다 **먼저** 불립니다. 그래서 위 예의 `render()`는 React root가 아직 없으면 아무것도 하지 않게 막아 두었습니다
+
+| 알아 둘 점 | 이렇게 |
+|---|---|
+| 업그레이드 전에는 태그가 **비어 있다** (깜빡임) | `eduhub-enroll-button:not(:defined) { visibility: hidden; }` 또는 자리 표시. 스크립트가 끝내 안 오면 빈 채로 남으므로 안내 문구를 준비 |
+| 태그를 조작하는 코드가 정의보다 먼저 돌 수 있다 | `await customElements.whenDefined('eduhub-enroll-button')` 후에 조작 |
+| 태그 이름은 **페이지 전체에서 하나** | 같은 이름을 두 번 `define`하면 오류 → 예처럼 `customElements.get()`으로 확인. 한 페이지에 두 버전을 함께 쓰려면 이름에 버전을 넣는다 (`eduhub-enroll-button-v2`) |
+
 **Module Federation과 Web Components 비교**
 
 | 비교 | Module Federation (EduHub 6회차) | Web Components |
