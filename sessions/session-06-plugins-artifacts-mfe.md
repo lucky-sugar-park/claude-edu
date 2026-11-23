@@ -443,61 +443,7 @@ sequenceDiagram
     Note over B: 그 뒤에 만드는 태그(HTML, createElement, React)는 처음부터 이 클래스
 ```
 
-<details>
-<summary>확인용 페이지: 컴포넌트 파일을 0.5초 늦게 불러와 업그레이드와 콜백 순서를 기록</summary>
-
-```html
-<!doctype html><html><head><meta charset="utf-8">
-<style> eduhub-enroll-button:not(:defined) { visibility: hidden; } </style></head>
-<body>
-<eduhub-enroll-button id="a" session-id="1" remaining="2"></eduhub-enroll-button>
-<x-trace id="t" foo="1"></x-trace>
-<script>
-  window.log = [];
-  const a = document.getElementById('a');
-  log.push('정의 전: ' + JSON.stringify({ 클래스: a.constructor.name, defined: a.matches(':defined'), shadowRoot: !!a.shadowRoot, 등록: !!customElements.get('eduhub-enroll-button') }));
-  // 콜백 순서를 보기 위한 작은 요소
-  class XTrace extends HTMLElement {
-    static observedAttributes = ['foo'];
-    constructor() { super(); log.push('x-trace: constructor'); }
-    connectedCallback() { log.push('x-trace: connectedCallback'); }
-    attributeChangedCallback(n, o, v) { log.push(`x-trace: attributeChangedCallback(${n}: ${o} → ${v})`); }
-    disconnectedCallback() { log.push('x-trace: disconnectedCallback'); }
-  }
-  customElements.define('x-trace', XTrace);
-  document.getElementById('t').setAttribute('foo', '2');
-  document.getElementById('t').remove();
-  // 0.5초 뒤에야 컴포넌트 파일을 불러온다 (느린 네트워크·나중 로드 흉내)
-  setTimeout(async () => {
-    customElements.whenDefined('eduhub-enroll-button').then(() => log.push('whenDefined 완료'));
-    await import('http://localhost:4174/eduhub-enroll-button.js');
-    await new Promise(r => setTimeout(r, 100));
-    log.push('정의 후: ' + JSON.stringify({ 클래스: a.constructor.name, defined: a.matches(':defined'), shadowRoot: !!a.shadowRoot, 내용: a.shadowRoot && a.shadowRoot.querySelector('.info')?.textContent }));
-    const b = document.createElement('eduhub-enroll-button'); b.setAttribute('session-id', '9'); b.setAttribute('remaining', '5'); document.body.append(b);
-    await new Promise(r => setTimeout(r, 100));
-    log.push('나중에 만든 태그: ' + b.shadowRoot.querySelector('.info').textContent);
-    window.done = true;
-  }, 500);
-</script></body></html>
-```
-
-</details>
-
-**실제 실행 결과** (Chromium)
-
-```text
-정의 전: {"클래스":"HTMLElement","defined":false,"shadowRoot":false,"등록":false}
-x-trace: constructor
-x-trace: attributeChangedCallback(foo: null → 1)
-x-trace: connectedCallback
-x-trace: attributeChangedCallback(foo: 1 → 2)
-x-trace: disconnectedCallback
-whenDefined 완료
-정의 후: {"클래스":"m","defined":true,"shadowRoot":true,"내용":"회차 1 · 남은 자리 2"}
-나중에 만든 태그: 회차 9 · 남은 자리 5
-```
-
-- 스크립트보다 태그가 **먼저** 있어도 됩니다. 정의되는 순간 이미 있던 태그가 업그레이드됩니다 (`"m"`은 빌드 때 줄여진 클래스 이름)
+- 스크립트보다 태그가 **먼저** 있어도 됩니다. 정의되는 순간 이미 있던 태그가 업그레이드되고, 그 뒤에 만드는 태그는 처음부터 그 클래스로 만들어집니다
 - 초기 속성의 `attributeChangedCallback`이 `connectedCallback`보다 **먼저** 불립니다. 그래서 B의 `element.tsx`에 있는 `render()`는 React root가 아직 없으면 아무것도 하지 않게 막아 두었습니다
 
 | 알아 둘 점 | 이렇게 |
