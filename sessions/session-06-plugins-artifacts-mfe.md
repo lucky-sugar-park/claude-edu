@@ -201,24 +201,82 @@ Module Federation은 **JavaScript 모듈(React 컴포넌트)** 단위로 다른 
 | **입력** | 속성(attribute, **문자열만**: `session-id="1"`). 객체를 넘기려면 JavaScript 프로퍼티(`el.course = {...}`) |
 | **출력** | 이벤트: `dispatchEvent(new CustomEvent('enroll-requested', { detail, bubbles: true, composed: true }))`. `composed: true`가 없으면 Shadow DOM 밖으로 나가지 않는다 |
 
-**예시: 5회차의 신청 버튼을 Web Component로**
+**Web Component는 어떻게 빌드하나: 세 가지 방법**
 
-enrollment 팀이 React로 만든 컴포넌트를 `<eduhub-enroll-button>` 태그로 감싸 **파일 하나**로 배포하고, 다른 페이지는 그 파일을 불러와 태그만 씁니다.
+결과물은 세 방법 모두 **브라우저가 바로 읽는 JavaScript 파일**(태그를 등록하는 스크립트)입니다. 어떤 방법으로 만들었는지는 쓰는 쪽이 알 필요가 없습니다.
 
-```mermaid
-flowchart LR
-    subgraph ENR["enrollment 팀 (따로 빌드·배포, :4174)"]
-        C["EnrollButton.tsx<br/>(평범한 React)"] --> E["element.tsx<br/>Custom Element로 감싸기<br/>+ Shadow DOM"]
-        E --> F["eduhub-enroll-button.js<br/>(React까지 포함한 파일 하나)"]
-    end
-    F -- "script type=module" --> H1["React가 아닌 페이지<br/>(JSP·Thymeleaf·HTML)"]
-    F -- "script type=module" --> H2["React 호스트<br/>(EduHub shell 같은)"]
-    H1 & H2 -- "속성: session-id, remaining" --> F
-    F -- "이벤트: enroll-requested" --> H1 & H2
+| 방법 | 빌드 | 맞는 경우 |
+|---|---|---|
+| **A. 빌드 없이** 순수 JavaScript | 없음. 쓴 `.js` 파일을 그대로 배포 | 작은 위젯 (배지, 알림 표시). 화면이 커지면 상태 관리·다시 그리기를 직접 짜야 한다 |
+| **B. 번들러의 라이브러리 모드** (Vite 등) | `vite build` → 컴포넌트 + React + CSS를 **파일 하나로** | 이미 React로 만든 화면을 감쌀 때 |
+| **C. Web Component를 지원하는 도구** | 각 도구의 빌드 명령 | 처음부터 Web Component로 만들 때, 다른 프레임워크 팀 |
+
+**A. 빌드 없이: 순수 JavaScript**
+
+```js
+// hello-badge.js — 빌드 없이 그대로 배포하는 Web Component (표준 API만 사용)
+class HelloBadge extends HTMLElement {
+  static observedAttributes = ['name'];
+
+  connectedCallback() {
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: 'open' }).innerHTML = '<style>b { color: #2f5f9e; }</style><b></b>';
+    }
+    this.render();
+  }
+
+  attributeChangedCallback() {
+    this.render();
+  }
+
+  render() {
+    const b = this.shadowRoot?.querySelector('b');
+    if (b) b.textContent = `안녕하세요, ${this.getAttribute('name') ?? ''}님`;   // textContent: 입력을 HTML로 해석하지 않는다 (XSS 방지)
+  }
+}
+
+if (!customElements.get('hello-badge')) customElements.define('hello-badge', HelloBadge);
+```
+
+```html
+<script type="module" src="/wc/hello-badge/hello-badge.js"></script>
+<hello-badge name="김사원"></hello-badge>
+```
+
+> ⚠️ 사용자 입력을 `innerHTML`로 넣으면 그 안의 HTML·스크립트가 실행될 수 있습니다(XSS). 위 예처럼 글자는 `textContent`로 넣습니다.
+
+**B. 번들러의 라이브러리 모드 (Vite)**: 5회차의 신청 버튼(평범한 React 컴포넌트)을 `<eduhub-enroll-button session-id="1" remaining="2">` 태그로 감싸는 예로 봅니다. "앱"이 아니라 **라이브러리**로 빌드하므로 `index.html` 없이 입구 파일(`entry`) 하나에서 JS 파일을 만듭니다. 아래는 **두 가지 형식**으로 만들고 CSS를 별도 파일로 분리한 설정입니다.
+
+```text
+enroll-button/
+  src/EnrollButton.tsx      ← 평범한 React 컴포넌트 (5회차 EnrollButton을 단순화)
+  src/element.tsx           ← Custom Element로 감싸기 = 빌드 입구(entry)
+  src/enroll-button.css     ← CSS를 파일로 분리
+  vite.config.ts            ← 라이브러리 모드
+```
+
+```ts
+// 두 가지 형식으로: ES 모듈(<script type="module">)과 IIFE(옛 페이지의 일반 <script>)
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  define: { 'process.env.NODE_ENV': '"production"' },
+  build: {
+    lib: {
+      entry: 'src/element.tsx',
+      formats: ['es', 'iife'],
+      name: 'EduhubEnrollButton',                       // IIFE일 때 전역 이름 (이 예에서는 쓰지 않아도 됨)
+      fileName: (format) => `eduhub-enroll-button.${format === 'es' ? 'js' : 'iife.js'}`,
+    },
+    outDir: 'dist',
+  },
+});
 ```
 
 <details>
-<summary>① 컴포넌트와 Custom Element: <code>enroll-button/src/EnrollButton.tsx</code>, <code>element.tsx</code>, <code>vite.config.ts</code></summary>
+<summary>컴포넌트 코드: <code>EnrollButton.tsx</code>, <code>element.tsx</code>, <code>enroll-button.css</code></summary>
 
 ```tsx
 // 평범한 React 컴포넌트 (5회차의 EnrollButton을 단순화). Web Component인지 모른다
@@ -241,13 +299,8 @@ export function EnrollButton({ sessionId, remaining, onEnroll }: Props) {
 // <eduhub-enroll-button session-id="1" remaining="3"> — React 컴포넌트를 Web Component(Custom Element)로 감싼다
 import { createRoot, type Root } from 'react-dom/client';
 import { EnrollButton } from './EnrollButton';
-
-// Shadow DOM 안에만 적용되는 스타일: 바깥 페이지의 CSS가 들어오지도, 이 CSS가 나가지도 않는다
-const css = `
-  .box { display: inline-flex; gap: 8px; align-items: center; font: 14px sans-serif; }
-  .enroll { background: #2f5f9e; color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
-  .enroll:disabled { background: #9aa3af; cursor: default; }
-`;
+// ?inline: CSS 파일 내용을 문자열로 가져온다 → Shadow DOM 안의 <style>에 넣는다 (바깥 페이지에 CSS 파일이 따로 붙지 않음)
+import css from './enroll-button.css?inline';
 
 class EduhubEnrollButton extends HTMLElement {
   // 이 속성(attribute)이 바뀌면 attributeChangedCallback이 불린다 = 바깥에서 들어오는 입력
@@ -293,201 +346,15 @@ if (!customElements.get('eduhub-enroll-button')) {
 }
 ```
 
-```ts
-// enroll-button/vite.config.ts — Custom Element를 파일 하나(ES 모듈)로 빌드. React도 이 파일 안에 함께 들어간다
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  define: { 'process.env.NODE_ENV': '"production"' },
-  build: {
-    lib: { entry: 'src/element.tsx', formats: ['es'], fileName: () => 'eduhub-enroll-button.js' },
-    outDir: 'dist',
-  },
-});
+```css
+.box { display: inline-flex; gap: 8px; align-items: center; font: 14px sans-serif; }
+.enroll { background: #2f5f9e; color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+.enroll:disabled { background: #9aa3af; cursor: default; }
 ```
 
 </details>
 
-<details>
-<summary>② React가 아닌 페이지에서 쓰기: <code>host-html/index.html</code></summary>
-
-```html
-<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <title>JSP·Thymeleaf 같은 다른 화면에서도 쓸 수 있다</title>
-  <style>
-    /* 페이지 전체 CSS: 이 페이지의 모든 button을 빨갛게 → Shadow DOM 안의 버튼에는 적용되지 않는다 */
-    button { background: red; }
-  </style>
-  <!-- 별도로 배포된 파일 하나만 불러오면 된다 (React를 몰라도 됨) -->
-  <script type="module" src="http://localhost:4174/eduhub-enroll-button.js"></script>
-</head>
-<body>
-  <h1>과정 상세 (React가 아닌 페이지)</h1>
-  <button id="page-btn">이 페이지의 버튼</button>
-  <eduhub-enroll-button id="enroll" session-id="1" remaining="2"></eduhub-enroll-button>
-  <p id="log"></p>
-  <script>
-    const el = document.getElementById('enroll');
-    // 출력: 이벤트를 듣는다
-    el.addEventListener('enroll-requested', (e) => {
-      document.getElementById('log').textContent = '신청 요청: 회차 ' + e.detail.sessionId;
-      // 입력: 속성을 바꾸면 컴포넌트가 다시 그린다 (실제로는 API 호출 후)
-      el.setAttribute('remaining', String(Number(el.getAttribute('remaining')) - 1));
-    });
-  </script>
-</body>
-</html>
-```
-
-</details>
-
-<details>
-<summary>③ React 18 호스트에서 쓰기: <code>host-react/src/main.tsx</code></summary>
-
-```tsx
-// React 18 호스트에서 Custom Element 쓰기: 속성은 문자열로, 이벤트는 ref로 addEventListener
-import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-
-// TypeScript가 <eduhub-enroll-button>을 알게 한다
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements {
-      'eduhub-enroll-button': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        'session-id'?: string;
-        remaining?: number | string;
-      };
-    }
-  }
-}
-
-function CourseDetail() {
-  const [remaining, setRemaining] = useState(2);
-  const [log, setLog] = useState('');
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // React 18은 Custom Element의 사용자 정의 이벤트를 onXxx로 연결하지 못한다 → 직접 등록
-    const onEnroll = (e: Event) => {
-      const { sessionId } = (e as CustomEvent<{ sessionId: string }>).detail;
-      setLog(`신청 요청: 회차 ${sessionId}`);
-      setRemaining((r) => r - 1);
-    };
-    el.addEventListener('enroll-requested', onEnroll);
-    return () => el.removeEventListener('enroll-requested', onEnroll);
-  }, []);
-
-  return (
-    <div>
-      <h1>과정 상세 (React 호스트)</h1>
-      <eduhub-enroll-button ref={ref} session-id="1" remaining={String(remaining)} />
-      <p id="log">{log}</p>
-    </div>
-  );
-}
-
-createRoot(document.getElementById('root')!).render(<CourseDetail />);
-```
-
-</details>
-
-| 확인 (브라우저, 두 호스트 모두) | 결과 |
-|---|---|
-| 태그만 쓰고 파일 하나 불러오기 | `회차 1 · 남은 자리 2`가 그려진다 (호스트는 React가 아니어도 됨) |
-| 스타일 격리 | 페이지 CSS `button { background: red }` → 페이지 버튼은 빨강, **컴포넌트 안 버튼은 파랑 그대로**. 바깥 `document`에서 `.enroll`을 찾을 수 없다 |
-| 출력 (이벤트) | 신청 클릭 → 호스트가 `enroll-requested`를 받아 `신청 요청: 회차 1` |
-| 입력 (속성) | 호스트가 `remaining`을 2 → 1 → 0으로 바꾸면 다시 그려지고, 0이면 `마감`·비활성 |
-| 크기 | `eduhub-enroll-button.js` 193 kB (gzip 52 kB): **React가 이 파일 안에 한 벌 더** 들어 있다 |
-
-> ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 위 코드를 빌드해, 컴포넌트 파일을 다른 포트(4174)에서 제공하고 HTML 호스트·React 호스트 두 곳에서 위 표대로 동작하는 것을 확인했습니다 (콘솔 오류 없음, TypeScript 검사 통과).
-
-**Web Component는 어떻게 빌드하나: 세 가지 방법**
-
-결과물은 세 방법 모두 **브라우저가 바로 읽는 JavaScript 파일**(태그를 등록하는 스크립트)입니다. 어떤 방법으로 만들었는지는 쓰는 쪽이 알 필요가 없습니다.
-
-| 방법 | 빌드 | 맞는 경우 |
-|---|---|---|
-| **A. 빌드 없이** 순수 JavaScript | 없음. 쓴 `.js` 파일을 그대로 배포 | 작은 위젯 (배지, 알림 표시). 화면이 커지면 상태 관리·다시 그리기를 직접 짜야 한다 |
-| **B. 번들러의 라이브러리 모드** (Vite 등) | `vite build` → 컴포넌트 + React + CSS를 **파일 하나로** | 이미 React로 만든 화면을 감쌀 때 (위 예시) |
-| **C. Web Component를 지원하는 도구** | 각 도구의 빌드 명령 | 처음부터 Web Component로 만들 때, 다른 프레임워크 팀 |
-
-**A. 빌드 없이: 순수 JavaScript**
-
-```js
-// hello-badge.js — 빌드 없이 그대로 배포하는 Web Component (표준 API만 사용)
-class HelloBadge extends HTMLElement {
-  static observedAttributes = ['name'];
-
-  connectedCallback() {
-    if (!this.shadowRoot) {
-      this.attachShadow({ mode: 'open' }).innerHTML = '<style>b { color: #2f5f9e; }</style><b></b>';
-    }
-    this.render();
-  }
-
-  attributeChangedCallback() {
-    this.render();
-  }
-
-  render() {
-    const b = this.shadowRoot?.querySelector('b');
-    if (b) b.textContent = `안녕하세요, ${this.getAttribute('name') ?? ''}님`;   // textContent: 입력을 HTML로 해석하지 않는다 (XSS 방지)
-  }
-}
-
-if (!customElements.get('hello-badge')) customElements.define('hello-badge', HelloBadge);
-```
-
-```html
-<script type="module" src="/wc/hello-badge/hello-badge.js"></script>
-<hello-badge name="김사원"></hello-badge>
-```
-
-> ⚠️ 사용자 입력을 `innerHTML`로 넣으면 그 안의 HTML·스크립트가 실행될 수 있습니다(XSS). 위 예처럼 글자는 `textContent`로 넣습니다.
-
-**B. 번들러의 라이브러리 모드 (Vite)**: 위 신청 버튼 예시의 방식입니다. "앱"이 아니라 **라이브러리**로 빌드하므로 `index.html` 없이 입구 파일(`entry`) 하나에서 JS 파일을 만듭니다. 아래는 같은 버튼을 **두 가지 형식**으로 만들고 CSS를 별도 파일로 분리한 설정입니다.
-
-```text
-enroll-button/
-  src/EnrollButton.tsx      ← 평범한 React 컴포넌트 (위 예시와 같음)
-  src/element.tsx           ← Custom Element로 감싸기 = 빌드 입구(entry)
-  src/enroll-button.css     ← CSS를 파일로 분리
-  vite.config.ts            ← 라이브러리 모드
-```
-
-```ts
-// 두 가지 형식으로: ES 모듈(<script type="module">)과 IIFE(옛 페이지의 일반 <script>)
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  define: { 'process.env.NODE_ENV': '"production"' },
-  build: {
-    lib: {
-      entry: 'src/element.tsx',
-      formats: ['es', 'iife'],
-      name: 'EduhubEnrollButton',                       // IIFE일 때 전역 이름 (이 예에서는 쓰지 않아도 됨)
-      fileName: (format) => `eduhub-enroll-button.${format === 'es' ? 'js' : 'iife.js'}`,
-    },
-    outDir: 'dist',
-  },
-});
-```
-
-```tsx
-// element.tsx (바뀐 부분) — CSS 파일 내용을 문자열로 가져와 Shadow DOM 안의 <style>에 넣는다
-import css from './enroll-button.css?inline';
-// … connectedCallback 안에서
-shadow.innerHTML = `<style>${css}</style><span></span>`;
-```
+- 입력은 **속성**(`session-id`, `remaining`, 문자열), 출력은 **이벤트**(`enroll-requested`)입니다. 쓰는 쪽은 `el.addEventListener('enroll-requested', …)`로 받고, `el.setAttribute('remaining', '1')`로 바꾸면 다시 그려집니다
 
 ```bash
 npx vite build        # 또는 package.json의 "build": "vite build" → npm run build
@@ -520,13 +387,13 @@ npx vite build        # 또는 package.json의 "build": "vite build" → npm run
 
 **Web Component는 어디로 배포되나: 정적 JS 파일 하나**
 
-빌드 결과는 **JavaScript 파일**(위 예에서는 `eduhub-enroll-button.js` 하나)입니다. 정적 파일을 내줄 수 있는 곳이면 어디든 올릴 수 있고, 쓰는 쪽은 **그 파일의 주소만** 알면 됩니다.
+빌드 결과는 **JavaScript 파일**(B의 예에서는 `eduhub-enroll-button.js` 하나)입니다. 정적 파일을 내줄 수 있는 곳이면 어디든 올릴 수 있고, 쓰는 쪽은 **그 파일의 주소만** 알면 됩니다.
 
 | 배포 위치 | 예 |
 |---|---|
 | EduHub 구성 그대로 | `run\web\wc\enroll-button\eduhub-enroll-button.js` → `/wc/enroll-button/eduhub-enroll-button.js` (아래 설정 한 줄씩) |
 | 웹 서버·CDN | nginx 폴더, 오브젝트 스토리지(S3 등) + CDN, 사내 정적 파일 서버 |
-| 쓰는 페이지와 **다른 서버** | 가능. 단 `<script type="module">`은 다른 출처의 파일을 받을 때 **CORS 허용 헤더**(`Access-Control-Allow-Origin`)가 필요하다 (위 예는 4174 포트에서 이 헤더를 붙여 제공) |
+| 쓰는 페이지와 **다른 서버** | 가능. 단 `<script type="module">`은 다른 출처의 파일을 받을 때 **CORS 허용 헤더**(`Access-Control-Allow-Origin`)가 필요하다 |
 
 ```text
 run\web\
@@ -631,7 +498,7 @@ whenDefined 완료
 ```
 
 - 스크립트보다 태그가 **먼저** 있어도 됩니다. 정의되는 순간 이미 있던 태그가 업그레이드됩니다 (`"m"`은 빌드 때 줄여진 클래스 이름)
-- 초기 속성의 `attributeChangedCallback`이 `connectedCallback`보다 **먼저** 불립니다. 그래서 위 예의 `render()`는 React root가 아직 없으면 아무것도 하지 않게 막아 두었습니다
+- 초기 속성의 `attributeChangedCallback`이 `connectedCallback`보다 **먼저** 불립니다. 그래서 B의 `element.tsx`에 있는 `render()`는 React root가 아직 없으면 아무것도 하지 않게 막아 두었습니다
 
 | 알아 둘 점 | 이렇게 |
 |---|---|
@@ -664,7 +531,7 @@ whenDefined 완료
 | 다른 팀·외부 회사가 만든 위젯을 **격리해서** 붙인다 (스타일·버전 충돌을 막고 싶다) | **Web Components** |
 | 둘 다 필요 | 함께 쓴다: MFE 안의 화면 하나를 Custom Element로 감싸 레거시 페이지에도 내보내기 |
 
-> 💡 **EduHub가 Module Federation을 쓰는 이유**: shell과 두 remote가 모두 React 18 + MUI이고, 테마·`tokenStore`·라우터를 **한 벌로 공유**해야 하며, 상세 화면의 신청 버튼처럼 **함수(슬롯)로 긴밀하게** 연결됩니다. Web Components로 만들면 앱마다 React가 한 벌씩 들어가고(위 예에서 버튼 하나에 193 kB), 테마·로그인 정보를 속성·이벤트로 일일이 넘겨야 합니다. 반대로 사내 포털(JSP)에 "내 신청 내역" 위젯을 넣어 달라는 요청이 오면, 그 화면 하나를 위 예처럼 Web Component로 감싸 내보내는 것이 좋은 선택입니다.
+> 💡 **EduHub가 Module Federation을 쓰는 이유**: shell과 두 remote가 모두 React 18 + MUI이고, 테마·`tokenStore`·라우터를 **한 벌로 공유**해야 하며, 상세 화면의 신청 버튼처럼 **함수(슬롯)로 긴밀하게** 연결됩니다. Web Components로 만들면 앱마다 React가 한 벌씩 들어가고(B의 예에서 버튼 하나에 193 kB), 테마·로그인 정보를 속성·이벤트로 일일이 넘겨야 합니다. 반대로 사내 포털(JSP)에 "내 신청 내역" 위젯을 넣어 달라는 요청이 오면, 그 화면 하나를 위 예처럼 Web Component로 감싸 내보내는 것이 좋은 선택입니다.
 
 ---
 
