@@ -27,7 +27,7 @@
 | 시간 | 내용 | 형식 |
 |---|---|---|
 | 0:00 – 0:05 | 지난 회차 복습 & 과제 리뷰 | 강의 |
-| 0:05 – 0:20 | 1. 마이크로프론트엔드: 개념(lazy loading과의 차이)과 개발자가 통제할 경계 | 강의 |
+| 0:05 – 0:20 | 1. 마이크로프론트엔드: 개념(lazy loading과의 차이, Module Federation vs Web Components)과 개발자가 통제할 경계 | 강의 |
 | 0:20 – 0:35 | 2. 플러그인: 팀의 `.claude/`를 한 번에 배포하기 | 강의 + 시연 |
 | 0:35 – 0:45 | 3. 아티팩트: 결과물을 화면으로 공유하기 | 강의 |
 | 0:45 – 0:53 | ☕ 휴식 | — |
@@ -176,6 +176,264 @@ flowchart LR
 | "한 팀의 배포를 다른 팀이 기다린다", "화면 하나 고치는데 전체를 다시 배포한다" | **마이크로프론트엔드** (비용을 감수할 만한지 먼저 따진다) |
 
 > ✅ 이 교재 환경(Vite 8.3, React 18.3)에서 5회차 앱에 위 `React.lazy`를 적용해 빌드 결과물이 두 파일로 나뉘는 것, 브라우저(Chromium)가 `/courses`에서는 `index-….js`만 받고 **과정 등록**을 누를 때 `CourseFormPage-….js`를 받는 것을 확인했습니다. 6회차 course-mfe의 빌드 결과물에는 별도로 `remoteEntry.js`가 생깁니다.
+
+
+### ④ MFE를 합치는 또 하나의 방법: Web Components
+
+Module Federation은 **JavaScript 모듈(React 컴포넌트)** 단위로 다른 앱의 코드를 가져옵니다. 다른 방법으로 **Web Components**가 있습니다. 다른 팀의 화면을 **HTML 태그 하나**(`<eduhub-enroll-button>`)로 만들어, 어떤 페이지에서든 태그를 쓰는 것만으로 붙이는 방식입니다.
+
+**Web Components란**: 프레임워크가 아니라 **브라우저에 들어 있는 표준 기술**의 묶음입니다. React·Vue·Angular가 없어도, 서로 달라도 동작합니다.
+
+| 표준 기술 | 하는 일 | 예 |
+|---|---|---|
+| **Custom Elements** | 나만의 HTML 태그를 정의한다. 이름에 **하이픈(-)이 꼭** 있어야 한다 | `customElements.define('eduhub-enroll-button', EduhubEnrollButton)` |
+| **Shadow DOM** | 태그 안쪽을 **격리된 DOM**으로. 바깥 페이지의 CSS가 들어오지 않고, 안쪽 CSS도 나가지 않는다 | `this.attachShadow({ mode: 'open' })` |
+| **HTML template·slot** | 재사용할 HTML 조각, 바깥에서 내용을 끼워 넣을 자리 | `<template>`, `<slot name="title">` |
+| (ES Modules) | 태그를 정의한 JavaScript 파일을 불러온다 | `<script type="module" src=".../eduhub-enroll-button.js">` |
+
+**Custom Element의 생명주기와 입출력**
+
+| 메서드·규칙 | 언제·무엇 |
+|---|---|
+| `connectedCallback()` | 태그가 페이지에 붙을 때 → 화면을 그린다 |
+| `static observedAttributes` + `attributeChangedCallback()` | 지켜볼 속성 목록, 그 속성이 바뀔 때 → 다시 그린다 |
+| `disconnectedCallback()` | 태그가 페이지에서 떨어질 때 → 정리 (React root `unmount` 등) |
+| **입력** | 속성(attribute, **문자열만**: `session-id="1"`). 객체를 넘기려면 JavaScript 프로퍼티(`el.course = {...}`) |
+| **출력** | 이벤트: `dispatchEvent(new CustomEvent('enroll-requested', { detail, bubbles: true, composed: true }))`. `composed: true`가 없으면 Shadow DOM 밖으로 나가지 않는다 |
+
+**예시: 5회차의 신청 버튼을 Web Component로**
+
+enrollment 팀이 React로 만든 컴포넌트를 `<eduhub-enroll-button>` 태그로 감싸 **파일 하나**로 배포하고, 다른 페이지는 그 파일을 불러와 태그만 씁니다.
+
+```mermaid
+flowchart LR
+    subgraph ENR["enrollment 팀 (따로 빌드·배포, :4174)"]
+        C["EnrollButton.tsx<br/>(평범한 React)"] --> E["element.tsx<br/>Custom Element로 감싸기<br/>+ Shadow DOM"]
+        E --> F["eduhub-enroll-button.js<br/>(React까지 포함한 파일 하나)"]
+    end
+    F -- "script type=module" --> H1["React가 아닌 페이지<br/>(JSP·Thymeleaf·HTML)"]
+    F -- "script type=module" --> H2["React 호스트<br/>(EduHub shell 같은)"]
+    H1 & H2 -- "속성: session-id, remaining" --> F
+    F -- "이벤트: enroll-requested" --> H1 & H2
+```
+
+<details>
+<summary>① 컴포넌트와 Custom Element: <code>enroll-button/src/EnrollButton.tsx</code>, <code>element.tsx</code>, <code>vite.config.ts</code></summary>
+
+```tsx
+// 평범한 React 컴포넌트 (5회차의 EnrollButton을 단순화). Web Component인지 모른다
+type Props = { sessionId: string; remaining: number; onEnroll: () => void };
+
+export function EnrollButton({ sessionId, remaining, onEnroll }: Props) {
+  const full = remaining <= 0;
+  return (
+    <div className="box">
+      <span className="info">회차 {sessionId} · 남은 자리 {remaining}</span>
+      <button className="enroll" disabled={full} onClick={onEnroll}>
+        {full ? '마감' : '신청'}
+      </button>
+    </div>
+  );
+}
+```
+
+```tsx
+// <eduhub-enroll-button session-id="1" remaining="3"> — React 컴포넌트를 Web Component(Custom Element)로 감싼다
+import { createRoot, type Root } from 'react-dom/client';
+import { EnrollButton } from './EnrollButton';
+
+// Shadow DOM 안에만 적용되는 스타일: 바깥 페이지의 CSS가 들어오지도, 이 CSS가 나가지도 않는다
+const css = `
+  .box { display: inline-flex; gap: 8px; align-items: center; font: 14px sans-serif; }
+  .enroll { background: #2f5f9e; color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+  .enroll:disabled { background: #9aa3af; cursor: default; }
+`;
+
+class EduhubEnrollButton extends HTMLElement {
+  // 이 속성(attribute)이 바뀌면 attributeChangedCallback이 불린다 = 바깥에서 들어오는 입력
+  static observedAttributes = ['session-id', 'remaining'];
+  private root?: Root;
+
+  connectedCallback() {                       // 페이지에 붙을 때
+    const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `<style>${css}</style><span></span>`;
+    this.root = createRoot(shadow.querySelector('span')!);
+    this.render();
+  }
+
+  attributeChangedCallback() {               // 속성이 바뀔 때
+    this.render();
+  }
+
+  disconnectedCallback() {                    // 페이지에서 떨어질 때 (정리)
+    this.root?.unmount();
+    this.root = undefined;
+  }
+
+  private render() {
+    if (!this.root) return;
+    const sessionId = this.getAttribute('session-id') ?? '';
+    const remaining = Number(this.getAttribute('remaining') ?? 0);
+    this.root.render(
+      <EnrollButton
+        sessionId={sessionId}
+        remaining={remaining}
+        // 바깥으로 나가는 출력 = 이벤트. composed: true여야 Shadow DOM 밖까지 전달된다
+        onEnroll={() =>
+          this.dispatchEvent(new CustomEvent('enroll-requested', { detail: { sessionId }, bubbles: true, composed: true }))
+        }
+      />,
+    );
+  }
+}
+
+// 같은 이름을 두 번 등록하면 오류 → 한 번만
+if (!customElements.get('eduhub-enroll-button')) {
+  customElements.define('eduhub-enroll-button', EduhubEnrollButton);
+}
+```
+
+```ts
+// enroll-button/vite.config.ts — Custom Element를 파일 하나(ES 모듈)로 빌드. React도 이 파일 안에 함께 들어간다
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  define: { 'process.env.NODE_ENV': '"production"' },
+  build: {
+    lib: { entry: 'src/element.tsx', formats: ['es'], fileName: () => 'eduhub-enroll-button.js' },
+    outDir: 'dist',
+  },
+});
+```
+
+</details>
+
+<details>
+<summary>② React가 아닌 페이지에서 쓰기: <code>host-html/index.html</code></summary>
+
+```html
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>JSP·Thymeleaf 같은 다른 화면에서도 쓸 수 있다</title>
+  <style>
+    /* 페이지 전체 CSS: 이 페이지의 모든 button을 빨갛게 → Shadow DOM 안의 버튼에는 적용되지 않는다 */
+    button { background: red; }
+  </style>
+  <!-- 별도로 배포된 파일 하나만 불러오면 된다 (React를 몰라도 됨) -->
+  <script type="module" src="http://localhost:4174/eduhub-enroll-button.js"></script>
+</head>
+<body>
+  <h1>과정 상세 (React가 아닌 페이지)</h1>
+  <button id="page-btn">이 페이지의 버튼</button>
+  <eduhub-enroll-button id="enroll" session-id="1" remaining="2"></eduhub-enroll-button>
+  <p id="log"></p>
+  <script>
+    const el = document.getElementById('enroll');
+    // 출력: 이벤트를 듣는다
+    el.addEventListener('enroll-requested', (e) => {
+      document.getElementById('log').textContent = '신청 요청: 회차 ' + e.detail.sessionId;
+      // 입력: 속성을 바꾸면 컴포넌트가 다시 그린다 (실제로는 API 호출 후)
+      el.setAttribute('remaining', String(Number(el.getAttribute('remaining')) - 1));
+    });
+  </script>
+</body>
+</html>
+```
+
+</details>
+
+<details>
+<summary>③ React 18 호스트에서 쓰기: <code>host-react/src/main.tsx</code></summary>
+
+```tsx
+// React 18 호스트에서 Custom Element 쓰기: 속성은 문자열로, 이벤트는 ref로 addEventListener
+import { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+
+// TypeScript가 <eduhub-enroll-button>을 알게 한다
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'eduhub-enroll-button': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        'session-id'?: string;
+        remaining?: number | string;
+      };
+    }
+  }
+}
+
+function CourseDetail() {
+  const [remaining, setRemaining] = useState(2);
+  const [log, setLog] = useState('');
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // React 18은 Custom Element의 사용자 정의 이벤트를 onXxx로 연결하지 못한다 → 직접 등록
+    const onEnroll = (e: Event) => {
+      const { sessionId } = (e as CustomEvent<{ sessionId: string }>).detail;
+      setLog(`신청 요청: 회차 ${sessionId}`);
+      setRemaining((r) => r - 1);
+    };
+    el.addEventListener('enroll-requested', onEnroll);
+    return () => el.removeEventListener('enroll-requested', onEnroll);
+  }, []);
+
+  return (
+    <div>
+      <h1>과정 상세 (React 호스트)</h1>
+      <eduhub-enroll-button ref={ref} session-id="1" remaining={String(remaining)} />
+      <p id="log">{log}</p>
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<CourseDetail />);
+```
+
+</details>
+
+| 확인 (브라우저, 두 호스트 모두) | 결과 |
+|---|---|
+| 태그만 쓰고 파일 하나 불러오기 | `회차 1 · 남은 자리 2`가 그려진다 (호스트는 React가 아니어도 됨) |
+| 스타일 격리 | 페이지 CSS `button { background: red }` → 페이지 버튼은 빨강, **컴포넌트 안 버튼은 파랑 그대로**. 바깥 `document`에서 `.enroll`을 찾을 수 없다 |
+| 출력 (이벤트) | 신청 클릭 → 호스트가 `enroll-requested`를 받아 `신청 요청: 회차 1` |
+| 입력 (속성) | 호스트가 `remaining`을 2 → 1 → 0으로 바꾸면 다시 그려지고, 0이면 `마감`·비활성 |
+| 크기 | `eduhub-enroll-button.js` 193 kB (gzip 52 kB): **React가 이 파일 안에 한 벌 더** 들어 있다 |
+
+> ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 위 코드를 빌드해, 컴포넌트 파일을 다른 포트(4174)에서 제공하고 HTML 호스트·React 호스트 두 곳에서 위 표대로 동작하는 것을 확인했습니다 (콘솔 오류 없음, TypeScript 검사 통과).
+
+**Module Federation과 Web Components 비교**
+
+| 비교 | Module Federation (EduHub 6회차) | Web Components |
+|---|---|---|
+| 합치는 단위 | JavaScript 모듈 (React 컴포넌트·함수) | **HTML 태그** (DOM 요소) |
+| 기술 | 빌드 도구 플러그인 (`@module-federation/vite`, Webpack) | **브라우저 표준** (빌드 도구와 무관) |
+| 프레임워크 섞기 | 사실상 같은 프레임워크 (React 끼리) | **자유롭게** (React·Vue·Angular·JSP 페이지 어디에나) |
+| 공유 의존성 | `shared` singleton으로 **React·MUI 한 벌** | 보통 **컴포넌트마다 각자 번들** → React 여러 벌, 파일이 커진다 |
+| 버전 독립 | 공유 라이브러리 버전 범위를 **맞춰야** 함 (안 맞으면 두 벌·오류) | **완전히 독립** (각자 자기 React 버전) |
+| 스타일 | 격리 없음 → shell 테마를 **함께 쓰기 쉽다** (MUI 테마 공유) | Shadow DOM으로 **격리** → 섞이지 않지만 공통 테마를 넘기기 어렵다 (CSS 변수 등으로) |
+| 데이터 주고받기 | props·함수·Context 그대로 (`renderSessionAction` 슬롯처럼) | 속성(문자열)·프로퍼티·이벤트 → 객체·콜백을 넘기기 번거롭다 |
+| 라우팅·로그인 상태 | shell의 라우터·`tokenStore`를 공유 (singleton) | 각자 따로. 토큰·사용자 정보는 속성·이벤트·전역 저장소로 직접 전달 |
+| 타입 | `remotes.d.ts`로 import 타입 선언 | 태그 이름·속성 타입을 따로 선언 (`IntrinsicElements`) |
+| 실패 | remote 서버가 꺼지면 `lazy` + 오류 경계로 그 화면만 | 스크립트가 안 오면 태그가 **빈 채로** 남음 (대체 내용을 직접 준비) |
+| 주의점 | 공유 설정 실수 → `Invalid hook call` 등 (4-4) | MUI·emotion 같은 CSS-in-JS는 Shadow DOM 안에 스타일을 넣도록 **따로 설정** 필요, 폼·접근성(라벨 연결) 확인 필요 |
+
+**어느 쪽을 고를까**
+
+| 상황 | 추천 |
+|---|---|
+| 모든 앱이 **같은 프레임워크**(React), 테마·로그인·라우터를 **함께** 쓰고, 화면끼리 **긴밀하게** 주고받는다 | **Module Federation** ← EduHub |
+| **다른 프레임워크·레거시 화면**(JSP, Angular, 사내 포털)에 위젯을 넣어야 한다 | **Web Components** |
+| 다른 팀·외부 회사가 만든 위젯을 **격리해서** 붙인다 (스타일·버전 충돌을 막고 싶다) | **Web Components** |
+| 둘 다 필요 | 함께 쓴다: MFE 안의 화면 하나를 Custom Element로 감싸 레거시 페이지에도 내보내기 |
+
+> 💡 **EduHub가 Module Federation을 쓰는 이유**: shell과 두 remote가 모두 React 18 + MUI이고, 테마·`tokenStore`·라우터를 **한 벌로 공유**해야 하며, 상세 화면의 신청 버튼처럼 **함수(슬롯)로 긴밀하게** 연결됩니다. Web Components로 만들면 앱마다 React가 한 벌씩 들어가고(위 예에서 버튼 하나에 193 kB), 테마·로그인 정보를 속성·이벤트로 일일이 넘겨야 합니다. 반대로 사내 포털(JSP)에 "내 신청 내역" 위젯을 넣어 달라는 요청이 오면, 그 화면 하나를 위 예처럼 Web Component로 감싸 내보내는 것이 좋은 선택입니다.
 
 ---
 
@@ -2396,6 +2654,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 6. 처음 보는 플러그인을 설치하기 전에 반드시 읽어야 할 파일 세 가지는?
 7. 진행 현황 아티팩트를 공유하기 전에 확인할 것 세 가지는?
 8. 5회차 앱의 관리자 화면을 `React.lazy`로 나중에 불러오게 바꾸면 마이크로프론트엔드가 된 것인가? 아니라면 무엇이 다른가?
+9. 사내 포털(JSP)에 EduHub의 "내 신청 내역"을 넣어 달라는 요청이 왔다. Module Federation과 Web Components 중 무엇이 맞고, 그 이유는? EduHub 안에서는 왜 Module Federation을 쓰나?
 
 <details>
 <summary>정답 보기</summary>
@@ -2408,6 +2667,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 6. `hooks/hooks.json`, `.mcp.json`, `bin/` 안의 파일 (내 권한으로 코드를 실행하는 부분)
 7. 숫자가 근거 자료와 일치하는지, 실명·사번·접속 정보 같은 개인정보·비밀이 없는지, 운영 데이터가 아닌지 (그리고 공유 대상이 맞는지)
 8. 아니다. lazy loading은 **하나의 앱**을 파일(청크)로 나눠 필요할 때 받는 것이라 빌드·배포는 여전히 한 번이다. 마이크로프론트엔드는 **앱 자체**를 나눠 따로 빌드·배포하고 실행 중에 다른 서버에서 받아 합친다 (1-0의 비교 표). MFE는 lazy loading을 수단으로 쓸 뿐이다
+9. Web Components. 포털은 React 앱이 아니므로, 화면을 Custom Element로 감싸 파일 하나로 내보내면 `<script>`와 태그만으로 붙일 수 있고 Shadow DOM으로 스타일도 섞이지 않는다. EduHub 안에서는 shell과 remote가 모두 React·MUI라 테마·로그인 상태·라우터를 한 벌로 공유하고 함수(슬롯)로 긴밀하게 연결해야 하므로 Module Federation이 낫다 (Web Components로 하면 앱마다 React가 한 벌씩 들어가고 데이터를 속성·이벤트로만 넘겨야 한다)
 
 </details>
 
