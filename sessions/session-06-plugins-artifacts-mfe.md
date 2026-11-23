@@ -408,6 +408,116 @@ createRoot(document.getElementById('root')!).render(<CourseDetail />);
 
 > ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 위 코드를 빌드해, 컴포넌트 파일을 다른 포트(4174)에서 제공하고 HTML 호스트·React 호스트 두 곳에서 위 표대로 동작하는 것을 확인했습니다 (콘솔 오류 없음, TypeScript 검사 통과).
 
+**Web Component는 어떻게 빌드하나: 세 가지 방법**
+
+결과물은 세 방법 모두 **브라우저가 바로 읽는 JavaScript 파일**(태그를 등록하는 스크립트)입니다. 어떤 방법으로 만들었는지는 쓰는 쪽이 알 필요가 없습니다.
+
+| 방법 | 빌드 | 맞는 경우 |
+|---|---|---|
+| **A. 빌드 없이** 순수 JavaScript | 없음. 쓴 `.js` 파일을 그대로 배포 | 작은 위젯 (배지, 알림 표시). 화면이 커지면 상태 관리·다시 그리기를 직접 짜야 한다 |
+| **B. 번들러의 라이브러리 모드** (Vite 등) | `vite build` → 컴포넌트 + React + CSS를 **파일 하나로** | 이미 React로 만든 화면을 감쌀 때 (위 예시) |
+| **C. Web Component를 지원하는 도구** | 각 도구의 빌드 명령 | 처음부터 Web Component로 만들 때, 다른 프레임워크 팀 |
+
+**A. 빌드 없이: 순수 JavaScript**
+
+```js
+// hello-badge.js — 빌드 없이 그대로 배포하는 Web Component (표준 API만 사용)
+class HelloBadge extends HTMLElement {
+  static observedAttributes = ['name'];
+
+  connectedCallback() {
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: 'open' }).innerHTML = '<style>b { color: #2f5f9e; }</style><b></b>';
+    }
+    this.render();
+  }
+
+  attributeChangedCallback() {
+    this.render();
+  }
+
+  render() {
+    const b = this.shadowRoot?.querySelector('b');
+    if (b) b.textContent = `안녕하세요, ${this.getAttribute('name') ?? ''}님`;   // textContent: 입력을 HTML로 해석하지 않는다 (XSS 방지)
+  }
+}
+
+if (!customElements.get('hello-badge')) customElements.define('hello-badge', HelloBadge);
+```
+
+```html
+<script type="module" src="/wc/hello-badge/hello-badge.js"></script>
+<hello-badge name="김사원"></hello-badge>
+```
+
+> ⚠️ 사용자 입력을 `innerHTML`로 넣으면 그 안의 HTML·스크립트가 실행될 수 있습니다(XSS). 위 예처럼 글자는 `textContent`로 넣습니다.
+
+**B. 번들러의 라이브러리 모드 (Vite)**: 위 신청 버튼 예시의 방식입니다. "앱"이 아니라 **라이브러리**로 빌드하므로 `index.html` 없이 입구 파일(`entry`) 하나에서 JS 파일을 만듭니다. 아래는 같은 버튼을 **두 가지 형식**으로 만들고 CSS를 별도 파일로 분리한 설정입니다.
+
+```text
+enroll-button/
+  src/EnrollButton.tsx      ← 평범한 React 컴포넌트 (위 예시와 같음)
+  src/element.tsx           ← Custom Element로 감싸기 = 빌드 입구(entry)
+  src/enroll-button.css     ← CSS를 파일로 분리
+  vite.config.ts            ← 라이브러리 모드
+```
+
+```ts
+// 두 가지 형식으로: ES 모듈(<script type="module">)과 IIFE(옛 페이지의 일반 <script>)
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  define: { 'process.env.NODE_ENV': '"production"' },
+  build: {
+    lib: {
+      entry: 'src/element.tsx',
+      formats: ['es', 'iife'],
+      name: 'EduhubEnrollButton',                       // IIFE일 때 전역 이름 (이 예에서는 쓰지 않아도 됨)
+      fileName: (format) => `eduhub-enroll-button.${format === 'es' ? 'js' : 'iife.js'}`,
+    },
+    outDir: 'dist',
+  },
+});
+```
+
+```tsx
+// element.tsx (바뀐 부분) — CSS 파일 내용을 문자열로 가져와 Shadow DOM 안의 <style>에 넣는다
+import css from './enroll-button.css?inline';
+// … connectedCallback 안에서
+shadow.innerHTML = `<style>${css}</style><span></span>`;
+```
+
+```bash
+npx vite build        # 또는 package.json의 "build": "vite build" → npm run build
+```
+
+| 결과물 | 크기 (gzip) | 쓰는 쪽 |
+|---|---|---|
+| `dist/eduhub-enroll-button.js` (ES 모듈) | 193 kB (52 kB) | `<script type="module" src="…">` |
+| `dist/eduhub-enroll-button.iife.js` (IIFE) | 141 kB (46 kB) | `<script src="…">` (`type="module"`을 쓰지 않는 옛 페이지, JSP 등) |
+
+- `define: { 'process.env.NODE_ENV': '"production"' }`: 라이브러리 모드는 React를 운영 모드로 자동으로 바꿔 주지 않으므로 직접 지정합니다
+- `?inline`: CSS가 JS 안에 들어가 **CSS 파일이 따로 생기지 않고**, Shadow DOM 안에만 적용됩니다
+- TypeScript가 `?inline` import를 알도록 `/// <reference types="vite/client" />`를 둡니다 (Vite 프로젝트의 `vite-env.d.ts`)
+- 같은 코드인데 ES 파일이 더 큰 것은 Vite 라이브러리 모드가 ES 형식은 공백을 덜 압축하기 때문으로 보입니다 (쓰는 쪽 번들러가 다시 처리한다고 가정). 위 숫자는 실제 빌드 결과입니다
+- React를 파일에서 빼려면 `build.rollupOptions.external: ['react', 'react-dom']`와 페이지의 import map으로 React를 한 번만 받게 할 수 있습니다. 하지만 React 18은 공식 ES 모듈 배포판이 없어 따로 준비해야 하고, 페이지와 모든 위젯의 React 버전을 맞춰야 하므로 Web Component의 장점인 "완전 독립"이 줄어듭니다 (교재 환경에서 해 보지 않음)
+
+**C. Web Component를 지원하는 도구·프레임워크**
+
+| 도구 | 방식 |
+|---|---|
+| **Lit** | Web Component 전용의 가벼운 라이브러리. 작은 파일로 만들기 좋다 |
+| **Vue** | `defineCustomElement()`로 Vue 컴포넌트를 Custom Element로 |
+| **Angular** | Angular Elements(`@angular/elements`)의 `createCustomElement()` |
+| **Svelte** | 컴파일 옵션 `customElement` |
+| **Stencil** | Web Component를 만들기 위한 컴파일러 |
+
+> 어느 도구든 결과는 같습니다: **태그를 등록하는 JS 파일**이 나오고, 배포와 브라우저 연결은 아래 설명 그대로입니다. CI에서는 MFE 앱 빌드와 같은 방식으로 잡을 하나 더 두고 결과 파일을 `run\web\wc\<이름>\`에 교체합니다 (7회차 7-3).
+
+> ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 확인했습니다: A는 빌드 없이 그대로 동작하고 속성 변경에 다시 그리며, 속성에 HTML을 넣어도 태그로 해석되지 않음. B는 ES·IIFE 두 형식을 빌드해 각각 `<script type="module">`, 일반 `<script>` 페이지에서 그려지고, `?inline`으로 CSS 파일 요청 0건, TypeScript 검사 통과. ⚠️ C의 도구들은 교재 환경에서 직접 빌드해 보지 않았습니다.
+
 **Web Component는 어디로 배포되나: 정적 JS 파일 하나**
 
 빌드 결과는 **JavaScript 파일**(위 예에서는 `eduhub-enroll-button.js` 하나)입니다. 정적 파일을 내줄 수 있는 곳이면 어디든 올릴 수 있고, 쓰는 쪽은 **그 파일의 주소만** 알면 됩니다.
