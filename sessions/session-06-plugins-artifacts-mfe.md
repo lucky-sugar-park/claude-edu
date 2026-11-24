@@ -1952,6 +1952,8 @@ param(
     [switch]$Rollback
 )
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1은 [Parameter()]가 있는 스크립트의 param 기본값 계산 때 $PSScriptRoot가 비어 있으므로 본문에서 정한다
+if (-not $WebRoot) { $WebRoot = Join-Path $PSScriptRoot '..\run\web' }
 
 $target = @{ 'shell' = 'shell'; 'course-mfe' = 'mfe\course'; 'enrollment-mfe' = 'mfe\enrollment' }[$App]
 $dest = Join-Path $WebRoot $target
