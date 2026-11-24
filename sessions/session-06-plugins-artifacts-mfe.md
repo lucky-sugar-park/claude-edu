@@ -381,7 +381,7 @@ npx vite build        # 또는 package.json의 "build": "vite build" → npm run
 | **Svelte** | 컴파일 옵션 `customElement` |
 | **Stencil** | Web Component를 만들기 위한 컴파일러 |
 
-> 어느 도구든 결과는 같습니다: **태그를 등록하는 JS 파일**이 나오고, 배포와 브라우저 연결은 아래 설명 그대로입니다. CI에서는 MFE 앱 빌드와 같은 방식으로 잡을 하나 더 두고 결과 파일을 `run\web\wc\<이름>\`에 교체합니다 (7회차 7-3).
+> 어느 도구든 결과는 같습니다: **태그를 등록하는 JS 파일**이 나옵니다. CI에서는 MFE 앱 빌드와 같은 방식으로 잡을 하나 더 두고 결과 파일을 `run\web\wc\<이름>\`에 교체합니다 (7회차 7-3).
 
 > ✅ 이 교재 환경(Vite 8.3, React 18.3, Chromium)에서 확인했습니다: A는 빌드 없이 그대로 동작하고 속성 변경에 다시 그리며, 속성에 HTML을 넣어도 태그로 해석되지 않음. B는 ES·IIFE 두 형식을 빌드해 각각 `<script type="module">`, 일반 `<script>` 페이지에서 그려지고, `?inline`으로 CSS 파일 요청 0건, TypeScript 검사 통과. ⚠️ C의 도구들은 교재 환경에서 직접 빌드해 보지 않았습니다.
 
