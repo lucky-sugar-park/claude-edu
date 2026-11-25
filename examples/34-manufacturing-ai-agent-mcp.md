@@ -1105,5 +1105,5 @@ public class SmokeTest {
 
 - [나만의 MCP 서버 만들기 (Java 버전)](./33-custom-mcp-server-mariadb-java.md): MCP Java SDK 기본, 등록·권한
 - [MCP 서버 가이드](./19-mcp-server-guide.md): 원격 서버, 인증, 범위
-- [5회차: 훅과 MCP](../sessions/session-05-hooks-and-mcp.md) · [8회차: 자동화·Agent SDK·거버넌스](../sessions/session-08-automation-sdk-governance.md) — 여러 팀이 도구를 만들 때의 조직 표준(제조 도구 개발 키트)은 [8회차 2-3](../sessions/session-08-automation-sdk-governance.md#2-3-조직의-도구-표준-제조-도구-개발-키트를-만들어-그-위에서-개발한다)
+- [5회차: 훅과 MCP](../sessions/session-05-hooks-and-mcp.md) · [8회차: 자동화·Agent SDK·거버넌스](../sessions/session-08-automation-sdk-governance.md) — 여러 팀이 도구를 만들 때의 조직 표준(제조 도구 개발 키트)은 [8회차 2-4](../sessions/session-08-automation-sdk-governance.md#2-4-조직의-도구-표준-제조-도구-개발-키트를-만들어-그-위에서-개발한다)
 - [RAG 구축 (Ollama)](./26-rag-with-ollama.md): 작업표준서·매뉴얼 검색 도구의 바탕

@@ -18,7 +18,7 @@
 > - 과정 데이터 1만 건 시드 스크립트 (7회차 과제) 또는 강사가 배포한 `seed-10k.sql`
 > - [k6](https://k6.io/) 설치 (`k6 version`으로 확인). 설치가 어려우면 강사 PC의 결과를 함께 봅니다
 > - 저장소 Settings → Secrets에 `ANTHROPIC_API_KEY` 등록 권한 (팀장 1명)
-> 🖥️ **슬라이드 덱(33장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -138,9 +138,183 @@ Claude Code를 움직이는 **같은 에이전트 루프**(1회차 2-3)를 내 �
 | 개발자가 직접 쓰는 작업 | Claude Code (터미널·IDE·데스크톱) |
 | CI에서 정해진 시점에 한 번 실행 | `claude -p` 또는 `claude-code-action` |
 | **사내 도구·서비스 안에** 에이전트 기능을 넣어야 함 (사내 포털 버튼, 슬랙 봇, 배치 서버) | **Agent SDK** (TypeScript `@anthropic-ai/claude-agent-sdk`, Python `claude-agent-sdk`) |
-| 에이전트 루프가 필요 없는 단순 생성·분류 | SDK 대신 Claude API(Messages API) 직접 호출 |
+| 에이전트 루프가 필요 없는 단순 생성·분류 | SDK 대신 Claude API(Messages API) 직접 호출 (차이는 [2-2](#2-2-claude-api를-직접-호출하는-것과-agent-sdk를-쓰는-것은-무엇이-다른가)) |
 
-## 2-2. SDK 에이전트의 동작 시퀀스
+## 2-2. Claude API를 직접 호출하는 것과 Agent SDK를 쓰는 것은 무엇이 다른가
+
+둘 다 "내 코드에서 Claude를 부른다"는 점은 같지만, **누가 무엇을 맡는지**가 다릅니다. 한 줄로 정리하면:
+
+- **Claude API(Messages API)**: 내 코드가 **질문 한 번을 보내고 답 한 번을 받습니다.** 자료를 모으는 것, 도구를 실행하는 것, 다시 물을지 정하는 것은 모두 **내 코드**가 합니다
+- **Agent SDK**: **Claude Code를 라이브러리로** 쓰는 것입니다. 목표를 주면 SDK 안의 에이전트 루프가 파일을 읽고, 명령을 실행하고, 다시 묻기를 **스스로 반복**합니다. 내 코드는 허용 범위(도구·권한·폴더·턴 수)를 정하고 결과를 받습니다
+
+```mermaid
+flowchart LR
+    subgraph A["① Claude API 직접 호출"]
+        direction TB
+        A1["내 코드<br/>git log 실행 → 텍스트로"] -- "요청 1번<br/>(프롬프트 + 자료)" --> A2["Claude API<br/>POST /v1/messages"]
+        A2 -- "응답 1번<br/>(텍스트)" --> A3["내 코드<br/>결과 저장·표시"]
+    end
+    subgraph B["② Agent SDK"]
+        direction TB
+        B1["내 코드<br/>query(목표, 허용 도구·폴더·턴 수)"] --> B2["Agent SDK<br/>(Claude Code의 에이전트 루프)"]
+        B2 -- "요청" --> B3["Claude API"]
+        B3 -- "도구 사용 요청<br/>(Bash: git log)" --> B2
+        B2 -- "권한 확인 후 실행" --> B4["내장 도구<br/>Read · Grep · Bash…"]
+        B4 -- "결과" --> B2
+        B2 -- "result 메시지<br/>(답 + 사용량)" --> B5["내 코드"]
+    end
+```
+
+> 💡 **Agent SDK도 안에서는 Claude API를 호출합니다.** Agent SDK는 Claude API를 대신하는 다른 서비스가 아니라, API 위에 Claude Code의 루프·도구·권한·컨텍스트 관리를 얹은 것입니다. 그래서 요금도 똑같이 **API 토큰 요금**이고, 한 번 실행하는 동안 API를 **여러 번** 부릅니다.
+
+**비교**
+
+| 비교 | ① Claude API 직접 호출 | ② Agent SDK |
+|---|---|---|
+| 설치하는 것 | Anthropic SDK (API 클라이언트) — Java `com.anthropic:anthropic-java`, TypeScript `@anthropic-ai/sdk`, Python `anthropic` 등 | Agent SDK — TypeScript `@anthropic-ai/claude-agent-sdk`, Python `claude-agent-sdk` (**Java용은 없음**) |
+| 내 코드가 부르는 것 | `client.messages().create(...)` → 답 하나 | `query(prompt, options)` → 진행 메시지가 차례로, 마지막에 `result` |
+| 한 번 실행 = API 호출 | **1번** (도구를 쓰면 내가 루프를 돌리는 만큼) | 목표를 이룰 때까지 **여러 번** (`maxTurns`로 상한) |
+| 자료 (코드·로그·DB) | **내 코드가 모아서** 프롬프트에 넣는다. Claude는 내 PC·서버를 볼 수 없다 | Claude가 **스스로** 파일을 읽고 명령을 실행해 찾는다 (허용한 범위 안에서) |
+| 도구 | 없음. 필요하면 내가 정의하고(tool use), **실행도 내 코드가** | **내장 도구**(Read, Write, Edit, Bash, Grep, Glob, WebSearch 등) + MCP 서버 + 서브에이전트 |
+| 권한·안전 | 내 코드가 정한다 (Claude는 내가 넘긴 것만 본다) | `allowedTools`·`disallowedTools`·권한 모드·작업 폴더·훅으로 정한다 (Claude Code의 권한 체계와 같음) |
+| 대화 기록·컨텍스트 | 내가 `messages` 배열로 관리 | SDK가 관리 (세션 이어가기, 길어지면 자동 압축) |
+| 결과 형식 | 내가 정한 형식 그대로 (JSON 스키마로 고정할 수도 있음) | 마지막 답 텍스트 + 사용량·비용·턴 수 |
+| 토큰 | 프롬프트 + 자료 + 답만 | 그 위에 Claude Code의 시스템 지시, 도구 설명, 도구 결과가 **매 턴** 더해진다 → 같은 일이면 보통 더 많다 |
+| 실행 환경 | API에 접속되는 곳이면 어디든 (Spring 서버 안 등) | 작업 폴더(저장소 체크아웃 등)가 있는 서버. 내부에서 Claude Code를 실행 |
+| 결과가 매번 같은가 | 입력이 같으면 비슷하다 | Claude가 무엇을 읽을지 스스로 정하므로 실행마다 경로가 달라질 수 있다 |
+
+**같은 일을 두 방식으로: 릴리스 노트 초안** ([7-1](#7-1-sdk-미니-봇-릴리스-노트-초안)의 SDK 봇과 같은 일)
+
+```ts
+// ① Claude API 직접 호출 — git log는 내 코드가 실행하고, Claude에게는 한 번 묻는다
+import Anthropic from "@anthropic-ai/sdk";
+import { execFileSync } from "node:child_process";
+
+const from = process.argv[2] ?? "v0.7.0";
+
+// 자료는 내 코드가 모은다 (Claude는 저장소를 볼 수 없다)
+const log = execFileSync("git", ["log", "--no-merges", "--pretty=format:%h %s", `${from}..HEAD`], {
+  encoding: "utf8",
+});
+
+const client = new Anthropic(); // ANTHROPIC_API_KEY 환경 변수
+const response = await client.beta.messages.create({
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  betas: ["server-side-fallback-2026-07-01"],
+  fallbacks: "default", // 안전 분류기가 거절하면 다른 모델로 자동 재시도
+  system: "너는 릴리스 노트 작성자다. 주어진 커밋 목록만 근거로 쓴다.",
+  messages: [
+    {
+      role: "user",
+      content: `다음 커밋으로 릴리스 노트 초안을 마크다운으로 써줘.
+- feat / fix / perf / 기타로 분류, 요구사항 ID(FR-xx, NFR-xx)가 있으면 함께 표시
+- 사용자에게 보이는 변경을 먼저, 내부 변경은 마지막에 한 줄씩
+
+<commits>
+${log}
+</commits>`,
+    },
+  ],
+});
+
+// 결과 처리도 내 코드가
+if (response.stop_reason === "refusal") {
+  console.error("거절됨:", response.stop_details?.category);
+  process.exit(1);
+}
+for (const block of response.content) {
+  if (block.type === "text") console.log(block.text);
+}
+console.error(`입력 ${response.usage.input_tokens} / 출력 ${response.usage.output_tokens} 토큰`);
+```
+
+```ts
+// ② Agent SDK — "git log로 확인해서"까지 Claude에게 맡긴다 (전체 코드는 7-1)
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: `${from}..HEAD 사이의 커밋을 git log로 확인하고 릴리스 노트 초안을 써줘 ...`,
+  options: {
+    cwd: process.cwd(),                                   // Claude가 볼 수 있는 폴더
+    allowedTools: ["Read", "Grep", "Glob", "Bash(git log *)", "Bash(git show *)"],
+    disallowedTools: ["Write", "Edit"],
+    maxTurns: 10,                                         // API 호출 반복 상한
+  },
+})) {
+  if (message.type === "result") console.log(message);
+}
+```
+
+| 차이 | ① API | ② Agent SDK |
+|---|---|---|
+| `git log`를 누가 실행하나 | 내 코드 (`execFileSync`) | Claude가 Bash 도구로 (허용한 `git log *`만) |
+| 커밋 메시지만으로 부족하면 | 그대로 쓴다 (내가 넘긴 것만 본다) | `git show`로 변경 내용을 더 읽어 볼 수 있다 |
+| 고를 이유 | 자료가 **미리 정해져** 있다 → 싸고, 빠르고, 결과가 예측 가능 | **무엇을 볼지 미리 정하기 어렵다** → 탐색을 맡긴다 |
+
+<details>
+<summary>Java(Spring) 개발자라면: 같은 ①을 Java SDK로</summary>
+
+Agent SDK는 TypeScript·Python만 있으므로, **Spring 서비스 안에서는 Claude API를 직접 호출하는 방식**이 기본입니다. 에이전트 루프가 꼭 필요하면 TypeScript·Python으로 작은 서비스를 따로 두고 Spring에서 그 서비스를 부르거나, Java SDK의 도구 사용(tool use)으로 루프를 직접 짭니다.
+
+```kotlin
+// build.gradle.kts
+dependencies { implementation("com.anthropic:anthropic-java:3.3.0") }
+```
+
+```java
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.models.messages.Message;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.StopReason;
+
+AnthropicClient client = AnthropicOkHttpClient.fromEnv();   // ANTHROPIC_API_KEY
+MessageCreateParams params = MessageCreateParams.builder()
+        .model("claude-opus-5-5")
+        .maxTokens(16000L)
+        .system("너는 릴리스 노트 작성자다. 주어진 커밋 목록만 근거로 쓴다.")
+        .addUserMessage("""
+                다음 커밋으로 릴리스 노트 초안을 마크다운으로 써줘.
+                - feat / fix / perf / 기타로 분류, 요구사항 ID(FR-xx, NFR-xx)가 있으면 함께 표시
+
+                <commits>
+                %s
+                </commits>
+                """.formatted(log))                            // log: 내 코드가 git log로 모은 텍스트
+        .build();
+Message response = client.messages().create(params);
+
+if (response.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) {
+    throw new IllegalStateException("거절됨");
+}
+response.content().stream()
+        .flatMap(block -> block.text().stream())
+        .forEach(text -> System.out.println(text.text()));
+```
+
+</details>
+
+**어느 쪽을 고를까**
+
+| 상황 | 고를 것 | 예 |
+|---|---|---|
+| 입력이 정해져 있고 답 하나면 된다 (분류·요약·추출·번역·초안) | **① API** | 문의 메일 분류, 회의록 요약, 불량 보고서에서 항목 뽑기 |
+| 정해진 순서가 있고 Claude가 단계 사이에 판단만 한다 | **① API** + 내 코드의 흐름 (필요하면 tool use) | "조회 → 요약 → 사람 승인 → 저장" 업무 흐름 |
+| 무엇을 읽고 실행할지 **Claude가 찾아가야** 한다 (코드베이스·로그·파일 탐색) | **② Agent SDK** | CI 실패 원인 찾기, 저장소를 읽고 문서 갱신 제안, 여러 파일에 걸친 점검 |
+| 사람이 한 번 쓰고 끝나는 작업 | SDK 대신 Claude Code 또는 `claude -p` (2-1) | |
+
+> ⚠️ **헷갈리기 쉬운 것**
+> - **"Agent SDK = Claude API의 Java·TypeScript 클라이언트"가 아닙니다.** API 클라이언트는 Anthropic SDK(`anthropic-java`, `@anthropic-ai/sdk`)이고, Agent SDK는 그 위의 **에이전트 실행기**입니다
+> - **API만으로도 에이전트를 만들 수 있습니다.** 도구를 정의하고 "도구 요청 → 내 코드가 실행 → 결과를 돌려주기"를 반복하면 됩니다. Anthropic SDK에는 이 반복을 대신해 주는 **Tool Runner**도 있습니다. 다만 도구는 모두 내가 만들어야 하고, 파일 읽기·명령 실행 같은 내장 도구는 없습니다
+> - **Agent SDK가 더 똑똑한 것이 아닙니다.** 같은 모델을 씁니다. 차이는 **누가 자료를 모으고 도구를 실행하느냐**이고, 그만큼 토큰·실행 시간·예측 가능성이 달라집니다
+> - 참고: 루프와 실행 환경(컨테이너)까지 Anthropic이 운영해 주는 **Managed Agents**(베타)라는 방식도 있습니다. 이 과정에서는 다루지 않습니다
+
+> 💡 **시작은 ①부터.** "에이전트를 만들자"보다 "이 일에 필요한 자료를 내 코드가 모을 수 있나?"를 먼저 묻습니다. 모을 수 있으면 ①이 싸고 빠르고 테스트하기 쉽습니다. 2-4의 제조 도구 키트도 같은 생각입니다: 자료를 가져오는 일(MCP 도구)은 코드가 정확하게 하고, Claude는 판단을 맡습니다.
+
+> ✅ 이 교재 환경에서 위 TypeScript 두 예제를 `@anthropic-ai/sdk` 1.14.0, `@anthropic-ai/claude-agent-sdk` 0.3.332로 타입 검사(TypeScript 7.0, `strict`)했고, Java 예제는 `anthropic-java` 3.3.0(Java 21)으로 컴파일했습니다. ⚠️ API 키가 없어 **실제 호출은 하지 못했습니다.** 수업 전에 강사 키로 ①을 한 번 실행해 출력과 토큰 수를 확인하고, ②의 `result` 메시지(사용량·비용·턴 수)와 비교해 보여 주면 토큰 차이를 바로 볼 수 있습니다.
+
+## 2-3. SDK 에이전트의 동작 시퀀스
 
 ```mermaid
 sequenceDiagram
@@ -172,7 +346,7 @@ sequenceDiagram
 
 > 자세한 예제: [Agent SDK 예제](../examples/05-automation-and-capstone.md#모듈-18-claude-agent-sdk), [SDK 동작 시퀀스](../examples/10-agents.md#5-agent-sdk로-만든-커스텀-에이전트의-동작-시퀀스). 직접 만들어 보기는 [7-1](#7-1-sdk-미니-봇-릴리스-노트-초안)에서.
 
-## 2-3. 조직의 도구 표준: "제조 도구 개발 키트"를 만들어 그 위에서 개발한다
+## 2-4. 조직의 도구 표준: "제조 도구 개발 키트"를 만들어 그 위에서 개발한다
 
 5회차 [2-5](./session-05-hooks-and-mcp.md#2-5-사례-제조-현장의-ai-에이전트와-mcp-meserp-연결)에서 MES·ERP 정보를 가져오는 MCP 도구를 만들었습니다. 회사 전체로 넓히면 생산·품질·설비·물류 팀이 **저마다 도구를 만들게** 됩니다. 이때 각 팀이 마음대로 만들면 금방 문제가 생깁니다.
 
@@ -289,7 +463,7 @@ SyncToolSpecification lineStatus = MfgTool.readOnly("mes_get_line_status")
 
 ### ⑤ 에이전트 쪽 표준도 함께: Agent SDK 설정을 사내 기본값으로
 
-도구만큼 **도구를 쓰는 에이전트 앱**도 팀마다 제각각이 되기 쉽습니다. Agent SDK 앱을 만들 때 쓰는 **사내 기본 설정**을 정해 둡니다 (2-2 표의 "코드로 정해야 하는 것"을 회사 기준으로).
+도구만큼 **도구를 쓰는 에이전트 앱**도 팀마다 제각각이 되기 쉽습니다. Agent SDK 앱을 만들 때 쓰는 **사내 기본 설정**을 정해 둡니다 (2-3 표의 "코드로 정해야 하는 것"을 회사 기준으로).
 
 | 항목 | 사내 기본값 예 |
 |---|---|
@@ -894,7 +1068,7 @@ EduHub에 "교육 도우미"(과정 안내 문서에 대한 질의응답)를 붙
 ## 8-1. 오늘의 핵심
 
 1. **헤드리스·CI의 Claude는 보조 리뷰어·분석가**: 읽기 전용 도구, 턴 수·비용 제한, 코멘트만. 승인과 배포는 사람
-2. **SDK는 사내 도구 안에 에이전트가 필요할 때**: 허용 도구·권한·작업 폴더를 코드로 정한다. 여러 팀이 도구를 만들면 **표준(MCP·SDK) 위에 얇은 사내 도구 키트**를 두고 그 위에서 만든다 (2-3)
+2. **SDK는 사내 도구 안에 에이전트가 필요할 때**: 허용 도구·권한·작업 폴더를 코드로 정한다. 여러 팀이 도구를 만들면 **표준(MCP·SDK) 위에 얇은 사내 도구 키트**를 두고 그 위에서 만든다 (2-4)
 3. **거버넌스 = 최소 규칙의 강제**: 관리 설정(deny, bypass 금지, 승인된 MCP·마켓플레이스), 사용량 모니터링, 감사, 리뷰 문화
 4. **성능은 측정 → 원인 → 개선 → 재측정**, 결과는 쿼리 수 테스트로 고정한다. 방안 선택은 아키텍처 지식이 있는 개발자가
 5. ⭐ **AI 없이 고치고, 배포하고, 되돌릴 수 있어야** 시스템의 주인이다. AI는 사후 분석과 재발 방지에서 힘을 발휘한다
@@ -935,7 +1109,7 @@ EduHub에 "교육 도우미"(과정 안내 문서에 대한 질의응답)를 붙
 - [ ] 핫픽스 훈련 사후 분석: 회귀 테스트 PR, `docs/postmortem/…md`, 런북 개선 반영
 - [ ] 팀 거버넌스 제안 1쪽: "우리 회사에 Claude Code를 도입한다면 관리 설정으로 강제할 것 / 팀 자율로 둘 것"
 - [ ] (선택) 7-1 SDK 미니 봇 또는 7-2 CI 실패 분석
-- [ ] (선택, 제조업) 2-3: 우리 회사 도구 키트의 첫 후보 3개(여러 팀이 함께 쓰는 입력 타입·결과 형식·안전 규칙)와 도구 이름 규칙 초안 1쪽
+- [ ] (선택, 제조업) 2-4: 우리 회사 도구 키트의 첫 후보 3개(여러 팀이 함께 쓰는 입력 타입·결과 형식·안전 규칙)와 도구 이름 규칙 초안 1쪽
 - [ ] 7주 회고 준비: 주차별 `/usage` 기록, 가장 효과가 컸던 토큰 절약 습관, Claude에게 맡긴 것 / 직접 한 것의 변화
 
 ## 8-4. 다음 회차 예고

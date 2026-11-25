@@ -1,6 +1,6 @@
 # 예제: 사내 제조 도구 개발 키트 `mfg-tool-kit` — MCP 표준 위에 얹는 custom SDK (Java)
 
-> 관련 모듈: 13 (MCP), 16 (사내 프레임워크), 18 (Agent SDK) · 관련 회차: [5회차 2-5 제조 현장 MCP](../sessions/session-05-hooks-and-mcp.md#2-5-사례-제조-현장의-ai-에이전트와-mcp-meserp-연결), [8회차 2-3 조직의 도구 표준](../sessions/session-08-automation-sdk-governance.md#2-3-조직의-도구-표준-제조-도구-개발-키트를-만들어-그-위에서-개발한다)
+> 관련 모듈: 13 (MCP), 16 (사내 프레임워크), 18 (Agent SDK) · 관련 회차: [5회차 2-5 제조 현장 MCP](../sessions/session-05-hooks-and-mcp.md#2-5-사례-제조-현장의-ai-에이전트와-mcp-meserp-연결), [8회차 2-4 조직의 도구 표준](../sessions/session-08-automation-sdk-governance.md#2-4-조직의-도구-표준-제조-도구-개발-키트를-만들어-그-위에서-개발한다)
 > **목표**: 여러 팀이 제조 도구(MCP 서버)를 만들 때 **같은 규칙**을 지키도록, 표준 MCP Java SDK 위에 얇은 사내 키트를 만들고 그 키트로 생산팀 도구 서버를 만들어 실제로 호출해 봅니다. [예제 34](./34-manufacturing-ai-agent-mcp.md)의 `ToolSupport`(팀이 복사해 쓰던 도우미)를 **회사 라이브러리**로 키운 모습입니다.
 
 ---
@@ -45,7 +45,7 @@ mfg/
 ```
 
 - 키트를 팀에 나눠 주는 방법은 7회차와 같습니다: 같은 저장소 + `includeBuild`, 공유 폴더 Maven 저장소, 사내 Maven 저장소 ([예제 35의 2장](./35-corp-common-library.md#2-maven-저장소-없이-공유하는-방법))
-- 키트와 함께 **스킬(`mfg-tool`)과 CLAUDE.md 규칙**을 플러그인으로 배포하면, 각 팀이 Claude Code로 도구를 만들 때도 키트를 쓰게 됩니다 (8회차 2-3 ④)
+- 키트와 함께 **스킬(`mfg-tool`)과 CLAUDE.md 규칙**을 플러그인으로 배포하면, 각 팀이 Claude Code로 도구를 만들 때도 키트를 쓰게 됩니다 (8회차 2-4 ④)
 
 ---
 
@@ -1065,5 +1065,5 @@ mfg-tool-kit 표준 위반 (updateLineSpeed): 이름 'updateLineSpeed'이(가) �
 | **SDK 업데이트** | MCP SDK 새 버전은 키트에서 먼저 시험 (이 예제를 만들 때도 `Tool.builder()` 등 일부 API가 이미 deprecated였다) |
 | **쓰기 도구** | 키트에는 읽기 전용(`readOnly`)만 있다. 쓰기가 필요하면 `draft`(초안 만들기 → 사람 승인) 같은 별도 빌더를 **거버넌스 승인 후** 추가 |
 | **사용자별 권한** | stdio 서버는 실행한 사람 권한. 여러 사람이 쓰면 원격 서버 + 인증으로 바꾸고, 키트의 `MFG_USER` 대신 인증된 사용자를 감사 로그에 |
-| **평가** | 도구가 늘면 "질문 → 올바른 도구를 고르는가" 평가 질문 세트를 CI에 (8회차 2-3 ②) |
+| **평가** | 도구가 늘면 "질문 → 올바른 도구를 고르는가" 평가 질문 세트를 CI에 (8회차 2-4 ②) |
 | **처음부터 크게 ✕** | 이 예제의 키트도 도구 3개에서 겹친 부분만 담았다. 필요가 생길 때 늘린다 |
