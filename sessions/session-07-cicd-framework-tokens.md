@@ -2150,7 +2150,7 @@ model: haiku
 
 PR의 CI가 실패하면 Claude가 로그를 읽고 원인을 **PR 코멘트로만** 남기는 잡을 추가합니다. 설계 포인트는 [빌드·배포 파이프라인 4-2](../examples/28-build-deploy-pipeline.md#4-2-ci-실패-원인-자동-분석)를 봅니다.
 
-- 읽기 전용 도구만 허용 (`--allowedTools "Read" "Grep" "Glob"`), 최대 턴 수 제한 (`--max-turns`)
+- 허용 범위를 좁힘 (`--permission-mode dontAsk`: 작업 폴더 안 읽기·검색만 되고 나머지는 거부. `--allowedTools "Read"`처럼 범위 없이 허용하면 폴더 밖까지 읽힌다 — [8회차 2-2 예제 ①](./session-08-automation-sdk-governance.md#예제-①-javascript-agent-sdk로-테스트-실패-원인-분석-봇)), 최대 턴 수 제한 (`--max-turns`)
 - 외부 포크 PR에서는 실행하지 않음, API 키는 저장소 시크릿에만
 - 결과는 코멘트로만, **수정·푸시는 하지 않음**
 - 실행마다 사용량을 기록해 사용량 리포트에 CI 항목으로 추가

@@ -305,7 +305,7 @@ jobs:
         run: |
           npm install -g @anthropic-ai/claude-code
           claude -p "failed.log는 CI 실패 로그야. 원인을 찾고, 관련 파일과 수정 방향을 5줄 이내로 요약해줘. 코드는 수정하지 마." \
-            --permission-mode dontAsk --allowedTools "Read" "Grep" "Glob" \
+            --permission-mode dontAsk \
             --max-turns 8 > analysis.md
       - name: PR에 코멘트
         env: { GH_TOKEN: '${{ github.token }}' }
@@ -313,7 +313,7 @@ jobs:
 ```
 
 **설계 포인트**
-- **읽기 전용 도구만** 허용, 턴 수 제한 → 비용과 위험 통제
+- `--permission-mode dontAsk`로 **작업 폴더 안 읽기·검색만**, 턴 수 제한 → 비용과 위험 통제 (`--allowedTools "Read" "Grep" "Glob"`처럼 범위 없이 허용하면 러너의 다른 폴더까지 읽힌다)
 - 분석만 하고 **수정·푸시는 하지 않음** → 개발자가 판단해 수정
 
 ### 4-3. 그 밖의 활용

@@ -235,4 +235,4 @@ Claude Code는 **내 컴퓨터에서 내 권한으로** 파일을 고치고 명�
    - `.env`를 읽어 달라고 하면 차단되는가
 3. `Shift + Tab`으로 모드를 바꿔 가며 같은 수정 요청에 대한 동작 차이 관찰 (Manual → acceptEdits → plan)
 4. 사용자 설정에 allow, 프로젝트 설정에 같은 명령의 deny를 넣고 어느 쪽이 이기는지 확인
-5. CI용 명령 작성: `claude -p "..." --permission-mode dontAsk --allowedTools "Read" "Grep" "Bash(./gradlew test *)"`
+5. CI용 명령 작성: `claude -p "..." --permission-mode dontAsk --allowedTools "Bash(./gradlew test *)"` (작업 폴더 안 읽기·검색은 `dontAsk`에서도 허용된다. `"Read"`처럼 범위 없이 허용하면 폴더 밖까지 읽힌다)

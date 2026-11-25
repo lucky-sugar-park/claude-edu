@@ -18,7 +18,7 @@
 > - 과정 데이터 1만 건 시드 스크립트 (7회차 과제) 또는 강사가 배포한 `seed-10k.sql`
 > - [k6](https://k6.io/) 설치 (`k6 version`으로 확인). 설치가 어려우면 강사 PC의 결과를 함께 봅니다
 > - 저장소 Settings → Secrets에 `ANTHROPIC_API_KEY` 등록 권한 (팀장 1명)
-> 🖥️ **슬라이드 덱(34장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(35장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -74,14 +74,14 @@
 # 결과를 JSON으로 받아 사용량까지 기록 (CI 비용 추적에 사용)
 claude -p "backend에서 @Operation이 없는 컨트롤러 메서드를 찾아 목록으로 알려줘. 코드는 수정하지 마." \
   --output-format json \
-  --permission-mode dontAsk --allowedTools "Read" "Grep" "Glob" \
+  --permission-mode dontAsk \
   --max-turns 8 > openapi-audit.json
 
 # 파이프로 로그를 넘겨 분석
 ./gradlew test 2>&1 | tail -100 | claude -p "이 테스트 실패의 원인과 수정 방향을 5줄로 요약해줘"
 ```
 
-> 💡 헤드리스의 3대 안전장치: **읽기 전용 도구만 허용**(`--allowedTools`), **턴 수 제한**(`--max-turns`), **분석만 하고 수정·푸시는 사람이**. 비용 상한은 `--max-budget-usd`로도 걸 수 있습니다. ([빌드·배포 파이프라인 4-2](../examples/28-build-deploy-pipeline.md#4-2-ci-실패-원인-자동-분석))
+> 💡 헤드리스의 3대 안전장치: **허용 범위를 좁힌다**(`--permission-mode dontAsk` + 꼭 필요한 명령만 `--allowedTools`), **턴 수 제한**(`--max-turns`), **분석만 하고 수정·푸시는 사람이**. `dontAsk`에서도 **작업 폴더 안의 파일 읽기·검색은 허용**되므로 `Read`·`Grep`·`Glob`을 따로 허용하지 않습니다. 범위 없이 `--allowedTools "Read"`처럼 허용하면 **작업 폴더 밖**(러너의 다른 폴더)까지 읽을 수 있습니다 ([2-2 예제 ①](#예제-①-javascript-agent-sdk로-테스트-실패-원인-분석-봇)에서 실제로 확인). 비용 상한은 `--max-budget-usd`로도 걸 수 있습니다. ([빌드·배포 파이프라인 4-2](../examples/28-build-deploy-pipeline.md#4-2-ci-실패-원인-자동-분석))
 
 ---
 
@@ -236,9 +236,10 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 for await (const message of query({
   prompt: `${from}..HEAD 사이의 커밋을 git log로 확인하고 릴리스 노트 초안을 써줘 ...`,
   options: {
-    cwd: process.cwd(),                                   // Claude가 볼 수 있는 폴더
-    allowedTools: ["Read", "Grep", "Glob", "Bash(git log *)", "Bash(git show *)"],
+    cwd: process.cwd(),                                   // Claude가 읽을 수 있는 폴더
+    allowedTools: ["Bash(git log *)", "Bash(git show *)"], // 명령은 git 조회만 (읽기는 cwd 안이면 기본 허용)
     disallowedTools: ["Write", "Edit"],
+    permissionMode: "dontAsk",                            // 허용 안 된 것은 묻지 않고 거부
     maxTurns: 10,                                         // API 호출 반복 상한
   },
 })) {
@@ -252,48 +253,7 @@ for await (const message of query({
 | 커밋 메시지만으로 부족하면 | 그대로 쓴다 (내가 넘긴 것만 본다) | `git show`로 변경 내용을 더 읽어 볼 수 있다 |
 | 고를 이유 | 자료가 **미리 정해져** 있다 → 싸고, 빠르고, 결과가 예측 가능 | **무엇을 볼지 미리 정하기 어렵다** → 탐색을 맡긴다 |
 
-<details>
-<summary>Java(Spring) 개발자라면: 같은 ①을 Java SDK로</summary>
-
-Agent SDK는 TypeScript·Python만 있으므로, **Spring 서비스 안에서는 Claude API를 직접 호출하는 방식**이 기본입니다. 에이전트 루프가 꼭 필요하면 TypeScript·Python으로 작은 서비스를 따로 두고 Spring에서 그 서비스를 부르거나, Java SDK의 도구 사용(tool use)으로 루프를 직접 짭니다.
-
-```kotlin
-// build.gradle.kts
-dependencies { implementation("com.anthropic:anthropic-java:3.3.0") }
-```
-
-```java
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.models.messages.Message;
-import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.StopReason;
-
-AnthropicClient client = AnthropicOkHttpClient.fromEnv();   // ANTHROPIC_API_KEY
-MessageCreateParams params = MessageCreateParams.builder()
-        .model("claude-opus-5-5")
-        .maxTokens(16000L)
-        .system("너는 릴리스 노트 작성자다. 주어진 커밋 목록만 근거로 쓴다.")
-        .addUserMessage("""
-                다음 커밋으로 릴리스 노트 초안을 마크다운으로 써줘.
-                - feat / fix / perf / 기타로 분류, 요구사항 ID(FR-xx, NFR-xx)가 있으면 함께 표시
-
-                <commits>
-                %s
-                </commits>
-                """.formatted(log))                            // log: 내 코드가 git log로 모은 텍스트
-        .build();
-Message response = client.messages().create(params);
-
-if (response.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) {
-    throw new IllegalStateException("거절됨");
-}
-response.content().stream()
-        .flatMap(block -> block.text().stream())
-        .forEach(text -> System.out.println(text.text()));
-```
-
-</details>
+> 💡 **Java(Spring) 개발자라면**: Agent SDK는 TypeScript·Python만 있으므로, **Spring 서비스 안에서는 Claude API를 직접 호출하는 방식(①)이 기본**입니다. 에이전트 루프가 꼭 필요하면 TypeScript·Python으로 작은 도구를 따로 두거나(아래 예제 ①), Java SDK의 도구 사용(tool use)으로 루프를 직접 짭니다. Spring에 넣는 모양은 아래 예제 ②.
 
 **어느 쪽을 고를까**
 
@@ -312,7 +272,296 @@ response.content().stream()
 
 > 💡 **시작은 ①부터.** "에이전트를 만들자"보다 "이 일에 필요한 자료를 내 코드가 모을 수 있나?"를 먼저 묻습니다. 모을 수 있으면 ①이 싸고 빠르고 테스트하기 쉽습니다. 2-4의 제조 도구 키트도 같은 생각입니다: 자료를 가져오는 일(MCP 도구)은 코드가 정확하게 하고, Claude는 판단을 맡습니다.
 
-> ✅ 이 교재 환경에서 위 TypeScript 두 예제를 `@anthropic-ai/sdk` 1.14.0, `@anthropic-ai/claude-agent-sdk` 0.3.332로 타입 검사(TypeScript 7.0, `strict`)했고, Java 예제는 `anthropic-java` 3.3.0(Java 21)으로 컴파일했습니다. ⚠️ API 키가 없어 **실제 호출은 하지 못했습니다.** 수업 전에 강사 키로 ①을 한 번 실행해 출력과 토큰 수를 확인하고, ②의 `result` 메시지(사용량·비용·턴 수)와 비교해 보여 주면 토큰 차이를 바로 볼 수 있습니다.
+> ✅ 이 교재 환경에서 위 TypeScript 두 예제를 `@anthropic-ai/sdk` 1.14.0, `@anthropic-ai/claude-agent-sdk` 0.3.332로 타입 검사(TypeScript 7.0, `strict`)했습니다. Agent SDK는 아래 예제 ①로 실제 실행했고, ① API 방식은 API 키가 없어 **실제 호출은 하지 못했습니다.** 수업 전에 강사 키로 ①을 한 번 실행해 출력과 토큰 수를 확인하고, ②의 `result` 메시지(사용량·비용·턴 수)와 비교해 보여 주면 토큰 차이를 바로 볼 수 있습니다.
+
+### 예제 ① JavaScript: Agent SDK로 "테스트 실패 원인 분석" 봇
+
+CI나 사내 서버에서 테스트가 실패하면, 결과 XML과 코드를 **Claude가 스스로 찾아 읽고** 원인과 수정 방향을 보고하는 작은 도구입니다. 무엇을 읽어야 할지 미리 정하기 어려우므로 Agent SDK가 맞는 일입니다 (위 "어느 쪽을 고를까" 표). 코드는 고치지 않습니다.
+
+```json
+// tools/test-doctor/package.json
+{
+  "name": "eduhub-test-doctor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.332"
+  }
+}
+```
+
+```js
+// tools/test-doctor/index.mjs — 실패한 백엔드 테스트의 원인을 찾아 보고하는 사내 도구 (읽기 전용)
+// 실행: node index.mjs <저장소 폴더>   (ANTHROPIC_API_KEY 환경 변수 필요)
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { resolve } from "node:path";
+
+const repoDir = resolve(process.argv[2] ?? "."); // Claude가 볼 수 있는 폴더 (저장소 체크아웃)
+
+const prompt = `
+backend/build/test-results/test/ 아래의 JUnit 결과(XML)에서 실패한 테스트를 찾고,
+각 실패의 원인을 테스트 코드와 대상 코드를 읽어 분석해줘.
+
+[보고 형식] 실패한 테스트마다:
+- 테스트 이름
+- 원인 (파일:줄, 3줄 이내)
+- 수정 방향 (코드는 고치지 말 것)
+실패가 없으면 "실패 없음"과 확인한 파일 목록만.
+`;
+
+const run = query({
+  prompt,
+  options: {
+    cwd: repoDir,
+    // ① 쓸 수 있는 도구를 좁힌다
+    //    Read·Grep·Glob은 cwd 안에서는 허용 목록 없이도 쓸 수 있다. 여기에 "Read"처럼 범위 없이 넣으면
+    //    cwd 밖(서버의 다른 폴더)까지 허용되므로 넣지 않는다. 명령은 git 조회만 허용
+    allowedTools: ["Bash(git log *)", "Bash(git diff *)"],
+    disallowedTools: ["Write", "Edit", "WebFetch", "WebSearch"],
+    // 허용되지 않은 것(cwd 밖 읽기, 다른 명령)은 묻지 않고 거부 (서버에는 승인할 사람이 없으므로)
+    permissionMode: "dontAsk",
+    // ② 한 번 실행에 쓸 수 있는 양을 제한한다
+    maxTurns: 15,
+    maxBudgetUsd: 0.5,
+    // ③ 개인 PC 설정(~/.claude)이 섞이지 않게 저장소의 설정(.claude/, CLAUDE.md)만 읽는다
+    settingSources: ["project"],
+  },
+});
+
+for await (const message of run) {
+  // 진행 상황: Claude가 어떤 도구를 쓰는지 한 줄씩 (stderr)
+  if (message.type === "assistant") {
+    for (const block of message.message.content) {
+      if (block.type === "tool_use") {
+        console.error(`  → ${block.name} ${JSON.stringify(block.input).slice(0, 80)}`);
+      }
+    }
+  }
+
+  // 마지막 결과 (stdout)
+  if (message.type === "result") {
+    if (message.subtype === "success") {
+      console.log(message.result);
+    } else {
+      // error_max_turns, error_max_budget_usd, error_during_execution …
+      console.error(`실패: ${message.subtype}`, message.errors);
+      process.exitCode = 1;
+    }
+    console.error(
+      `턴 ${message.num_turns}회 · 비용 $${message.total_cost_usd.toFixed(4)} · ` +
+        `입력 ${message.usage.input_tokens} (+캐시 읽기 ${message.usage.cache_read_input_tokens}) / ` +
+        `출력 ${message.usage.output_tokens} 토큰`,
+    );
+  }
+}
+```
+
+```bash
+cd tools/test-doctor
+npm install
+node index.mjs ../..          # 저장소 루트를 넘긴다 (먼저 ./gradlew test로 결과 XML을 만들어 둔다)
+```
+
+| 옵션 | 하는 일 | 빼면 |
+|---|---|---|
+| `cwd` | Claude가 읽을 수 있는 폴더 (저장소 체크아웃) | 실행한 폴더가 기준이 된다 |
+| `allowedTools` | 묻지 않고 쓸 수 있는 도구. 명령은 **`git log`·`git diff`만** | — |
+| `permissionMode: "dontAsk"` | 허용되지 않은 것은 **묻지 않고 거부**. 서버에는 승인 버튼을 누를 사람이 없다 | 승인을 기다리거나 실패 |
+| `disallowedTools` | 쓰기·웹 도구를 확실히 금지 (2중 안전장치) | — |
+| `maxTurns`, `maxBudgetUsd` | 반복 횟수·비용 상한. 넘으면 `result`가 `error_max_turns`·`error_max_budget_usd` | 탐색이 길어지면 비용이 계속 늘어난다 |
+| `settingSources: ["project"]` | 저장소의 `.claude/`·`CLAUDE.md`만 읽는다 | 서버 계정의 `~/.claude` 설정이 섞일 수 있다 |
+
+> ⚠️ **`allowedTools`에 `"Read"`, `"Glob"`을 범위 없이 넣지 않습니다.** 이 교재 환경에서 처음에 `allowedTools: ["Read", "Grep", "Glob", …]`으로 실행했더니, 작업 폴더에서 결과 파일을 찾지 못한 Claude가 **작업 폴더 밖의 상위 폴더까지 `Glob`으로 검색해** 다른 프로젝트의 테스트 결과를 찾아냈습니다. `cwd`는 기본 위치일 뿐 **울타리가 아닙니다.** 읽기 도구는 `cwd` 안에서는 허용 목록이 없어도 쓸 수 있으므로 목록에서 빼고, `dontAsk`로 나머지를 거부하게 했습니다 (위 코드). 서버에서 더 단단히 막으려면 전용 계정·컨테이너 안에서 실행합니다.
+
+**실제 실행 결과** (이 교재 환경, 정원 비교를 `<=`로 잘못 쓴 작은 예제 저장소)
+
+```text
+  → Bash {"command":"cd backend/build/test-results/test/ 2>&1 && ls -la && grep -l -E '<(
+  → Bash {"command":"cd …
+  → Read {"file_path":"…/backend/build/test-results/test/TEST-com.example.eduhub.SeatCounterTest.xml"
+  → Read {"file_path":"…/backend/src/test/java/com/example/eduhub/SeatCounterTest.java"
+  → Read {"file_path":"…/backend/src/main/java/com/example/eduhub/SeatCounter.java"
+실패한 테스트는 1개입니다. …
+
+**테스트 이름:** `SeatCounterTest.정원이_차면_신청할_수_없다()`
+**원인:** `backend/src/main/java/com/example/eduhub/SeatCounter.java:5`
+- `canEnroll()`이 `enrolled <= capacity`로 비교합니다. 그래서 정원이 꽉 찬 경우(`enrolled == capacity`)에도 `true`를 반환합니다. …
+**수정 방향:** 비교 연산자를 `<=`에서 `<`로 바꾸면 됩니다(`enrolled < capacity`). …
+턴 6회 · 비용 $0.3166 · 입력 10 (+캐시 읽기 126713) / 출력 1327 토큰
+```
+
+- `Bash(cd … && ls …)`는 허용 목록(`git log`·`git diff`)에 없어 **거부**되었고, Claude는 `Read`로 방법을 바꿨습니다
+- 입력 토큰 대부분이 **캐시 읽기**(Claude Code의 시스템 지시·도구 설명)입니다. 작은 저장소에서도 한 번에 약 $0.3: API 한 번 호출(①)보다 비싼 이유가 이것입니다 (2-2 비교표의 "토큰")
+
+### 예제 ② Java(Spring): Claude API로 "수강 문의 분류·답변 초안"
+
+수강 문의 한 건을 받아 **분류, 한 줄 요약, 담당자 확인 필요 여부, 답변 초안**을 돌려주는 Spring 서비스입니다. 입력이 정해져 있고 답 하나면 되므로 API를 한 번 호출합니다. 응답을 **Java record로 바로 받도록**(structured output) 해서 JSON을 직접 파싱하지 않습니다.
+
+```kotlin
+// backend/build.gradle.kts (추가)
+dependencies {
+    implementation("com.anthropic:anthropic-java:3.3.0")   // Claude API 클라이언트 (Anthropic Java SDK)
+}
+```
+
+```java
+// ClaudeConfig.java
+package com.example.eduhub.inquiry;
+
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/** Claude API 클라이언트는 애플리케이션에 하나만 만들어 재사용한다 (연결 풀을 공유) */
+@Configuration
+public class ClaudeConfig {
+
+    @Bean(destroyMethod = "close")
+    public AnthropicClient anthropicClient() {
+        // ANTHROPIC_API_KEY 환경 변수에서 키를 읽는다. 키를 코드·application.yml에 넣지 않는다
+        return AnthropicOkHttpClient.fromEnv();
+    }
+}
+```
+
+```java
+// InquiryTriage.java — 결과 타입
+package com.example.eduhub.inquiry;
+
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+
+/** Claude가 돌려줄 결과의 모양. 이 record에서 JSON 스키마가 만들어지고, 응답이 이 타입으로 바로 바뀐다 */
+public record InquiryTriage(
+        @JsonPropertyDescription("문의 종류") Category category,
+        @JsonPropertyDescription("문의 내용 한 줄 요약") String summary,
+        @JsonPropertyDescription("담당자가 직접 답해야 하면 true (환불, 개인정보, 불만 등)") boolean needsHuman,
+        @JsonPropertyDescription("담당자가 다듬어 보낼 답변 초안, 3문장 이내") String replyDraft) {
+
+    public enum Category { ENROLLMENT, CANCELLATION, SCHEDULE, CERTIFICATE, OTHER }
+}
+```
+
+```java
+// InquiryTriageService.java
+package com.example.eduhub.inquiry;
+
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.errors.AnthropicIoException;
+import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.errors.RateLimitException;
+import com.anthropic.models.messages.Message;
+import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.StopReason;
+import com.anthropic.models.messages.StructuredMessage;
+import com.anthropic.models.messages.StructuredMessageCreateParams;
+import org.springframework.stereotype.Service;
+
+/**
+ * 수강 문의 한 건을 분류하고 답변 초안을 만든다.
+ * 에이전트 루프가 필요 없는 일(입력이 정해져 있고 답 하나)이므로 Claude API를 한 번 호출한다.
+ */
+@Service
+public class InquiryTriageService {
+
+    private static final String SYSTEM = """
+            너는 EduHub 교육 운영팀의 문의 담당 보조다.
+            문의를 분류하고, 담당자가 다듬어 보낼 답변 초안을 쓴다.
+            모르는 정보(일정, 금액, 규정)는 지어내지 말고 "담당자가 확인 후 안내" 라고 쓴다.
+            """;
+
+    private final AnthropicClient client;
+
+    public InquiryTriageService(AnthropicClient client) {
+        this.client = client;
+    }
+
+    public InquiryTriage triage(String inquiry) {
+        StructuredMessageCreateParams<InquiryTriage> params = MessageCreateParams.builder()
+                .model("claude-opus-5-5")
+                .maxTokens(4000L)
+                .system(SYSTEM)
+                .outputConfig(InquiryTriage.class)          // 응답을 InquiryTriage JSON으로 고정
+                // 문의 내용은 사용자가 쓴 데이터: 태그로 감싸 지시와 구분한다
+                .addUserMessage("<inquiry>\n" + inquiry + "\n</inquiry>")
+                .build();
+
+        StructuredMessage<InquiryTriage> response;
+        try {
+            response = client.messages().create(params);
+        } catch (RateLimitException e) {
+            throw new IllegalStateException("요청이 많습니다. 잠시 후 다시 시도하세요.", e);   // 429 (SDK가 이미 2번 재시도한 뒤)
+        } catch (AnthropicServiceException e) {
+            throw new IllegalStateException("Claude API 오류: " + e.statusCode(), e);            // 400·401·5xx 등
+        } catch (AnthropicIoException e) {
+            throw new IllegalStateException("Claude API에 연결할 수 없습니다.", e);               // 네트워크
+        }
+
+        Message raw = response.rawMessage();
+        if (raw.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) {
+            throw new IllegalStateException("요청이 거절되었습니다. 담당자가 직접 확인하세요.");
+        }
+        if (raw.stopReason().filter(StopReason.MAX_TOKENS::equals).isPresent()) {
+            throw new IllegalStateException("답이 잘렸습니다. maxTokens를 늘리세요.");
+        }
+
+        return response.content().stream()
+                .flatMap(block -> block.text().stream())
+                .map(text -> text.text())                   // 이미 InquiryTriage 타입
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("응답에 결과가 없습니다."));
+    }
+}
+```
+
+<details>
+<summary>Spring 없이 한 번 실행해 보기: <code>InquiryTriageDemo.java</code></summary>
+
+```java
+package com.example.eduhub.inquiry;
+
+import com.anthropic.client.AnthropicClient;
+
+/** Spring 없이 한 번 실행해 보는 용도: ./gradlew run (ANTHROPIC_API_KEY 필요) */
+public class InquiryTriageDemo {
+
+    public static void main(String[] args) throws Exception {
+        AnthropicClient client = new ClaudeConfig().anthropicClient();
+        try {
+            InquiryTriageService service = new InquiryTriageService(client);
+            InquiryTriage result = service.triage("""
+                    안녕하세요. 다음 주 화요일 'Spring 트랜잭션 심화' 2회차를 신청했는데
+                    회사 일정 때문에 참석이 어렵습니다. 취소하고 3회차로 옮길 수 있나요?
+                    """);
+            System.out.println("분류: " + result.category());
+            System.out.println("요약: " + result.summary());
+            System.out.println("담당자 확인: " + result.needsHuman());
+            System.out.println("답변 초안: " + result.replyDraft());
+        } finally {
+            client.close();   // Spring에서는 @Bean(destroyMethod = "close")가 대신 한다
+        }
+    }
+}
+```
+
+</details>
+
+| 코드 | 이유 |
+|---|---|
+| 클라이언트를 `@Bean` 하나로 | 요청마다 만들면 연결을 매번 새로 연다. SDK가 429·5xx·네트워크 오류를 **기본 2번 재시도**한다 |
+| `outputConfig(InquiryTriage.class)` | record에서 JSON 스키마를 만들고, 응답이 그 스키마를 지키도록 API가 보장한다. `@JsonPropertyDescription`이 각 칸의 설명 |
+| `<inquiry>` 태그 | 문의 내용은 **사용자가 쓴 데이터**. "이전 지시를 무시하고…" 같은 문장이 있어도 지시와 섞이지 않게 구분한다 |
+| `stopReason` 확인 | `refusal`(거절)·`max_tokens`(잘림)이면 결과를 쓰지 않는다 |
+| 예외를 종류별로 | 429는 잠시 후 다시, 400·401은 설정 문제, 네트워크는 연결 문제. EduHub에서는 7회차 `BizException`·`ErrorCode`로 바꿔 던진다 |
+| 결과는 **초안** | `needsHuman`이 `true`거나 아니거나, 답변은 담당자가 확인한 뒤 보낸다 (금액·일정은 지어내지 않게 지시) |
+
+> ✅ 이 교재 환경에서 위 Java 코드를 `anthropic-java` 3.3.0, Spring 6.2.19, Java 21로 컴파일했습니다. 실행은 API 키가 없어 `401 authentication_error`가 났고, 서비스의 예외 처리(`AnthropicServiceException` → "Claude API 오류: 401")가 동작하는 것까지 확인했습니다. ⚠️ **정상 응답(분류 결과)은 확인하지 못했습니다.** 수업 전에 강사 키로 `InquiryTriageDemo`를 한 번 실행해 결과를 확인합니다.
+
+> 💡 **두 예제의 인증**: 위 Agent SDK 예제가 이 교재 환경에서 키 없이 실행된 것은 SDK가 내부에서 Claude Code를 실행하고, 그 Claude Code가 **이미 로그인된 인증**을 썼기 때문입니다. 사내 도구로 서버에 배포할 때는 두 예제 모두 **API 키(`ANTHROPIC_API_KEY`)를 비밀 저장소·환경 변수로** 주고, 개인 로그인을 쓰지 않습니다.
 
 ## 2-3. SDK 에이전트의 동작 시퀀스
 
@@ -338,7 +587,7 @@ sequenceDiagram
 
 | 항목 | 예 (EduHub 릴리스 노트 봇) |
 |---|---|
-| 허용 도구 | `Read`, `Grep`, `Glob`, `Bash(git log *)` — 쓰기 도구는 금지 |
+| 허용 도구 | 명령은 `Bash(git log *)`만, 권한 모드 `dontAsk`. 읽기는 작업 폴더 안만 (`Read`·`Grep`·`Glob`을 범위 없이 허용하지 않음, [예제 ①](#예제-①-javascript-agent-sdk로-테스트-실패-원인-분석-봇)) — 쓰기 도구는 금지 |
 | 작업 폴더 | 저장소 체크아웃 경로 하나 |
 | 턴 수·비용 상한 | 턴 10회 |
 | 결과 처리 | `result` 메시지를 받아 사내 위키나 PR 코멘트로 |
@@ -1038,8 +1287,9 @@ for await (const message of query({
   prompt,
   options: {
     cwd: process.cwd(),
-    allowedTools: ["Read", "Grep", "Glob", "Bash(git log *)", "Bash(git show *)"],
+    allowedTools: ["Bash(git log *)", "Bash(git show *)"], // 읽기는 cwd 안이면 기본 허용 (2-2 예제 ①)
     disallowedTools: ["Write", "Edit"],
+    permissionMode: "dontAsk",
     maxTurns: 10,
   },
 })) {
