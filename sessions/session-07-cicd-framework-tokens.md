@@ -18,7 +18,7 @@
 > - GitHub 저장소의 **Settings에 접근할 수 있는 권한**(팀에서 한 명 이상, 보통 저장소 관리자)
 > - 로컬에서 `cd backend && ./gradlew test`, `cd frontend && npm test`가 통과하는 상태
 > - (Testcontainers를 쓰는 팀) 로컬에 Docker Desktop. 스테이징 배포에는 Docker를 쓰지 않습니다
-> 🖥️ **슬라이드 덱(41장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(42장, 발표자 노트 포함)**: https://claude.ai/artifact/LvvMiWcYjq4uLrkB72hBEM — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -770,20 +770,135 @@ GitHub에서 PR을 만들고 **Checks** 영역에서 `backend`, `frontend` 잡�
 
 ---
 
-## Step 5. `main`에 필수 상태 체크 걸기 (사람이 직접)
+## Step 5. `main`에 필수 상태 체크 걸기 (사람이 직접, GitHub 화면에서)
 
-CI가 한 번 성공한 뒤에 설정합니다 (체크 이름이 목록에 나타나야 고를 수 있습니다).
+Step 4까지는 CI가 **돌기만** 합니다. 빨간불이어도 Merge 버튼을 누를 수 있고, `main`에 직접 푸시할 수도 있습니다. 이 단계에서 GitHub에 **"`main`은 이 규칙을 지켜야만 바뀐다"**는 규칙을 겁니다. 규칙은 GitHub 서버가 지키게 하므로 사람이 잊어도, Claude가 실수해도 막힙니다.
 
-1. 저장소 **Settings** → **Branches**(또는 **Rules** → **Rulesets**)
-2. `main`에 규칙 추가
-   - PR을 거쳐야만 병합 (직접 푸시 금지), 승인 1명 이상
-   - **필수 상태 체크**: `backend`, `frontend`
-   - 강제 푸시 금지, 브랜치 삭제 금지
-3. 저장
+| 켤 규칙 | 막는 것 |
+|---|---|
+| PR을 거쳐야만 병합 (+ 승인 1명) | `main`에 직접 푸시, 리뷰 없는 병합 |
+| 필수 상태 체크 `backend`, `frontend` | CI가 빨간불이거나 아직 돌고 있는 PR의 병합 |
+| 강제 푸시 금지 | `git push --force`로 `main`의 이력을 덮어쓰기 |
+| 브랜치 삭제 금지 | `main` 브랜치 삭제 |
 
-> ⚠️ 비공개(private) 저장소에서 보호 규칙·필수 체크를 쓸 수 있는지는 **GitHub 요금제에 따라 다를 수 있습니다** (GitHub 문서 확인 필요). 쓸 수 없으면 팀 규칙으로 "CI 초록색이 아니면 병합하지 않는다"를 정하고, 강사가 교육용 조직 저장소를 제공하는 방법을 씁니다.
+### 5-0. 시작하기 전에 확인
 
-✅ **확인**: 일부러 포맷을 어긴 커밋을 올려 `spotlessCheck`가 실패하고 **Merge 버튼이 비활성화**되는지 봅니다. 확인 후 그 커밋은 되돌립니다.
+| 확인 | 이유 |
+|---|---|
+| Step 4의 PR에서 `backend`, `frontend`가 **한 번 성공**했다 | 필수 체크는 **최근 7일 안에 이 저장소에서 성공한 적이 있는 체크**만 검색 목록에 나온다 |
+| 내가 저장소의 **Admin**이다 (저장소를 만든 사람) | 상단에 ⚙ **Settings** 탭이 보이지 않으면 권한이 없다. 저장소 주인에게 부탁한다 |
+| 저장소가 **Public**이거나, Private이면 요금제가 **Pro·Team 이상** | 아래 표 |
+
+| 저장소 | GitHub Free (개인·조직) | Pro · Team · Enterprise Cloud |
+|---|---|---|
+| Public | ✅ 규칙 사용 가능 | ✅ |
+| Private | ❌ 규칙이 적용되지 않음 | ✅ |
+
+(GitHub 문서 "About rulesets", "About protected branches"의 요금제 안내. Ruleset과 classic 브랜치 보호 모두 같습니다.) 개인 Free 계정의 Private 저장소라면 [5-4의 대안](#5-4-규칙을-쓸-수-없을-때)을 봅니다.
+
+GitHub에는 규칙을 거는 화면이 두 가지 있습니다. **새 방식인 Ruleset(방법 A)을 권장**하며, 같은 규칙을 예전 방식(방법 B)으로도 걸 수 있습니다. **둘 중 하나만** 합니다.
+
+### 5-1. 방법 A (권장): Ruleset 만들기
+
+**① 설정 화면 열기**
+
+1. 브라우저에서 저장소 첫 화면(`https://github.com/<계정>/eduhub`)을 엽니다
+2. 저장소 이름 아래 탭 줄의 오른쪽 끝 **⚙ Settings**를 누릅니다 (창이 좁아 안 보이면 **···** 메뉴 안에 있습니다)
+3. 왼쪽 메뉴의 **"Code, planning, and automation"** 묶음에서 **Rules**를 펼쳐 **Rulesets**를 누릅니다 (화면에 따라 묶음 이름이 "Code and automation"일 수 있습니다)
+4. **New ruleset** 버튼 → **New branch ruleset**을 고릅니다 (New tag ruleset이 아닙니다)
+
+**② 폼을 위에서부터 채우기**
+
+| 화면의 칸 | 입력·선택 | 설명 |
+|---|---|---|
+| **Ruleset name** | `main-protection` | 목록에서 알아볼 이름. 아무 이름이나 됩니다 |
+| **Enforcement status** | **Disabled ▾** 를 눌러 **Active**로 | ⚠️ 기본값이 **Disabled**(꺼짐)입니다. 바꾸지 않으면 저장해도 아무것도 막히지 않습니다 |
+| **Bypass list** | 비워 둡니다 | 여기에 넣은 역할·사람은 규칙을 건너뜁니다. 교육에서는 관리자인 나도 규칙을 지키게 비워 둡니다 |
+| **Target branches** | **Add target** → **Include default branch** | 기본 브랜치(`main`)에 규칙을 겁니다. 추가하면 목록에 `Default` 가 보입니다. 이름으로 지정하려면 **Include by pattern** → `main` |
+
+**③ Branch rules(규칙 체크 목록)에서 고르기**
+
+목록이 길지만 **아래 네 가지(+ 하위 옵션)만** 켭니다. 표에 없는 항목은 건드리지 않습니다.
+
+| 규칙 (화면 이름) | 켜기 | 펼쳐지는 하위 옵션 |
+|---|---|---|
+| **Restrict deletions** | ✅ (처음부터 켜져 있음, 그대로) | 없음 |
+| **Require a pull request before merging** | ✅ 켠다 | **Required approvals**: 팀은 `1`, **혼자 실습이면 `0`** ([5-3](#5-3-혼자-실습할-때-승인-1명이-막힌다)) · **Dismiss stale pull request approvals when new commits are pushed** ✅ (승인 뒤에 코드가 바뀌면 승인 취소) · 나머지(Require review from Code Owners 등)는 끈 채로 |
+| **Require status checks to pass** | ✅ 켠다 | **Require branches to be up to date before merging** ✅ (최신 `main`을 합친 상태로 CI가 통과해야 함. 팀원이 먼저 병합하면 내 PR에서 **Update branch**를 눌러 CI를 다시 돌린다) · **Add checks**(또는 ➕) → 검색 칸에 `backend` 입력 → 목록의 `backend`(출처 **GitHub Actions**) 선택 → 같은 방법으로 `frontend` 추가 → 아래 목록에 두 체크가 보이는지 확인 |
+| **Block force pushes** | ✅ (처음부터 켜져 있음, 그대로) | 없음 |
+
+> ⚠️ **켜면 안 되는 것**: **Restrict updates**는 "Bypass list에 있는 사람만 이 브랜치를 바꿀 수 있다"는 뜻이라, 켜면 PR 병합까지 막힙니다. **Restrict creations**, **Require linear history**, **Require signed commits**, **Require deployments to succeed** 등도 오늘은 켜지 않습니다.
+
+> 💡 **체크 이름은 `ci.yml`의 잡 이름**입니다. Step 3의 `jobs:` 아래 `backend:`, `frontend:`가 그대로 체크 이름이 됩니다 (잡에 `name:`을 따로 적었다면 그 이름). 워크플로우 이름(`CI`)이 아닙니다.
+
+**④ 저장하고 확인**
+
+1. 맨 아래 **Create**를 누릅니다. Enforcement status가 Active면 **바로 적용**됩니다
+2. Rulesets 목록에 `main-protection`이 **Active**로 보이는지 확인합니다
+3. 나중에 고치려면 목록에서 이름을 눌러 바꾸고 **Save changes**를 누릅니다
+
+### 5-2. 방법 B: 예전 방식 (classic branch protection rule)
+
+회사 GitHub(Enterprise Server)가 오래되어 Rulesets 메뉴가 없거나, 팀이 이미 이 방식을 쓰고 있다면 이것으로 합니다. **Ruleset과 함께 같은 규칙을 이중으로 걸지 않습니다.**
+
+1. ⚙ **Settings** → 왼쪽 메뉴 **Branches**
+2. "Branch protection rules"에서 **Add classic branch protection rule** (화면에 **Add branch ruleset** 버튼도 함께 있는데, 그것은 방법 A의 화면으로 갑니다)
+3. **Branch name pattern**: `main`
+4. "Protect matching branches"에서 체크
+
+| 체크 (화면 이름) | 켜기 |
+|---|---|
+| **Require a pull request before merging** | ✅ → **Require approvals** ✅, **Required number of approvals before merging**: `1` (혼자면 Require approvals를 끈다) → **Dismiss stale pull request approvals when new commits are pushed** ✅ |
+| **Require status checks to pass before merging** | ✅ → **Require branches to be up to date before merging** ✅ → 아래 검색 칸에 `backend`, `frontend`를 입력해 각각 선택 |
+| **Do not allow bypassing the above settings** | ✅ (관리자도 규칙을 지키게) |
+| "Rules applied to everyone including administrators"의 **Allow force pushes** | ☐ **끈 채로** (켜지 않는 것이 "강제 푸시 금지") |
+| **Allow deletions** | ☐ **끈 채로** (켜지 않는 것이 "삭제 금지") |
+| 나머지 | 끈 채로 |
+
+5. 맨 아래 **Create**
+
+### 5-3. 혼자 실습할 때: "승인 1명"이 막힌다
+
+GitHub에서는 **PR을 만든 사람이 자기 PR을 승인할 수 없습니다.** 혼자 쓰는 저장소에 승인 1명을 걸면 아무도 병합할 수 없습니다.
+
+| 상황 | 설정 |
+|---|---|
+| 2명 이상 팀 (교육 기본) | 승인 `1`. 팀원을 저장소에 초대(⚙ Settings → **Collaborators**)하고 서로 리뷰 |
+| 혼자 실습 | **Required approvals `0`** (방법 B는 Require approvals 끄기). PR 필수·필수 체크·강제 푸시 금지는 그대로 켠다 → "CI 통과 전 병합 금지"는 그대로 연습된다 |
+
+> 💡 Bypass list에 나를 넣어 승인을 건너뛰는 방법도 있지만, 그러면 필수 체크까지 건너뛸 수 있게 되어 이 단계의 목적이 사라집니다. 혼자라면 승인 수만 0으로 둡니다.
+
+### 5-4. 규칙을 쓸 수 없을 때
+
+개인 Free 계정의 Private 저장소처럼 규칙이 적용되지 않으면:
+
+1. 강사가 준비한 **교육용 조직(Organization)의 Public 저장소**로 옮겨 실습하거나 (Public이면 Free에서도 됨)
+2. 팀 규칙으로 "**CI가 초록색이 아니면 병합하지 않는다**, `main`에 직접 푸시하지 않는다"를 CLAUDE.md와 팀 문서에 적고, 4회차의 권한 설정(`git push` 확인)으로 Claude의 푸시를 사람이 확인합니다
+
+> ⚠️ Public 저장소로 바꾸기 전에 **비밀 값·사내 코드가 커밋 이력에 없는지** 확인합니다 (Step 6). 회사 코드는 Public으로 올리지 않습니다.
+
+### 5-5. 규칙이 동작하는지 확인
+
+| # | 할 일 | 기대 결과 |
+|---|---|---|
+| R1 | 로컬에서 `main`에 직접 커밋하고 `git push origin main` | 거부: `GH013: Repository rule violations found for refs/heads/main` (방법 B면 `GH006: Protected branch update failed`). 확인 후 `git reset --hard origin/main`으로 로컬 커밋을 버린다 |
+| R2 | 브랜치에서 일부러 포맷을 어긴 커밋(예: Java 파일 들여쓰기 망가뜨리기)을 푸시하고 PR | `backend`가 `spotlessCheck`에서 실패, PR 아래 병합 상자에 **Merging is blocked**, Merge 버튼 비활성화 |
+| R3 | 그 커밋을 되돌리고(`git revert`) 다시 푸시 | 두 체크가 초록색이 되고 (팀이면 승인 1명 후) Merge 버튼 활성화 |
+| R4 | `git push --force origin main` | 거부 (강제 푸시 금지) |
+| R5 | Claude Code에게 "main에 바로 푸시해줘" | 4회차 권한 설정 때문에 먼저 확인 창이 뜨고, 허용해도 **GitHub가 R1처럼 거부** |
+
+**자주 겪는 문제**
+
+| 증상 | 원인과 해결 |
+|---|---|
+| **Add checks** 검색에 `backend`가 안 나온다 | 최근 7일 안에 이 저장소에서 성공한 적이 없다 → Step 4의 PR에서 CI를 한 번 성공시킨 뒤 다시. 잡 이름이 다르다면 `ci.yml`의 `jobs:` 아래 이름으로 검색 |
+| PR에 `backend — Expected: Waiting for status to be reported`가 계속 남는다 | 필수 체크 이름이 실제 잡 이름과 다르거나(오타, 잡 이름 변경), 그 PR에서 워크플로우가 돌지 않았다(`on: pull_request` 확인). 규칙의 체크 이름을 고친다 |
+| 규칙을 만들었는데 직접 푸시가 된다 | Enforcement status가 **Disabled**로 남아 있다 → Active로. 또는 Private + Free 저장소 (5-0 표) |
+| 혼자인데 Merge 버튼이 계속 막힌다 | 승인 1명 규칙 → [5-3](#5-3-혼자-실습할-때-승인-1명이-막힌다) |
+| 팀원이 먼저 병합한 뒤 내 PR이 막힌다 ("This branch is out-of-date") | Require branches to be up to date 때문. PR의 **Update branch** → CI가 다시 돌고 통과하면 병합 |
+| 7-2·7-3의 배포 워크플로우가 막히나? | 아니다. 배포 워크플로우는 병합 **뒤에** `main`의 push로 시작하므로 이 규칙과 부딪히지 않는다 |
+
+> ⚠️ 화면 이름과 순서는 GitHub 공식 문서(Creating rulesets for a repository, Available rules for rulesets, Managing a branch protection rule — 2026년 11월 확인)를 따랐습니다. 이 교재 환경에서는 GitHub 설정 화면을 직접 열어 보지 못했으므로, 버튼 위치나 이름이 조금 다르면 같은 뜻의 항목을 고르고, 수업 전에 강사가 한 번 따라 해 봅니다.
 
 ---
 
