@@ -15,10 +15,10 @@
 > **사전 준비**
 > - 5회차 PR이 `main`에 병합되어 있고, `git switch main && git pull`로 최신 상태. 특히 **5회차 6장(로그인과 화면 완성)**까지 끝나 [6-2 확인 표](./session-05-hooks-and-mcp.md#6-2-데모-흐름으로-확인하기)가 `http://localhost:3001`에서 동작해야 합니다 (오늘은 이 앱을 쪼갭니다)
 > - Node.js LTS, `frontend/` 의존성 설치(`npm install`) 완료
-> - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 안내를 봅니다
-> - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나
+> - 플러그인 실습용 **터미널 CLI**(`claude -v`로 확인). 데스크톱 앱만 쓰는 사람은 [6장 Step 4](#step-4-팀원-pc에-설치하고-확인하기)의 데스크톱 안내를 봅니다 (플러그인 담당자는 Step 3의 검사 명령 때문에 CLI가 필요)
+> - 팀별 GitHub에 빈 저장소 `eduhub-<팀이름>-plugins`(Private) 하나 (예: 1팀은 `eduhub-team1-plugins`. [6장 Step 1](#step-1-무엇을-옮길지-고르기-직접-판단)의 이름 표)
 >
-> 🖥️ **슬라이드 덱(44장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(45장, 발표자 노트 포함)**: https://claude.ai/artifact/BXjy2hwcueRHy9zpXNXzCH — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -469,7 +469,7 @@ shared: {
 // remote(course-mfe, enrollment-mfe)도 같은 shared 설정을 쓴다
 ```
 
-> 💡 이 네 가지를 **CLAUDE.md(`frontend/CLAUDE.md`)에 짧게** 적고, 3주차에 만든 리뷰 에이전트(예: `mfe-integration-checker`)가 검사하게 하면 Claude가 처음부터 규칙대로 씁니다. ([서브에이전트 예제](../examples/03-settings-skills-agents-hooks.md#모듈-11-서브에이전트))
+> 💡 이 네 가지를 **CLAUDE.md(`frontend/CLAUDE.md`)에 짧게** 적고, 리뷰 에이전트(예: 서브에이전트 예제의 `mfe-integration-checker`)가 검사하게 하면 Claude가 처음부터 규칙대로 씁니다. ([서브에이전트 예제](../examples/03-settings-skills-agents-hooks.md#모듈-11-서브에이전트))
 
 ---
 
@@ -861,7 +861,7 @@ flowchart LR
 | 구성 요소 | 플러그인 안 위치 | 세션에서 |
 |---|---|---|
 | 매니페스트 | `.claude-plugin/plugin.json` | 플러그인 이름(스킬 앞에 붙는 접두사), 버전, 설명 |
-| 스킬 | `skills/<이름>/SKILL.md` | `/eduhub-team-kit:add-api-endpoint`처럼 **플러그인 이름이 접두사** |
+| 스킬 | `skills/<이름>/SKILL.md` | `/eduhub-team-kit:spring-api`처럼 **플러그인 이름이 접두사** |
 | 서브에이전트 | `agents/<이름>.md` | Claude가 위임할 수 있는 에이전트 |
 | 훅 | `hooks/hooks.json` | 플러그인이 켜져 있으면 해당 이벤트에 실행 |
 | MCP 서버 | `.mcp.json` | 플러그인이 켜져 있는 동안 연결 |
@@ -873,7 +873,7 @@ flowchart LR
 | 질문 | 프로젝트 `.claude/` | 팀 플러그인 |
 |---|---|---|
 | 이 저장소에만 해당하나? | ✅ (EduHub 도메인 규칙, 이 저장소의 경로) | |
-| 여러 프로젝트에서 공통인가? | | ✅ (Spring API 추가 절차, JPA 리뷰어, 포맷 훅) |
+| 여러 프로젝트에서 공통인가? | | ✅ (Spring API 추가 절차, 구현·검토 에이전트, 포맷 훅) |
 | 버전을 붙여 배포·업데이트하고 싶은가? | | ✅ |
 | 저장소를 클론하면 바로 적용되어야 하나? | ✅ | 설치가 한 번 필요 (프로젝트 설정으로 권장 가능) |
 
@@ -919,7 +919,7 @@ sequenceDiagram
     Dev->>Dev: claude plugin validate
     Dev->>Repo: PR → 리뷰 → 병합 (version 1.1.0)
     Mate->>Repo: plugin marketplace add (최초 1회)
-    Mate->>Repo: plugin install eduhub-team-kit@마켓플레이스
+    Mate->>Repo: plugin install eduhub-team-kit@eduhub-team1-plugins
     Repo-->>Mate: 플러그인 설치 (사용자 PC 캐시)
     Note over Mate: 이후 업데이트는 마켓플레이스 갱신 시 반영<br/>(자동 업데이트 여부는 설정에 따름)
 ```
@@ -2328,25 +2328,41 @@ git push -u origin feature/fr-09-notification
 
 ## Step 1. 무엇을 옮길지 고르기 (직접 판단)
 
-| 자산 (예) | 옮길까? | 이유 |
-|---|---|---|
-| `skills/add-api-endpoint` | ✅ 플러그인 | Spring + OpenAPI 팀 공통 절차 |
-| `agents/jpa-reviewer.md` | ✅ 플러그인 | 다른 JPA 프로젝트에도 유용 |
-| `agents/mfe-integration-checker.md` | ✅ 플러그인 | MFE 공통 규칙 |
-| 포맷 훅 (`format.sh`) | ✅ 플러그인 | 공통 |
-| 수정 금지 파일 보호 훅 | ❌ 프로젝트 | EduHub 경로(`application-prod.yml` 등)에 묶여 있음 |
-| `.mcp.json`의 개발 DB | ❌ 프로젝트 | 프로젝트별 접속 정보 (환경 변수) |
-| EduHub 도메인 규칙 | ❌ 프로젝트 CLAUDE.md | 이 저장소에만 해당 |
+4회차 Step 4~5와 5회차 Step 2~3에서 EduHub 저장소의 `.claude/`에 만든 자산을 하나씩 봅니다.
 
-> 💬 **강사 노트:** 이 표를 Claude가 아니라 **팀이 직접** 채우게 합니다. "무엇이 공통이고 무엇이 이 프로젝트 것인가"는 구조를 아는 사람만 정할 수 있습니다.
+| 자산 (4·5회차에 만든 것) | 옮길까? | 플러그인 안 이름 | 이유 |
+|---|---|---|---|
+| `skills/eduhub-api` (4회차 4-1) | ✅ 플러그인 | `skills/spring-api` | Spring + OpenAPI API 추가 절차는 팀 공통. **다른 프로젝트에서도 쓰므로 프로젝트 이름을 뺀 이름으로** 바꾸고, EduHub 전용 내용(패키지 경로, 수강 신청 예시)은 빼서 EduHub `CLAUDE.md`에 남긴다 |
+| `skills/fr-start` (4회차 4-2) | ✅ 플러그인 | `skills/fr-start` (그대로) | 요구사항 → 설계명세 → 구현계획 흐름과 문서 위치(`docs/design`, `docs/plans`)는 팀 공통 |
+| `agents/implementer.md`, `agents/reviewer.md` (4회차 Step 5) | ✅ 플러그인 | `agents/implementer.md`, `agents/reviewer.md` (그대로) | 계획대로 구현 → 검토하는 팀의 작업 방식. "EduHub" 표현과 `.claude/skills/eduhub-api/SKILL.md` 경로만 일반화 |
+| `agents/critical-reviewer.md` (4회차 Step 5) | ❌ 프로젝트 | | 신청 상태 전이(CONFIRMED/WAITING…)·대기 순번처럼 **EduHub 도메인 위험**에 맞춘 검토 |
+| 포맷 훅 `hooks/format.sh`·`format.ps1` (5회차 Step 2) | ✅ 플러그인 | `scripts/format.sh`, `scripts/format.ps1` + `hooks/hooks.json` | `backend/`·`frontend/` 구조를 쓰는 팀 저장소 모두에 공통 |
+| 보호 훅 `protect-files`, `protect-prod-config`, `guard-bash` (5회차 1-4, Step 3) | ❌ 프로젝트 | | EduHub의 경로(`application-prod.yml` 등)·명령 목록에 묶여 있고, 보호 규칙은 그 저장소와 함께 리뷰해야 한다 |
+| 그 밖의 5회차 훅 (`check-openapi`, `filter-test-output`, `stop-test`, `session-context`) | ❌ 프로젝트 | | 이 저장소의 폴더·테스트 명령에 맞춘 것 |
+| `.mcp.json`의 개발 DB (5회차) | ❌ 프로젝트 | | 프로젝트별 접속 정보 (환경 변수) |
+| EduHub 도메인 규칙 | ❌ 프로젝트 `CLAUDE.md` | | 이 저장소에만 해당 |
+
+> 💬 **강사 노트:** 이 표를 Claude가 아니라 **팀이 직접** 채우게 합니다. "무엇이 공통이고 무엇이 이 프로젝트 것인가"는 구조를 아는 사람만 정할 수 있습니다. 위 표는 한 가지 답이며, 팀이 `critical-reviewer`도 일반화해 옮기기로 정해도 됩니다.
+
+**이 장에서 쓰는 이름** (1팀 기준. 내 팀 이름으로 `team1`만 바꿉니다)
+
+| 무엇 | 이름 | 어디에 나오나 |
+|---|---|---|
+| 마켓플레이스 저장소 (GitHub, Private) | `<팀-계정>/eduhub-team1-plugins` | Step 2 `git clone`, Step 4 `marketplace add`, `settings.json`의 `repo` |
+| 마켓플레이스 이름 | `eduhub-team1-plugins` (저장소 이름과 같게) | `marketplace.json`의 `name`, `install …@eduhub-team1-plugins`, `settings.json`의 키 |
+| 플러그인 이름 | `eduhub-team-kit` | `plugin.json`·`marketplace.json` 항목의 `name`, 폴더 `plugins/eduhub-team-kit`, 스킬·에이전트 앞 접두사 `eduhub-team-kit:` |
+
+> 💡 마켓플레이스 이름을 저장소 이름과 같게 두면, `@` 뒤에 무엇을 써야 하는지 헷갈리지 않습니다. 2회차에 팀 저장소를 `eduhub-team1`로 만들었다면, 그 이름과도 구분됩니다.
 
 ---
 
 ## Step 2. 마켓플레이스 저장소에 플러그인 만들기
 
+EduHub 저장소와 **같은 상위 폴더**에 클론합니다 (아래 지시의 `../eduhub/`가 EduHub 저장소. 팀 저장소 이름이 다르면 그 이름으로).
+
 ```bash
-git clone https://github.com/<팀-계정>/eduhub-<팀이름>-plugins.git
-cd eduhub-<팀이름>-plugins
+git clone https://github.com/<팀-계정>/eduhub-team1-plugins.git
+cd eduhub-team1-plugins
 mkdir -p .claude-plugin plugins/eduhub-team-kit/.claude-plugin
 ```
 
@@ -2354,15 +2370,21 @@ mkdir -p .claude-plugin plugins/eduhub-team-kit/.claude-plugin
 
 ```text
 [목표] EduHub의 공통 .claude 자산을 eduhub-team-kit 플러그인으로 만든다
-[위치] 원본: ../eduhub/.claude/ (skills/add-api-endpoint, agents/jpa-reviewer.md, agents/mfe-integration-checker.md, 포맷 훅)
+[위치] 원본: ../eduhub/.claude/
+         skills/eduhub-api, skills/fr-start, agents/implementer.md, agents/reviewer.md,
+         hooks/format.sh, hooks/format.ps1
        대상: plugins/eduhub-team-kit/
 [범위]
-- plugins/eduhub-team-kit/.claude-plugin/plugin.json (name, version 1.0.0, description)
-- skills/, agents/ 로 복사
-- 포맷 훅은 hooks/hooks.json 과 scripts/format.sh 로. 스크립트 경로는 플러그인 루트 기준
-- 마켓플레이스 루트 .claude-plugin/marketplace.json
-- README.md (무엇이 들어 있고, 각 훅이 언제 무엇을 실행하는지)
-[하지 않는 것] EduHub 저장소 수정, 프로젝트 전용 훅·MCP 설정 포함
+- .claude-plugin/plugin.json: name eduhub-team-kit, version 1.0.0, description, author
+- skills/eduhub-api 는 skills/spring-api 로 복사하고 SKILL.md의 name도 spring-api 로.
+  EduHub 전용 내용(패키지 경로 com.example.eduhub, 수강 신청 예시)은 빼고, 뺀 내용은 목록으로 보고
+- skills/fr-start, agents/implementer.md, agents/reviewer.md 는 이름 그대로 복사.
+  본문의 "EduHub"는 "이 저장소"로, ".claude/skills/eduhub-api/SKILL.md"는 "spring-api 스킬"로
+- format.sh, format.ps1 은 scripts/ 로. hooks/hooks.json 에 5회차와 같은 PostToolUse(Edit|Write)로 등록하되
+  경로는 ${CLAUDE_PLUGIN_ROOT}/scripts/format.sh
+- 마켓플레이스 루트 .claude-plugin/marketplace.json: name eduhub-team1-plugins, owner EduHub 1팀
+- README.md: 들어 있는 것, 각 훅이 언제 무엇을 실행하는지, 설치 명령
+[하지 않는 것] EduHub 저장소 수정, critical-reviewer·보호 훅·.mcp.json 포함
 [완료 기준] claude plugin validate ./plugins/eduhub-team-kit 와 claude plugin validate . 통과
 [진행 방식] 만들 파일 목록 먼저
 ```
@@ -2370,22 +2392,24 @@ mkdir -p .claude-plugin plugins/eduhub-team-kit/.claude-plugin
 **결과 구조**
 
 ```text
-eduhub-<팀이름>-plugins/
+eduhub-team1-plugins/                      ← 마켓플레이스 저장소 (마켓플레이스 이름도 eduhub-team1-plugins)
 ├── .claude-plugin/
 │   └── marketplace.json
 └── plugins/
-    └── eduhub-team-kit/
+    └── eduhub-team-kit/                   ← 플러그인 (이름 = 폴더 = plugin.json의 name)
         ├── .claude-plugin/
         │   └── plugin.json
         ├── skills/
-        │   └── add-api-endpoint/SKILL.md
+        │   ├── spring-api/SKILL.md        ← 4회차 eduhub-api를 일반화
+        │   └── fr-start/SKILL.md          ← 4회차 그대로
         ├── agents/
-        │   ├── jpa-reviewer.md
-        │   └── mfe-integration-checker.md
+        │   ├── implementer.md             ← 4회차 그대로 (일반화)
+        │   └── reviewer.md
         ├── hooks/
-        │   └── hooks.json
+        │   └── hooks.json                 ← 5회차 settings.json의 포맷 훅 등록을 옮긴 것
         ├── scripts/
-        │   └── format.sh
+        │   ├── format.sh                  ← 5회차 .claude/hooks/format.sh
+        │   └── format.ps1                 ← 5회차 .claude/hooks/format.ps1 (Git Bash가 없는 PC용)
         └── README.md
 ```
 
@@ -2394,35 +2418,36 @@ eduhub-<팀이름>-plugins/
 {
   "name": "eduhub-team-kit",
   "version": "1.0.0",
-  "description": "Spring Boot + React MFE 팀 공통 키트: API 추가 스킬, JPA·MFE 리뷰 에이전트, 자동 포맷 훅"
+  "description": "EduHub 팀 공통 키트: Spring API 추가·요구사항 시작 스킬, 구현·검토 에이전트, 자동 포맷 훅",
+  "author": { "name": "EduHub 1팀" }
 }
 ```
 
 ```json
 // .claude-plugin/marketplace.json (마켓플레이스 루트)
 {
-  "name": "eduhub-team1",
+  "name": "eduhub-team1-plugins",
   "description": "EduHub 1팀 공통 플러그인",
   "owner": { "name": "EduHub 1팀" },
   "plugins": [
     {
       "name": "eduhub-team-kit",
       "source": "./plugins/eduhub-team-kit",
-      "description": "API 추가 스킬, JPA·MFE 리뷰어, 포맷 훅"
+      "description": "spring-api·fr-start 스킬, implementer·reviewer 에이전트, 포맷 훅"
     }
   ]
 }
 ```
 
 ```json
-// plugins/eduhub-team-kit/hooks/hooks.json (요지)
+// plugins/eduhub-team-kit/hooks/hooks.json
 {
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/format.sh" }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/format.sh\"", "timeout": 120 }
         ]
       }
     ]
@@ -2430,40 +2455,81 @@ eduhub-<팀이름>-plugins/
 }
 ```
 
-> 플러그인 훅 파일의 정확한 형식과 `${CLAUDE_PLUGIN_ROOT}` 변수는 공식 문서 Plugin components의 Hooks 절로 한 번 더 확인합니다 (공식 문서 확인 필요).
+| 5회차 프로젝트 설정 | 플러그인에서 | 바뀐 것 |
+|---|---|---|
+| `.claude/settings.json`의 `hooks.PostToolUse` | `hooks/hooks.json` | 등록 위치만 (형식은 같다) |
+| `$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh` | `${CLAUDE_PLUGIN_ROOT}/scripts/format.sh` | 스크립트 위치 = 플러그인 폴더 기준. **스크립트 안**의 `$CLAUDE_PROJECT_DIR/backend`·`frontend`는 그대로 (포맷할 대상은 여전히 작업 중인 저장소) |
+
+> 💡 **Windows에서 Git Bash가 없는 팀원**: 플러그인 훅은 팀원 모두에게 같은 명령으로 등록되므로, 교육 기본(Git for Windows)대로 `format.sh`를 등록했습니다. `format.ps1`은 함께 넣어 두고, README에 5회차 1-3의 PowerShell 등록 형식(`powershell.exe … -File "${CLAUDE_PLUGIN_ROOT}/scripts/format.ps1"`)을 적어 둡니다.
 
 **diff 검토 체크리스트**
 
-- [ ] 마켓플레이스 항목 `name`과 `plugin.json`의 `name`이 같은가? (`eduhub-team-kit`)
-- [ ] `source`가 마켓플레이스 루트 기준 상대 경로이고 `..`가 없는가?
+- [ ] 플러그인 이름이 세 곳에서 같은가? `plugin.json`의 `name` = `marketplace.json` 항목의 `name` = 폴더 이름 (`eduhub-team-kit`)
+- [ ] `source`가 마켓플레이스 루트 기준 상대 경로(`./plugins/eduhub-team-kit`)이고 `..`가 없는가?
+- [ ] `skills/spring-api/SKILL.md`의 `name`이 `spring-api`이고, EduHub 패키지 경로·도메인 예시가 빠졌는가? (빠진 내용은 EduHub `CLAUDE.md`로)
+- [ ] `implementer.md`에 `.claude/skills/eduhub-api/SKILL.md` 경로가 남아 있지 않은가? (플러그인에는 그 경로가 없다)
 - [ ] 훅 스크립트가 무엇을 실행하는지 README에 적혀 있는가?
 - [ ] 접속 정보, 토큰, 사내 서버 주소가 들어가지 않았는가?
-- [ ] 프로젝트 전용 자산(EduHub 경로, 개발 DB)이 섞이지 않았는가?
+- [ ] 프로젝트 전용 자산(`critical-reviewer`, 보호 훅, 개발 DB)이 섞이지 않았는가?
 
 ---
 
 ## Step 3. 로컬에서 시험하고 검증하기
 
 ```bash
-# 마켓플레이스 없이 폴더에서 바로 불러와 시험
-claude --plugin-dir ./plugins/eduhub-team-kit
-
-# (세션 안에서) 스킬이 플러그인 이름 접두사로 보이는지 확인
-# /eduhub-team-kit:add-api-endpoint
-
-# 형식 검사
+# 형식 검사 (마켓플레이스 저장소 루트에서)
 claude plugin validate ./plugins/eduhub-team-kit
 claude plugin validate .
+
+# 구성 목록: 스킬 2, 에이전트 2, 훅 1이 보이는지
+claude --plugin-dir ./plugins/eduhub-team-kit plugin details eduhub-team-kit
+
+# 마켓플레이스 없이 폴더에서 바로 불러와 세션에서 시험 (EduHub 저장소에서 실행)
+cd ../eduhub
+claude --plugin-dir ../eduhub-team1-plugins/plugins/eduhub-team-kit
+# (세션 안에서) / 를 입력 → eduhub-team-kit:spring-api, eduhub-team-kit:fr-start 가 보이는지
+# /agents → eduhub-team-kit:implementer, eduhub-team-kit:reviewer 가 보이는지
 ```
 
-> ✅ **확인**: 두 검사 모두 마지막 줄이 `✔ Validation passed`이고, 세션에서 `/eduhub-team-kit:`로 시작하는 스킬이 보이면 됩니다.
+> ✅ **확인**: 두 검사 모두 마지막 줄이 `√ Validation passed`이고(이 교재 환경의 CLI 2.1.332 표시. 경고는 함께 읽고 판단합니다), `plugin details`의 구성 목록이 `Skills (2) fr-start, spring-api`, `Agents (2) reviewer, implementer`, `Hooks (1) PostToolUse`이면 됩니다. EduHub 저장소에 원본이 아직 남아 있으므로 이 단계에서는 `eduhub-api`와 `eduhub-team-kit:spring-api`가 함께 보입니다 (원본 삭제는 Step 4).
 
-검증이 끝나면 2단계 커밋 후 PR로 올리고, 팀원 리뷰를 받아 병합합니다.
+**데스크톱 앱(Code 탭)에서 시험하기**
+
+데스크톱 앱에는 `--plugin-dir`처럼 **폴더를 바로 불러오는 방법이 없습니다** (공식 문서 기준). 그래서 플러그인 폴더를 **로컬 마켓플레이스**로 추가하고, **내 EduHub 폴더에만**(local 범위) 설치해서 시험합니다. 형식 검사(`validate`)는 위와 같이 터미널에서 합니다 (플러그인 담당자는 CLI를 설치해 둡니다).
+
+```powershell
+# ① 터미널(PowerShell)에서: 로컬 폴더를 마켓플레이스로 추가하고, EduHub 폴더에만 설치
+cd C:\work\eduhub
+claude plugin marketplace add C:\work\eduhub-team1-plugins
+claude plugin install eduhub-team-kit@eduhub-team1-plugins --scope local
+#   → .claude/settings.local.json(커밋하지 않는 개인 설정)에 "eduhub-team-kit@eduhub-team1-plugins": true 가 생긴다
+#   → 나 혼자, 이 폴더에서만 켜진다. 팀원에게는 영향 없음
+```
+
+| # | 데스크톱 앱에서 할 일 | 기대 결과 |
+|---|---|---|
+| D1 | Code 탭에서 `C:\work\eduhub` 폴더로 **새 로컬 세션** | (이미 열린 세션은 플러그인을 다시 읽지 않으므로 새로 연다) |
+| D2 | 입력창 옆 **+** → **Plugins** → **Manage plugins** (로컬 세션은 사이드바의 **Customize** 또는 **Plugins**도 가능) | `eduhub-team-kit`가 켜져 있다 |
+| D3 | 입력창에 `/` 입력 (또는 **+** → **Slash commands**) | `/eduhub-team-kit:spring-api`, `/eduhub-team-kit:fr-start`가 보인다 |
+| D4 | "지금 쓸 수 있는 서브에이전트 이름을 알려줘" | `eduhub-team-kit:implementer`, `eduhub-team-kit:reviewer`가 답에 나온다 |
+| D5 | "backend의 아무 Java 파일 하나에 빈 줄을 하나 넣어줘" | 저장 뒤 포맷 훅이 돌아 `spotlessApply`가 정리한다 (5회차 Step 2와 같은 결과) |
+
+- 플러그인 파일을 고친 뒤에는 **새 세션**을 열어 다시 확인합니다. 바뀐 것이 안 보이면 터미널에서 `claude plugin marketplace update eduhub-team1-plugins`
+- 시험이 끝나면 **반드시 정리**합니다. 로컬 마켓플레이스와 GitHub 마켓플레이스는 이름(`eduhub-team1-plugins`)이 같아서, 정리하지 않으면 Step 4의 `marketplace add`가 같은 이름과 부딪힙니다
+
+```powershell
+cd C:\work\eduhub
+claude plugin uninstall eduhub-team-kit@eduhub-team1-plugins --scope local
+claude plugin marketplace remove eduhub-team1-plugins
+```
+
+검증이 끝나면 2단계 커밋 후 PR로 올리고, 팀원 리뷰를 받아 병합합니다 (마켓플레이스 저장소에서).
 
 ```bash
+cd ../eduhub-team1-plugins
 git switch -c feature/team-kit-1.0.0
 git add .claude-plugin plugins
-git commit -m "feat(plugin): eduhub-team-kit 1.0.0 (API 추가 스킬, 리뷰 에이전트, 포맷 훅)"
+git commit -m "feat(plugin): eduhub-team-kit 1.0.0 (spring-api·fr-start 스킬, implementer·reviewer 에이전트, 포맷 훅)"
 git push -u origin feature/team-kit-1.0.0
 ```
 
@@ -2474,9 +2540,9 @@ git push -u origin feature/team-kit-1.0.0
 **팀원 각자** (마켓플레이스 PR 병합 후)
 
 ```bash
-claude plugin marketplace add <팀-계정>/eduhub-<팀이름>-plugins
-claude plugin install eduhub-team-kit@eduhub-team1
-claude plugin list                       # Status: ✔ enabled 확인
+claude plugin marketplace add <팀-계정>/eduhub-team1-plugins
+claude plugin install eduhub-team-kit@eduhub-team1-plugins     # 플러그인이름@마켓플레이스이름
+claude plugin list                       # eduhub-team-kit@eduhub-team1-plugins, Status: √ enabled 확인
 claude plugin details eduhub-team-kit    # 구성 목록(Component inventory) 확인
 ```
 
@@ -2487,20 +2553,48 @@ claude plugin details eduhub-team-kit    # 구성 목록(Component inventory) �
 ```json
 {
   "extraKnownMarketplaces": {
-    "eduhub-team1": {
-      "source": { "source": "github", "repo": "<팀-계정>/eduhub-<팀이름>-plugins" }
+    "eduhub-team1-plugins": {
+      "source": { "source": "github", "repo": "<팀-계정>/eduhub-team1-plugins" }
     }
   },
   "enabledPlugins": {
-    "eduhub-team-kit@eduhub-team1": true
+    "eduhub-team-kit@eduhub-team1-plugins": true
   }
 }
 ```
 
 - 이 설정은 팀원이 그 폴더를 **신뢰(workspace trust)한 뒤** 적용됩니다
-- 플러그인으로 옮긴 스킬·에이전트·훅은 EduHub의 `.claude/`에서 **삭제**하는 PR을 함께 올립니다 (중복 로드 방지)
+- 플러그인으로 옮긴 것은 EduHub 저장소에서 **정리하는 PR**을 함께 올립니다 (중복 로드 방지)
 
-> 💡 **데스크톱 앱 사용자**: 터미널·데스크톱 로컬 세션·VS Code 확장은 같은 설정 파일을 읽으므로, 터미널에서 사용자 범위로 설치한 플러그인은 데스크톱 로컬 세션에서도 쓸 수 있습니다. 클라우드 세션은 로컬에 설치한 플러그인을 불러오지 않습니다. 데스크톱 앱 안에서 설치하는 화면은 공식 문서 Install plugins의 Desktop 안내를 따릅니다.
+| EduHub 저장소에서 | 할 일 |
+|---|---|
+| `.claude/skills/eduhub-api/`, `.claude/skills/fr-start/` | 삭제. `eduhub-api`에서 뺀 EduHub 전용 내용은 `CLAUDE.md`에 |
+| `.claude/agents/implementer.md`, `reviewer.md` | 삭제 (`critical-reviewer.md`는 남김) |
+| `.claude/hooks/format.sh`, `format.ps1` | 삭제 |
+| `.claude/settings.json`의 포맷 훅 등록 (`PostToolUse` → `format.sh`) | **삭제**. 남겨 두면 저장할 때마다 포맷이 두 번 실행되고, 스크립트를 지운 뒤에는 오류가 난다 |
+| 보호 훅·나머지 훅과 그 등록, `.mcp.json` | 그대로 |
+| 사람이 부르던 `/fr-start FR-05` | 이제 `/eduhub-team-kit:fr-start FR-05` (팀 문서·README의 안내도 바꾼다) |
+
+**데스크톱 앱(Code 탭)에서 설치하고 확인하기** (데스크톱 앱만 쓰는 팀원)
+
+| # | 할 일 | 화면·결과 |
+|---|---|---|
+| ① | **마켓플레이스 추가** (최초 1회). 아래 셋 중 하나 | 공식 문서에는 데스크톱 화면에서 마켓플레이스를 추가하는 메뉴가 나오지 않습니다 |
+| | ⓐ EduHub 저장소의 위 `settings.json` 권장 설정이 병합되어 있으면, EduHub 폴더로 로컬 세션을 열 때 등록 | 폴더 신뢰를 수락한 뒤 |
+| | ⓑ 세션 입력창에 `/plugin marketplace add <팀-계정>/eduhub-team1-plugins` | |
+| | ⓒ 터미널에서 위 `claude plugin marketplace add …` 한 줄 (CLI가 있으면) | |
+| ② | 입력창 옆 **+** → **Add plugins** (메뉴에 **Plugins**가 보이면 **Plugins** → **Browse plugins**, 그것도 없으면 **Manage plugins**) | 플러그인 브라우저에 `eduhub-team1-plugins`의 `eduhub-team-kit`가 보인다 |
+| ③ | `eduhub-team-kit` 선택 → **범위(scope)** 선택 → 설치 | 팀 공통으로 늘 쓸 것이면 사용자 범위, EduHub에서만 쓰려면 프로젝트·로컬 범위 |
+| ④ | **새 로컬 세션**을 열고 **+** → **Plugins** → **Manage plugins** | `eduhub-team-kit` 켜짐. 끄기·제거도 여기서 (로컬 세션은 사이드바 **Customize**·**Plugins**도) |
+| ⑤ | 입력창에 `/` | `/eduhub-team-kit:spring-api`, `/eduhub-team-kit:fr-start` (Step 3의 D3~D5와 같게 확인) |
+
+- **Private 저장소**: 마켓플레이스를 받을 때 내 PC의 Git 인증을 씁니다. Git for Windows의 자격 증명 관리자나 `gh auth login`으로 GitHub에 로그인되어 있어야 합니다
+- 터미널·데스크톱 로컬 세션·VS Code 확장은 **같은 설정 파일**을 읽으므로, 어느 쪽에서 사용자 범위로 설치해도 나머지에서 쓸 수 있습니다
+- **클라우드 세션**은 내 PC에 설치한 플러그인을 불러오지 않습니다 (claude.ai 계정에 추가한 플러그인만). **WSL 세션**에서는 플러그인을 쓸 수 없습니다 (공식 문서)
+
+> ⚠️ 데스크톱 앱의 메뉴 이름은 공식 문서 Desktop의 Install plugins 안내(2026년 11월 확인)를 따랐으며, 이 교재 환경에서는 데스크톱 앱을 실행할 수 없어 **화면을 직접 확인하지 못했습니다.** 특히 ⓐ(프로젝트 설정의 `extraKnownMarketplaces`를 데스크톱 앱이 읽는지)와 ⓑ(데스크톱 세션에서 `/plugin` 명령)는 문서에 명시되어 있지 않으므로, 수업 전에 데스크톱 앱에서 한 번 해 보고 안 되면 ⓒ를 씁니다. CLI 쪽 명령(`--scope local` 설치, `marketplace remove`)은 이 교재 환경에서 실행해 확인했습니다.
+
+> ✅ 이 교재 환경(Claude Code CLI 2.1.332, Linux)에서 위 구조와 JSON 그대로(스킬·에이전트 본문은 짧은 시험용) 만들어 확인했습니다: 두 `validate` 모두 `√ Validation passed`, 로컬 경로로 `marketplace add` → `install eduhub-team-kit@eduhub-team1-plugins` 성공, `plugin list`에 `√ enabled`, `plugin details`에 스킬 2·에이전트 2·훅 1, 스킬·에이전트 이름은 `eduhub-team-kit:spring-api`처럼 접두사가 붙어 표시. ⚠️ GitHub 저장소에서의 설치, 세션 안에서 포맷 훅이 실제로 실행되는 것, Windows에서의 동작은 확인하지 못했습니다.
 
 ---
 
@@ -2508,12 +2602,14 @@ claude plugin details eduhub-team-kit    # 구성 목록(Component inventory) �
 
 | 증상 | 원인과 해결 |
 |---|---|
-| `Plugin "..." not found in marketplace "..."` | 마켓플레이스 항목 이름과 `plugin.json` 이름이 다름. 같게 맞추기 |
+| `Plugin "..." not found in marketplace "..."` | 마켓플레이스 항목 이름과 `plugin.json` 이름이 다름, 또는 `@` 뒤에 저장소 경로를 씀. `eduhub-team-kit@eduhub-team1-plugins`처럼 **마켓플레이스 이름**을 쓴다 |
 | `Path contains ".."` | `source` 경로를 `.claude-plugin/` 기준으로 씀. **마켓플레이스 루트 기준** `./plugins/...` |
 | `Source path does not exist` | `source` 폴더가 실제로 없음. 경로 오타 확인 |
 | 마켓플레이스 추가 시 인증 오류 | Private 저장소 읽기 권한, Git 인증 상태 확인 |
-| 훅이 실행되지 않음 | 스크립트 실행 권한(`chmod +x`), 경로가 플러그인 루트 기준인지 확인 |
-| 같은 스킬이 두 개 보임 | 프로젝트 `.claude/skills/`에 원본이 남아 있음. 삭제 |
+| 훅이 실행되지 않음 | 경로가 `${CLAUDE_PLUGIN_ROOT}/scripts/...`인지, 스크립트가 `scripts/`에 실제로 있는지 확인. 명령 앞에 `bash`를 붙였다면 실행 권한은 없어도 된다 |
+| 저장할 때 포맷이 두 번 돌거나 `format.sh` 오류 | EduHub `settings.json`에 5회차 포맷 훅 등록이 남아 있음. 삭제 (Step 4 표) |
+| 같은 스킬이 두 개 보임 (`eduhub-api`와 `eduhub-team-kit:spring-api`) | 프로젝트 `.claude/skills/`에 원본이 남아 있음. 삭제 |
+| implementer가 "spring-api SKILL.md를 찾을 수 없다"고 함 | 에이전트 본문에 `.claude/skills/eduhub-api/SKILL.md` 경로가 남아 있음. "spring-api 스킬"로 |
 | 프로젝트 설정의 마켓플레이스가 등록되지 않음 | 폴더 신뢰 대화상자를 아직 수락하지 않음 |
 
 ---
@@ -2602,7 +2698,7 @@ cd backend && ./gradlew test; cd ..        # 결과 요약은 build/reports/test
 
 ## 8-2. 플러그인 1.1.0 배포
 
-- `mfe-integration-checker`에 "remote에서 ThemeProvider 생성 금지" 검사 항목을 추가하고 `version`을 `1.1.0`으로 올린 뒤, `CHANGELOG.md`와 함께 PR → 병합
+- `reviewer` 에이전트에 "remote에서 ThemeProvider 생성 금지" 검사 항목을 추가하고 `version`을 `1.1.0`으로 올린 뒤, `CHANGELOG.md`와 함께 PR → 병합
 - 팀원 PC에서 업데이트가 반영되는 과정을 확인하고 기록합니다
 
 ## 8-3. 공개 플러그인 하나 검토하기
