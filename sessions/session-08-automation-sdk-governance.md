@@ -979,6 +979,137 @@ COMMIT
 
 > ⚠️ **운영·스테이징 DB에서 실행하지 않습니다.** `.env`나 환경 변수의 DB 주소가 스테이징으로 되어 있으면 그대로 그쪽에 들어갑니다. 실행 전 `\conninfo`로 확인하는 습관을 들입니다. 4회차 권한 설정에서 `Bash(psql *)`는 **deny**라 Claude는 psql을 실행할 수 없습니다. 그래서 SQL은 Claude가 쓰고, 실행은 사람이 합니다.
 
+**⑤ (참고) MariaDB를 쓰는 프로젝트라면**
+
+EduHub는 PostgreSQL이지만, 회사 프로젝트가 MariaDB(MySQL 계열)라면 같은 시드를 **MariaDB 문법으로** 만들어야 합니다. 지시문의 `[규칙]`만 바꿉니다.
+
+```text
+[규칙]
+- MariaDB 10.11용. 숫자 만들기는 SEQUENCE 엔진 테이블(seq_1_to_10000)로 (INSERT 1만 줄 금지)
+- 시드 표시('[seed-10k]')로만 지우고 다시 넣기, 외래 키 순서대로 (DELETE … JOIN)
+- START TRANSACTION/COMMIT으로 묶고, 마지막에 건수 확인 SELECT
+- 파일은 scripts/seed-10k-mariadb.sql, 맨 위에 "dev·로컬 전용, 운영·스테이징 실행 금지" 주석
+```
+
+| PostgreSQL 판 | MariaDB 판 | 이유 |
+|---|---|---|
+| `generate_series(1, 10000)` | `seq_1_to_10000` 테이블 | MariaDB에는 `generate_series`가 없다. SEQUENCE 엔진이 `seq_<시작>_to_<끝>` 이름의 가상 테이블을 만들어 준다 (기본으로 켜져 있음) |
+| `(ARRAY['a','b'])[i]` | `ELT(i, 'a', 'b')` | 배열 문법이 없다. `ELT`는 i번째 값 |
+| `format('%s %s', a, b)` | `CONCAT(a, ' ', b)` | |
+| `n / 8` (정수 나눗셈) | `seq DIV 8` | MariaDB의 `/`는 소수가 나온다 |
+| `DATE '2026-12-01' + n` | `DATE_ADD('2026-12-01', INTERVAL n DAY)` | |
+| `CASE WHEN … THEN … ELSE … END` | `IF(조건, 참, 거짓)` (CASE도 됨) | |
+| `DELETE … WHERE id IN (SELECT …)` | `DELETE s FROM course_session s JOIN course c …` | 같은 뜻. MariaDB에서는 JOIN 형태가 흔하고 빠르다 |
+| `BEGIN` | `START TRANSACTION` | 테이블이 InnoDB여야 트랜잭션이 된다 |
+
+**결과 예** (이 교재 환경에서 MariaDB 10.11로 실행한 파일)
+
+```sql
+-- scripts/seed-10k-mariadb.sql — 성능 측정용 시드, MariaDB 10.x·11.x용 (dev·로컬 DB 전용, 운영·스테이징에서 실행 금지)
+-- 과정 10,000건 + 과정마다 회차 2~3개(약 25,000건). 여러 번 실행해도 결과가 같다.
+-- 시드로 넣은 과정은 description이 '[seed-10k]'로 시작한다 (이 표시로만 지우고 다시 넣는다)
+-- 숫자 1~10000은 MariaDB의 SEQUENCE 엔진 테이블(seq_1_to_10000)로 만든다 (기본으로 켜져 있음)
+-- 실행: mariadb -h 127.0.0.1 -u eduhub -p --default-character-set=utf8mb4 eduhub < scripts/seed-10k-mariadb.sql
+
+START TRANSACTION;
+
+-- 0) 이전에 넣은 시드만 지운다 (직접 만든 과정·신청은 건드리지 않는다)
+DELETE e FROM enrollment e
+  JOIN course_session s ON s.id = e.session_id
+  JOIN course c ON c.id = s.course_id
+ WHERE c.description LIKE '[seed-10k]%';
+DELETE s FROM course_session s
+  JOIN course c ON c.id = s.course_id
+ WHERE c.description LIKE '[seed-10k]%';
+DELETE FROM course WHERE description LIKE '[seed-10k]%';
+
+-- 1) 과정 10,000건: 분야 8개 × 주제를 섞어 검색어(keyword)로 찾을 수 있는 제목을 만든다
+--    ELT(i, a, b, …)는 i번째 값 (PostgreSQL의 ARRAY[…][i]에 해당)
+INSERT INTO course (title, category, description, status)
+SELECT CONCAT(ELT(1 + seq % 8, 'Spring 트랜잭션', 'JPA 성능 튜닝', 'React 기초', 'Kubernetes 운영',
+                               '데이터 분석 SQL', '리더십 코칭', '보안 기본', '클라우드 아키텍처'),
+              ' ', ELT(1 + (seq DIV 8) % 3, '입문', '실무', '심화'),
+              ' ', seq),
+       ELT(1 + seq % 8, 'BACKEND', 'BACKEND', 'FRONTEND', 'INFRA',
+                        'DATA', 'LEADERSHIP', 'SECURITY', 'INFRA'),
+       CONCAT('[seed-10k] ',
+              ELT(1 + seq % 8, 'Spring 트랜잭션', 'JPA 성능 튜닝', 'React 기초', 'Kubernetes 운영',
+                               '데이터 분석 SQL', '리더십 코칭', '보안 기본', '클라우드 아키텍처'),
+              ' 과정 ', seq, '번 (성능 측정용 데이터)'),
+       IF(seq % 10 = 0, 'CLOSED', 'OPEN')
+  FROM seq_1_to_10000;
+
+-- 2) 회차: 과정마다 2~3개 (id 기준으로 결정해 매번 같게)
+INSERT INTO course_session (course_id, start_date, place, capacity, status)
+SELECT c.id,
+       DATE_ADD('2026-12-01', INTERVAL (c.id + k.seq * 7) % 120 DAY),
+       ELT(1 + (c.id + k.seq) % 3, '본사 3층 교육장', '연수원 A동', '온라인'),
+       10 + (c.id % 4) * 10,
+       'OPEN'
+  FROM course c
+  CROSS JOIN seq_1_to_3 AS k
+ WHERE c.description LIKE '[seed-10k]%'
+   AND (k.seq <= 2 OR c.id % 2 = 0);
+
+COMMIT;
+
+-- 3) 확인 (결과를 눈으로 본다)
+SELECT COUNT(*) AS seed_courses FROM course WHERE description LIKE '[seed-10k]%';
+SELECT COUNT(*) AS seed_sessions
+  FROM course_session s JOIN course c ON c.id = s.course_id
+ WHERE c.description LIKE '[seed-10k]%';
+SELECT category, COUNT(*) AS cnt FROM course WHERE description LIKE '[seed-10k]%' GROUP BY category ORDER BY category;
+```
+
+**실행**
+
+```bash
+# bash (Git Bash·macOS·Linux): 파일을 입력으로
+mariadb -h 127.0.0.1 -u eduhub -p --default-character-set=utf8mb4 eduhub -e "status" | grep -E "Current database|Connection"   # 로컬인지 먼저 확인
+mariadb -h 127.0.0.1 -u eduhub -p --default-character-set=utf8mb4 eduhub < scripts/seed-10k-mariadb.sql
+```
+
+```powershell
+# PowerShell: "<"(입력 리디렉션)을 쓸 수 없으므로 클라이언트의 source 명령으로
+mariadb -h 127.0.0.1 -u eduhub -p --default-character-set=utf8mb4 eduhub -e "source scripts/seed-10k-mariadb.sql"
+
+# 클라이언트가 없고 MariaDB가 Docker 컨테이너(서비스 이름 mariadb)라면
+docker compose cp scripts/seed-10k-mariadb.sql mariadb:/tmp/seed.sql
+docker compose exec mariadb mariadb -u eduhub -p --default-character-set=utf8mb4 eduhub -e "source /tmp/seed.sql"
+```
+
+- `-p`만 쓰면 비밀번호를 물어봅니다. `-peduhub`처럼 붙여 쓰면 명령 기록에 비밀번호가 남으니 로컬 실습에서만
+- 예전 버전이나 MySQL 클라이언트는 명령 이름이 `mysql`입니다 (옵션은 같음)
+
+**기대 결과** (`-t` 옵션을 붙이면 표 모양으로 나온다)
+
+```text
++--------------+
+| seed_courses |
++--------------+
+|        10000 |
++--------------+
++---------------+
+| seed_sessions |
++---------------+
+|         25000 |
++---------------+
++------------+------+
+| category   | cnt  |
++------------+------+
+| BACKEND    | 2500 |
+| DATA       | 1250 |
+| FRONTEND   | 1250 |
+| INFRA      | 2500 |
+| LEADERSHIP | 1250 |
+| SECURITY   | 1250 |
++------------+------+
+```
+
+> ⚠️ **`--default-character-set=utf8mb4`를 꼭 붙입니다.** 이 교재 환경의 MariaDB 클라이언트는 옵션이 없으면 `latin1`로 접속했고, 그 상태로 넣은 한글 제목 "직접 만든 과정"이 `ì§ì ‘ ë§Œë“  ê³¼ì •`처럼 깨져 저장되었습니다. 오류 없이 **조용히 깨지므로** 넣은 뒤 `SELECT title FROM course LIMIT 3`으로 한글을 눈으로 확인합니다. 테이블도 `DEFAULT CHARSET=utf8mb4`로 만들어져 있어야 합니다.
+
+> ✅ 이 교재 환경(MariaDB 10.11.14, InnoDB, EduHub의 V1~V3 테이블을 MariaDB 문법으로 옮긴 스키마)에서 확인했습니다: 0.3초에 10,000 / 25,000건, 두 번 실행해도 건수 같음, 직접 넣은 과정 1건과 그 신청은 남고 시드 회차의 신청만 지워짐, `< 파일`과 `-e "source 파일"` 두 방식 모두 동작. ⚠️ Windows PowerShell과 Docker 컨테이너에서의 실행, MariaDB 11.x는 해 보지 못했습니다. EduHub 백엔드를 MariaDB로 바꾸는 방법(드라이버, Flyway 스크립트)은 이 과정의 범위 밖입니다.
+
 ### 1-4. 서버 실행 (시드를 넣은 뒤 그대로 띄워 둡니다)
 
 ```bash
