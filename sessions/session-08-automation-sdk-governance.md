@@ -15,10 +15,10 @@
 > **관련 모듈**: 17(헤드리스 & CI/CD), 18(Claude Agent SDK), 20(운영 & 거버넌스) + 선택 심화 A(RAG)
 > **사전 준비**
 > - 7회차 결과: `main` 병합 시 스테이징에 자동 배포되는 파이프라인, 런북(`docs/runbook.md`), 이전 버전으로 되돌리는 롤백 절차
-> - 과정 데이터 1만 건 시드 스크립트 (7회차 과제) 또는 강사가 배포한 `seed-10k.sql`
-> - [k6](https://k6.io/) 설치 (`k6 version`으로 확인). 설치가 어려우면 강사 PC의 결과를 함께 봅니다
+> - 과정 데이터 1만 건 시드: 수업 중 Claude Code로 `scripts/seed-10k.sql`을 만들어 넣습니다 ([Step 1-3](#1-3-1만-건-시드-sql은-claude-code에게-만들게-하고-실행은-내가)). 로컬 PostgreSQL(`docker compose up -d postgres`)이 떠 있어야 합니다
+> - [k6](https://k6.io/) 설치 (`k6 version`으로 확인, 방법은 [Step 2-3](#2-3-k6-설치)). 회사 PC에서 설치가 막히면 강사 PC의 결과를 함께 봅니다
 > - 저장소 Settings → Secrets에 `ANTHROPIC_API_KEY` 등록 권한 (팀장 1명)
-> 🖥️ **슬라이드 덱(35장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(36장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -815,10 +815,14 @@ flowchart LR
 
 ## Step 1. 브랜치와 측정 준비
 
+### 1-1. 브랜치
+
 ```bash
 git switch main && git pull
 git switch -c perf/nfr-02-course-list
 ```
+
+### 1-2. 쿼리 수를 볼 수 있게 설정
 
 `backend/src/main/resources/application-dev.yml`에 측정용 설정이 없으면 **직접** 추가합니다 (세 줄이라 Claude에게 맡기는 것보다 빠릅니다).
 
@@ -834,11 +838,150 @@ logging:
     org.hibernate.stat: debug                      # 요청별 통계
 ```
 
-1만 건 시드를 넣고 서버를 띄웁니다.
+### 1-3. 1만 건 시드: SQL은 Claude Code에게 만들게 하고, 실행은 내가
+
+과정 1만 건을 손으로 넣을 수는 없습니다. **"무엇을 몇 건, 어떤 규칙으로"는 사람이 정하고**, SQL 작성은 Claude Code에게 맡깁니다. 실행은 **접속한 DB가 내 로컬 DB인지 확인한 뒤 내가** 합니다.
+
+**① Claude Code에게 지시** (EduHub 저장소에서, 기본 모드)
+
+```text
+[목표] 과정 목록 API(GET /api/v1/courses)의 성능 측정용 시드 SQL을 만들어줘.
+[위치] scripts/seed-10k.sql (새 파일). 스키마는 backend/src/main/resources/db/migration/ 의 Flyway 파일을 읽고 맞춰줘.
+[데이터]
+- course 10,000건. 제목은 검색어로 찾을 수 있게 "주제 + 난이도 + 번호" (예: "JPA 성능 튜닝 입문 1"),
+  주제 8개를 골고루, category는 주제에 맞게, 10건 중 1건은 CLOSED
+- 과정마다 course_session 2~3개 (시작일·장소·정원은 규칙적으로 다르게)
+- enrollment·employee는 넣지 않음
+[규칙]
+- PostgreSQL generate_series로 짧게 (INSERT 1만 줄 금지)
+- 시드로 넣은 행에 표시를 남기고(description이 '[seed-10k]'로 시작), 다시 실행하면 그 표시가 있는 것만 지우고 새로 넣기
+  (직접 만든 데이터는 건드리지 않기, 외래 키 순서대로 지우기)
+- BEGIN/COMMIT으로 묶고, 마지막에 건수를 확인하는 SELECT
+- 파일 맨 위에 "dev·로컬 전용, 운영·스테이징 실행 금지" 주석
+[하지 않는 것] SQL 실행, Flyway 마이그레이션 파일 추가·수정, 다른 파일 수정
+[완료 기준] 파일만 만들고, 지우는 조건과 넣는 건수를 요약해서 보여줘
+```
+
+> 💡 **왜 Flyway 마이그레이션(`V5__seed.sql`)으로 만들지 않나**: 마이그레이션은 **모든 환경**(스테이징·운영 포함)에서 자동으로 실행됩니다. 측정용 가짜 데이터가 운영 DB에 들어가면 안 되므로, 시드는 `scripts/`에 두고 **사람이 로컬에서만** 실행합니다.
+
+**② Claude가 만든 결과 예** (이 교재 환경에서 위 지시로 만든 것과 같은 내용)
+
+```sql
+-- scripts/seed-10k.sql — 성능 측정용 시드 (dev·로컬 DB 전용, 운영·스테이징에서 실행 금지)
+-- 과정 10,000건 + 과정마다 회차 2~3개(약 25,000건). 여러 번 실행해도 결과가 같다.
+-- 시드로 넣은 과정은 description이 '[seed-10k]'로 시작한다 (이 표시로만 지우고 다시 넣는다)
+-- 실행: psql -h localhost -U eduhub -d eduhub -v ON_ERROR_STOP=1 -f scripts/seed-10k.sql
+
+BEGIN;
+
+-- 0) 이전에 넣은 시드만 지운다 (직접 만든 과정·신청은 건드리지 않는다)
+DELETE FROM enrollment
+ WHERE session_id IN (SELECT s.id FROM course_session s
+                        JOIN course c ON c.id = s.course_id
+                       WHERE c.description LIKE '[seed-10k]%');
+DELETE FROM course_session
+ WHERE course_id IN (SELECT id FROM course WHERE description LIKE '[seed-10k]%');
+DELETE FROM course WHERE description LIKE '[seed-10k]%';
+
+-- 1) 과정 10,000건: 분야 8개 × 주제를 섞어 검색어(keyword)로 찾을 수 있는 제목을 만든다
+INSERT INTO course (title, category, description, status)
+SELECT format('%s %s %s', topic.name, level.name, n),
+       topic.category,
+       format('[seed-10k] %s 과정 %s번 (성능 측정용 데이터)', topic.name, n),
+       CASE WHEN n % 10 = 0 THEN 'CLOSED' ELSE 'OPEN' END
+  FROM generate_series(1, 10000) AS n
+  JOIN LATERAL (
+        SELECT (ARRAY['Spring 트랜잭션', 'JPA 성능 튜닝', 'React 기초', 'Kubernetes 운영',
+                      '데이터 분석 SQL', '리더십 코칭', '보안 기본', '클라우드 아키텍처'])[1 + n % 8] AS name,
+               (ARRAY['BACKEND', 'BACKEND', 'FRONTEND', 'INFRA',
+                      'DATA', 'LEADERSHIP', 'SECURITY', 'INFRA'])[1 + n % 8] AS category
+       ) AS topic ON true
+  JOIN LATERAL (
+        SELECT (ARRAY['입문', '실무', '심화'])[1 + (n / 8) % 3] AS name
+       ) AS level ON true;
+
+-- 2) 회차: 과정마다 2~3개 (id 기준으로 결정해 매번 같게)
+INSERT INTO course_session (course_id, start_date, place, capacity, status)
+SELECT c.id,
+       DATE '2026-12-01' + ((c.id + k * 7) % 120)::int,
+       (ARRAY['본사 3층 교육장', '연수원 A동', '온라인'])[1 + (c.id + k) % 3],
+       10 + (c.id % 4) * 10,
+       'OPEN'
+  FROM course c
+  CROSS JOIN generate_series(1, 3) AS k
+ WHERE c.description LIKE '[seed-10k]%'
+   AND (k <= 2 OR c.id % 2 = 0);
+
+COMMIT;
+
+-- 3) 확인 (결과를 눈으로 본다)
+SELECT count(*) AS seed_courses FROM course WHERE description LIKE '[seed-10k]%';
+SELECT count(*) AS seed_sessions
+  FROM course_session s JOIN course c ON c.id = s.course_id
+ WHERE c.description LIKE '[seed-10k]%';
+SELECT category, count(*) FROM course WHERE description LIKE '[seed-10k]%' GROUP BY category ORDER BY category;
+```
+
+**③ 실행 전에 검토** (사람이 직접)
+
+- [ ] 컬럼 이름·NOT NULL·CHECK가 Flyway 스키마(`V1__course.sql`)와 맞는가? (`capacity > 0` 등)
+- [ ] `DELETE`의 조건이 **시드 표시(`[seed-10k]`)로만** 걸려 있는가? 조건 없는 `DELETE`·`TRUNCATE`가 없는가?
+- [ ] 지우는 순서가 외래 키 순서인가? (`enrollment` → `course_session` → `course`)
+- [ ] `BEGIN`/`COMMIT`으로 묶여 있어, 중간에 실패하면 아무것도 바뀌지 않는가?
+- [ ] 파일을 Flyway 폴더(`db/migration/`)가 아니라 `scripts/`에 만들었는가?
+
+**④ 실행** (먼저 서버를 한 번 띄워 Flyway가 테이블을 만든 상태여야 합니다)
 
 ```bash
 docker compose up -d postgres
-psql -h localhost -U eduhub -d eduhub -f scripts/seed-10k.sql   # 7회차 과제 또는 강사 배포본
+
+# 접속한 DB가 "내 로컬"인지 먼저 확인 (host가 localhost, database가 eduhub)
+psql -h localhost -U eduhub -d eduhub -c "\conninfo"
+
+psql -h localhost -U eduhub -d eduhub -v ON_ERROR_STOP=1 -f scripts/seed-10k.sql
+```
+
+```powershell
+# Windows에 psql이 없으면: 파일을 컨테이너에 복사해서 컨테이너 안의 psql로 실행
+docker compose cp scripts/seed-10k.sql postgres:/tmp/seed-10k.sql
+docker compose exec postgres psql -U eduhub -d eduhub -v ON_ERROR_STOP=1 -f /tmp/seed-10k.sql
+```
+
+**기대 결과** (이 교재 환경에서 실제로 실행한 결과, 0.3초)
+
+```text
+DELETE 0
+DELETE 0
+DELETE 0
+INSERT 0 10000
+INSERT 0 25000
+COMMIT
+ seed_courses
+--------------
+        10000
+
+ seed_sessions
+---------------
+         25000
+
+  category  | count
+------------+-------
+ BACKEND    |  2500
+ DATA       |  1250
+ FRONTEND   |  1250
+ INFRA      |  2500
+ LEADERSHIP |  1250
+ SECURITY   |  1250
+```
+
+- 한 번 더 실행하면 `DELETE`가 시드 건수만큼 지우고 다시 넣어, **건수가 그대로** 10,000 / 25,000입니다 (두 번 실행해 확인했습니다)
+- `-v ON_ERROR_STOP=1`이 없으면 오류가 나도 다음 줄을 계속 실행합니다. 꼭 붙입니다
+
+> ⚠️ **운영·스테이징 DB에서 실행하지 않습니다.** `.env`나 환경 변수의 DB 주소가 스테이징으로 되어 있으면 그대로 그쪽에 들어갑니다. 실행 전 `\conninfo`로 확인하는 습관을 들입니다. 4회차 권한 설정에서 `Bash(psql *)`는 **deny**라 Claude는 psql을 실행할 수 없습니다. 그래서 SQL은 Claude가 쓰고, 실행은 사람이 합니다.
+
+### 1-4. 서버 실행 (시드를 넣은 뒤 그대로 띄워 둡니다)
+
+```bash
 cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
 ```
 
@@ -846,44 +989,231 @@ cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'
 
 ## Step 2. 기준 측정 (Before)
 
-**쿼리 수**: 다른 터미널에서 한 번 호출하고 로그의 SQL 줄 수를 셉니다.
+같은 API를 두 가지로 잽니다: **① 요청 한 번에 쿼리가 몇 개 나가나**(N+1 확인), **② 여러 사람이 동시에 부를 때 얼마나 빨리 응답하나**(k6).
+
+### 2-1. 쿼리 수: 요청 한 번, 로그로 세기
+
+다른 터미널에서 한 번 호출합니다.
 
 ```bash
-curl -s "http://localhost:8080/api/courses?page=0&size=20" > /dev/null
-# 로그에서 이번 요청의 select 문 개수를 확인 (예: 21개 = 목록 1 + 회차 20)
+curl -s "http://localhost:8080/api/v1/courses?page=0&size=20" > /dev/null
 ```
 
-**응답 시간**: k6로 간단한 부하를 줍니다.
+서버 로그에서 이번 요청에 찍힌 `org.hibernate.SQL` 줄을 봅니다. 이 교재 환경(시드 1만 건)에서는 이렇게 나왔습니다.
+
+```text
+select c1_0.id,c1_0.category,… from course c1_0 where (? is null or lower(c1_0.title) like …) order by c1_0.id offset ? rows fetch first ? rows only   ← 목록 1번
+select count(c1_0.id) from course c1_0 where (? is null or lower(c1_0.title) like …)                                                           ← 전체 건수 1번
+select count(cs1_0.id) from course_session cs1_0 left join course c1_0 on … where c1_0.id=?                                                    ← 과정마다 1번 × 20
+…
+Session Metrics {
+    … nanoseconds spent executing 22 JDBC statements;
+```
+
+**22개 = 목록 1 + 전체 건수 1 + 회차 수 20.** 목록에 보이는 과정 20개마다 "회차가 몇 개인지" 쿼리가 따로 나갑니다. 이것이 **N+1**입니다 (2회차 2-2). 한 페이지를 100건으로 늘리면 102개가 됩니다.
+
+> 💡 줄 수를 세기 어려우면 `Session Metrics`의 `executing NN JDBC statements`를 봅니다. 요청마다 한 번씩 찍힙니다.
+
+### 2-2. k6란: "여러 사람이 동시에 쓰는 상황"을 만들어 주는 도구
+
+**k6**(케이식스)는 Grafana Labs가 만든 무료(오픈소스) **부하 테스트 도구**입니다. 브라우저 대신 **가상 사용자**를 여러 명 만들어 API를 계속 호출하고, 응답 시간을 모아 통계를 냅니다.
+
+- 시나리오는 **JavaScript 파일**로 씁니다 (어떤 주소를, 몇 명이, 얼마 동안). 하지만 Node.js에서 도는 것이 아니라, k6 **실행 파일 하나**가 스크립트를 읽어 실행합니다. Node.js·npm 설치가 필요 없습니다
+- `curl`로 한 번 재는 것은 "혼자 쓸 때"의 시간입니다. 실제 서비스는 **여러 명이 동시에** 쓰고, 그때 DB 연결이 모자라거나 쿼리가 몰려 느려집니다. k6는 그 상황을 만듭니다
+- 비슷한 도구: JMeter(화면에서 설정, Java), Gatling(Scala·Java 코드), nGrinder(네이버, 웹 화면). k6는 **스크립트가 짧고 CI에 넣기 쉬워서** 이 과정에서 씁니다
+
+```mermaid
+flowchart LR
+    S["perf/course-list.js<br/>(시나리오)"] --> K6["k6 run"]
+    K6 --> V1["VU 1"] & V2["VU 2"] & V3["… VU 20"]
+    V1 & V2 & V3 -- "GET /api/v1/courses (반복)" --> API["Spring Boot :8080"]
+    API --> DB[("PostgreSQL<br/>과정 1만 건")]
+    K6 --> R["결과 요약<br/>p95 응답 시간 · 실패율 · 기준 통과 여부"]
+```
+
+**꼭 알아야 할 용어**
+
+| 용어 | 뜻 | 예 |
+|---|---|---|
+| **VU** (Virtual User) | 가상 사용자. 각자 스크립트의 `default` 함수를 **끝나면 다시** 반복한다 | `vus: 20` = 20명이 동시에 |
+| **iteration** | VU가 `default` 함수를 한 번 끝까지 실행한 것 | 요청 1번 + 0.5초 쉬기 = 1 iteration |
+| **think time** | 사용자가 화면을 보는 시간. `sleep(0.5)` | 없으면 쉬지 않고 두드리는 "최대 부하" |
+| **http_req_duration** | 요청을 보내고 응답을 다 받을 때까지 걸린 시간 | NFR-02의 "응답 시간" |
+| **p95** (95번째 백분위수) | 응답 시간을 빠른 순으로 줄 세웠을 때 **95% 지점**의 값. "100번 중 95번은 이 시간 안에" | `p(95)=127ms` |
+| **threshold** | 통과 기준. 넘으면 결과에 ✗, k6의 **종료 코드가 99**(실패) | `'p(95)<300'` |
+| **check** | 응답 하나하나가 맞는지 확인 (상태 코드, 건수). 기준(threshold)과 달리 실패해도 종료 코드는 그대로 | `'status 200'` |
+
+> 💡 **왜 평균(avg)이 아니라 p95인가**: 평균은 아주 빠른 요청들이 아주 느린 요청을 가립니다. 평균 58ms여도 20명 중 1명은 0.5초를 기다릴 수 있습니다. "대부분의 사용자가 겪는 최악"을 보려고 p95(또는 p99)로 기준을 정합니다.
+
+### 2-3. k6 설치
+
+| PC | 설치 명령 | 비고 |
+|---|---|---|
+| ⭐ Windows (교육 기본) | `winget install k6 --source winget` | Windows 10·11 기본 포함. 설치 후 **터미널을 새로 연다** |
+| Windows (Chocolatey) | `choco install k6` | 관리자 PowerShell |
+| macOS | `brew install k6` | |
+| Linux (Debian·Ubuntu) | k6 공식 문서 Install의 apt 저장소 등록 후 `sudo apt-get install k6` | |
+| 설치 도구를 쓸 수 없을 때 | GitHub `grafana/k6` 저장소 Releases에서 내 OS용 압축 파일(`k6-v…-windows-amd64.zip`)을 받아 풀고, `k6.exe`가 있는 폴더를 PATH에 추가 | 받은 파일은 회사 보안 정책에 따라 IT 확인 |
+| Docker만 있을 때 | `docker run --rm -i grafana/k6 run - < perf/course-list.js` | 컨테이너 안에서는 `localhost`가 내 PC가 아니다 → `-e BASE_URL=http://host.docker.internal:8080` |
+
+설치 확인:
+
+```bash
+k6 version
+# k6 v1.x.x (go1.xx, windows/amd64)
+```
+
+> ⚠️ 6회차의 nginx처럼, 회사 PC의 보안 프로그램이 `k6.exe`를 막을 수 있습니다. 끄지 말고, 실행 파일 경로와 출처(Grafana 공식 배포)를 근거로 **IT에 예외 등록을 요청**합니다. 허용 전까지는 강사 PC의 결과를 함께 봅니다.
+
+### 2-4. 시나리오 작성: `perf/course-list.js`
 
 ```javascript
-// perf/course-list.js
+// perf/course-list.js — NFR-02: 과정 목록 API 응답 시간 측정
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
+
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 export const options = {
-  vus: 20,               // 동시 사용자 20명
-  duration: '30s',
-  thresholds: { http_req_duration: ['p(95)<300'] },  // NFR-02 기준
+  vus: 20,          // 가상 사용자(VU) 20명이 동시에
+  duration: '30s',  // 30초 동안 반복
+  thresholds: {
+    http_req_duration: ['p(95)<300'],  // NFR-02: 95%의 요청이 300ms 안에
+    http_req_failed: ['rate<0.01'],    // 실패율 1% 미만
+  },
 };
 
+// VU 한 명이 반복해서 실행하는 내용 (끝나면 처음부터 다시)
 export default function () {
-  const res = http.get('http://localhost:8080/api/courses?page=0&size=20');
-  check(res, { 'status 200': (r) => r.status === 200 });
+  const page = Math.floor(Math.random() * 50);   // 같은 페이지만 부르면 캐시 효과로 실제보다 빨라 보인다
+  const res = http.get(`${BASE_URL}/api/v1/courses?page=${page}&size=20`);
+  check(res, {
+    'status 200': (r) => r.status === 200,
+    '20건': (r) => r.json('content').length === 20,
+  });
+  sleep(0.5);   // 사용자가 화면을 보는 시간 (0.5초 쉬고 다음 요청)
 }
 ```
 
-```bash
-k6 run perf/course-list.js
+| 부분 | 하는 일 |
+|---|---|
+| `import http from 'k6/http'` | k6에 들어 있는 HTTP 모듈 (npm 패키지가 아니다. `axios`·`fetch`는 쓸 수 없다) |
+| `__ENV.BASE_URL` | 실행할 때 `-e BASE_URL=…`로 주소를 바꿀 수 있게 (스테이징 주소로 잘못 돌리지 않게 기본값은 localhost) |
+| `options.vus`, `duration` | 몇 명이, 얼마 동안 |
+| `options.thresholds` | **NFR-02를 그대로 코드로**. 통과·실패를 사람이 판단하지 않고 k6가 판정한다 |
+| `export default function` | VU 한 명이 반복하는 일: 페이지 하나를 골라 목록 조회 |
+| `check(...)` | 응답이 200이고 20건인지. 에러 페이지를 빠르게 돌려받고 "빠르다"고 착각하지 않게 |
+| `sleep(0.5)` | 사람처럼 0.5초 쉬기. 20명 × 초당 약 2번 = **초당 약 35~40건** 정도의 부하 |
+
+**사람이 몰리는 상황도 하나 더**: 수강 신청을 연 직후처럼 **50명이 쉬지 않고 검색**하는 시나리오입니다.
+
+```javascript
+// perf/course-list-peak.js — 사람이 몰릴 때: 수강 신청 오픈 직후처럼 쉬지 않고 검색
+import http from 'k6/http';
+import { check } from 'k6';
+
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+
+export const options = {
+  vus: 50,          // 동시에 50명
+  duration: '20s',
+  thresholds: {
+    http_req_duration: ['p(95)<300'],
+    http_req_failed: ['rate<0.01'],
+  },
+};
+
+export default function () {
+  const page = Math.floor(Math.random() * 50);
+  // 검색어까지 넣는다: 제목 LIKE 검색 + 전체 건수 count 쿼리가 함께 돈다
+  const res = http.get(`${BASE_URL}/api/v1/courses?keyword=jpa&page=${page}&size=20`);
+  check(res, {
+    'status 200': (r) => r.status === 200,
+    '20건': (r) => r.json('content').length === 20,
+  });
+  // sleep 없음: 응답을 받자마자 다음 요청
+}
 ```
 
-**측정 기록표** (PR 본문에 그대로 붙입니다)
+> 💡 시나리오 초안은 Claude에게 맡겨도 됩니다 ("이 API로 20 VU 30초, p95<300ms 기준의 k6 스크립트"). 단 **VU 수·시간·기준값은 사람이 정한** NFR에서 옵니다. k6 문법은 버전에 따라 바뀌므로 Claude가 쓴 스크립트는 한 번 실행해 보고 씁니다.
 
-| 항목 | Before | After |
+### 2-5. 실행하고 결과 읽기
+
+```bash
+# 서버(Step 1-4)가 떠 있는 상태에서, 저장소 루트에서
+k6 run perf/course-list.js
+k6 run perf/course-list-peak.js
+
+# 결과를 파일로도 남기기 (PR에 붙일 근거)
+k6 run perf/course-list.js 2>&1 | tee perf/before-normal.txt          # PowerShell: | Tee-Object perf\before-normal.txt
+```
+
+실행하면 30초 동안 진행 막대가 움직이고, 끝나면 요약이 나옵니다. 이 교재 환경(Linux, k6 v1.4.2, 백엔드·PostgreSQL 16이 같은 PC)의 **실제 결과**입니다.
+
+```text
+  █ THRESHOLDS
+
+    http_req_duration
+    ✓ 'p(95)<300' p(95)=127.42ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+  █ TOTAL RESULTS
+
+    checks_succeeded...: 100.00% 2164 out of 2164
+    ✓ status 200
+    ✓ 20건
+
+    HTTP
+    http_req_duration..............: avg=58.26ms  min=29.42ms  med=46.49ms  max=499.55ms p(90)=80.09ms p(95)=127.42ms
+    http_req_failed................: 0.00%  0 out of 1082
+    http_reqs......................: 1082   35.462316/s
+```
+
+| 줄 | 읽는 법 |
+|---|---|
+| `THRESHOLDS`의 ✓·✗ | **NFR-02 통과 여부.** 하나라도 ✗이면 마지막에 `thresholds on metrics 'http_req_duration' have been crossed`가 나오고 종료 코드 99 |
+| `p(95)=127.42ms` | 100번 중 95번은 127ms 안에 응답 |
+| `avg`·`med`·`max` | 평균·가운데 값·가장 느린 것. `max`가 튀는 것은 한두 번일 수 있으니 p95와 함께 본다 |
+| `http_req_failed 0.00%` | 오류 응답(4xx·5xx·연결 실패) 비율 |
+| `http_reqs 35.46/s` | 초당 처리한 요청 수 (처리량) |
+| `checks 100%` | 응답 내용 확인(200, 20건)이 모두 맞았다 |
+
+**사람이 몰릴 때**(`course-list-peak.js`) 결과는 달랐습니다.
+
+```text
+    http_req_duration
+    ✗ 'p(95)<300' p(95)=670.26ms
+    http_req_duration..............: avg=520.38ms min=51.61ms med=517.55ms max=1.25s p(90)=615.96ms p(95)=670.26ms
+    http_reqs......................: 1943   95.074501/s
+time="…" level=error msg="thresholds on metrics 'http_req_duration' have been crossed"
+```
+
+**측정 기록표** (PR 본문에 그대로 붙입니다. 아래는 이 교재 환경의 Before 예)
+
+| 항목 | Before (교재 환경 예) | After |
 |---|---|---|
-| 요청 1회당 select 수 | | |
-| p95 응답 시간 | | |
-| 실패율 | | |
-| k6 threshold 통과 | | |
+| 요청 1회당 select 수 (`size=20`) | 22 (목록 1 + 건수 1 + 회차 20) | |
+| 평소 부하 p95 (20 VU, 0.5초 쉬기, 30초) | 127ms ✓ | |
+| 몰릴 때 p95 (50 VU, 쉬지 않음, 검색어, 20초) | 670ms ~ 1.02s ✗ (세 번 측정) | |
+| 실패율 | 0% | |
+| k6 threshold 통과 | 평소 ✓ / 몰릴 때 ✗ | |
+
+> 💡 **"평소에는 통과하는데 왜 고치나?"** NFR-02는 "300ms 이내" **그리고 "N+1 없음"**입니다. 내 PC처럼 DB가 바로 옆에 있으면 작은 쿼리 20개도 빨라서 평소 부하는 통과합니다. 하지만 ① 요청 하나가 쿼리 22개를 쓰는 동안 DB 연결을 오래 붙잡아, 사람이 몰리면 연결을 기다리는 줄이 생기고(위 결과), ② 운영처럼 DB가 다른 서버에 있으면 쿼리마다 네트워크 왕복이 더해집니다. **쿼리 수는 PC와 상관없이 같으므로** 가장 믿을 만한 지표입니다.
+
+### 2-6. 측정할 때 지킬 것
+
+| 규칙 | 이유 |
+|---|---|
+| **같은 조건으로 Before·After** (같은 PC, 같은 시드, 같은 스크립트) | 조건이 다르면 개선 효과인지 알 수 없다 |
+| 서버를 띄운 뒤 **한 번 돌려 버리고**(워밍업) 두 번째부터 기록 | 처음 몇 초는 JVM이 코드를 최적화하는 중이라 느리다 |
+| **2~3번 재서** 범위로 적는다 | 같은 조건에서도 결과가 흔들린다 (교재 환경의 몰릴 때 p95: 670ms, 914ms, 1.02s) |
+| 측정 중에는 IDE 빌드·브라우저 탭 등 무거운 작업을 하지 않는다 | 내 PC가 서버·DB·k6를 모두 돌리고 있다 |
+| 내 PC의 숫자는 **비교용**이다 | 운영 성능은 운영과 같은 구성의 스테이징에서, 정해진 시간에 잰다 |
+| ⚠️ **스테이징·운영에 승인 없이 부하를 주지 않는다** | 다른 사람의 테스트·실제 사용자에게 장애가 된다. `BASE_URL` 기본값을 localhost로 둔 이유 |
+
+> ✅ 이 교재 환경(Linux, k6 v1.4.2, Spring Boot 3.5 백엔드, PostgreSQL 16, 위 시드)에서 이 Step의 명령을 차례로 실행해 위 결과를 얻었습니다: 시드 SQL 두 번 실행해도 건수 같음, 요청 1회당 SQL 22개, 평소 부하 p95 127ms·143ms(✓), 몰릴 때 p95 670ms~1.02s(✗, 종료 코드 99). SQL 로그를 끄고 재도 평소 부하 p95는 143ms로 비슷했습니다. ⚠️ k6는 Linux에서 공식 소스로 빌드해 썼고, Windows의 `winget`·`choco` 설치와 PowerShell의 `docker compose cp` 실행은 해 보지 못했습니다 (k6 공식 문서 Install의 방식). 시드 SQL은 Claude Code가 아니라 교재 작성 중에 만든 것이며, 수업에서 Claude가 만든 결과는 모양이 다를 수 있으니 ③의 검토를 꼭 합니다.
 
 ---
 
@@ -892,7 +1222,7 @@ k6 run perf/course-list.js
 권한 모드를 **Plan**으로 두고 측정 결과와 함께 지시합니다.
 
 ```text
-[목표] 과정 목록 API(GET /api/courses)의 N+1 쿼리와 응답 시간을 개선하려고 해. 원인 분석과 개선 방안만 먼저 알려줘.
+[목표] 과정 목록 API(GET /api/v1/courses)의 N+1 쿼리와 응답 시간을 개선하려고 해. 원인 분석과 개선 방안만 먼저 알려줘.
 
 [위치]
 - @backend/src/main/java/com/example/eduhub/course/CourseController.java
@@ -900,8 +1230,8 @@ k6 run perf/course-list.js
 - @backend/src/main/java/com/example/eduhub/course/CourseRepository.java
 
 [측정 결과]
-- 데이터 1만 건, page size 20 요청 1회에 select 21개
-- k6 20 VU, 30초: p95 ○○○ms (기준 300ms 초과)
+- 데이터 1만 건, page size 20 요청 1회에 SQL 22개 (목록 1 + 전체 건수 1 + 과정마다 회차 수 20)
+- k6 평소 부하(20 VU, 0.5초 쉬기): p95 ○○○ms / 몰릴 때(50 VU, 쉬지 않음, 검색어): p95 ○○○ms (기준 300ms 초과)
 - 아래는 요청 1회의 SQL 로그 일부:
 (로그 20줄 붙여넣기)
 
@@ -910,7 +1240,7 @@ k6 run perf/course-list.js
 - 캐시 도입은 하지 않는다 (이번 범위 아님)
 
 [완료 기준]
-- 요청 1회당 select 3개 이하, k6 p95 < 300ms
+- 요청 1회당 SQL 3개 이하, k6 두 시나리오 모두 p95 < 300ms
 - ./gradlew test 통과
 
 [진행 방식] 개선 방안을 2~3가지 비교표(장점·단점·페이징 영향)로 보여줘. 구현은 내가 고른 뒤에.
@@ -983,9 +1313,10 @@ CREATE INDEX IF NOT EXISTS idx_enrollment_session_status ON enrollment (session_
 ## Step 5. 재측정과 PR
 
 ```bash
-k6 run perf/course-list.js          # 같은 조건으로 재측정, 기록표 After 칸 채우기
+k6 run perf/course-list.js          # 같은 조건으로 재측정 (워밍업 1번 후, 2~3번), 기록표 After 칸 채우기
+k6 run perf/course-list-peak.js
 cd backend && ./gradlew test        # 내 터미널에서 직접
-git add backend/src perf/
+git add backend/src perf/ scripts/seed-10k.sql
 git diff --staged                   # 측정용 로그 설정이 섞이지 않았는지 확인
 git commit -m "perf(course): 과정 목록 N+1 제거와 인덱스 추가 (NFR-02)"
 git push -u origin perf/nfr-02-course-list
@@ -1258,6 +1589,11 @@ git push -u origin hotfix/waiting-promotion
 | 고치다가 리팩터링까지 함 | 핫픽스는 **최소 수정**. 정리는 사후에 별도 PR |
 | 긴급 PR 리뷰를 건너뜀 | 긴급해도 리뷰 1명 + CI. 브랜치 보호가 막아 주는지 확인 |
 | k6 결과가 매번 크게 다름 | 서버 워밍업 후 측정, 같은 PC·같은 데이터·같은 VU로 비교 |
+| `k6`: 명령을 찾을 수 없음 | 설치 후 **터미널을 새로** 연다 (PATH 갱신). Releases 압축 파일을 쓴 경우 `k6.exe` 폴더를 PATH에 |
+| k6에서 `connection refused` | 서버가 안 떠 있거나 포트가 다름. Docker로 k6를 돌리면 `localhost`가 컨테이너 자신 → `-e BASE_URL=http://host.docker.internal:8080` |
+| k6 check `20건` 실패 | 시드가 없거나 페이지 번호가 데이터보다 큼. 시드 확인 SQL(1-3 ④)로 건수 확인 |
+| 시드 실행 시 `relation "course" does not exist` | Flyway가 아직 테이블을 만들지 않음 → 서버를 한 번 띄운 뒤 다시 |
+| 시드 실행 시 `violates check constraint` 등 | Claude가 쓴 SQL이 스키마와 다름 → 오류 메시지를 그대로 붙여 고치게 하고, `BEGIN`으로 묶여 있으니 DB는 그대로 |
 | Claude PR 리뷰가 달리지 않음 | Secrets 이름, 워크플로우 `permissions`, 외부 포크 조건, Actions 로그 확인 |
 
 ---
