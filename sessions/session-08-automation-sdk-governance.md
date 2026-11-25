@@ -18,7 +18,7 @@
 > - 과정 데이터 1만 건 시드: 수업 중 Claude Code로 `scripts/seed-10k.sql`을 만들어 넣습니다 ([Step 1-3](#1-3-1만-건-시드-sql은-claude-code에게-만들게-하고-실행은-내가)). 로컬 PostgreSQL(`docker compose up -d postgres`)이 떠 있어야 합니다
 > - [k6](https://k6.io/) 설치 (`k6 version`으로 확인, 방법은 [Step 2-3](#2-3-k6-설치)). 회사 PC에서 설치가 막히면 강사 PC의 결과를 함께 봅니다
 > - 저장소 Settings → Secrets에 `ANTHROPIC_API_KEY` 등록 권한 (팀장 1명)
-> 🖥️ **슬라이드 덱(36장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
+> 🖥️ **슬라이드 덱(37장, 발표자 노트 포함)**: https://claude.ai/artifact/GtdvAoFTYMtxTvStG13Zme — 처음에는 만든 사람만 볼 수 있으며, 다른 사람에게 보여주려면 덱의 공유 메뉴에서 공유해야 합니다. PowerPoint(.pptx)·PDF로 내려받을 수 있습니다.
 
 ---
 
@@ -1529,13 +1529,146 @@ cancel()에 본인 확인을 추가해줘. currentEmployeeId는 컨트롤러에�
 
 ## Step 3. 비밀 정보 스캔
 
-```bash
-# gitleaks: 저장소 이력 전체에서 비밀 정보 패턴 검사 (설치: https://github.com/gitleaks/gitleaks)
-gitleaks detect --source . --redact
+### 3-1. 비밀 정보 스캔이란
+
+**비밀 정보(secret)**는 그것만 있으면 누군가 **내 대신 시스템에 들어갈 수 있는 값**입니다: API 키, DB 비밀번호, 클라우드 접근 키(AWS·Azure), JWT 서명 키, GitHub 토큰, 개인 키(`-----BEGIN PRIVATE KEY-----`), 사내 시스템 계정. **비밀 정보 스캔**은 저장소의 파일과 **커밋 이력 전체**를 뒤져 이런 값이 들어 있는지 찾아 주는 검사입니다.
+
+| 왜 필요한가 | 설명 |
+|---|---|
+| **커밋은 지워도 이력에 남는다** | 키를 넣고 다음 커밋에서 지워도, 그 커밋을 받아 간 사람·백업·포크에는 그대로 있다. `git log -p`로 누구나 볼 수 있다 |
+| **공개 저장소는 몇 분 안에 수집된다** | 공개 저장소에 올라간 키를 찾는 자동 수집기가 늘 돌고 있다. "잠깐 올렸다 지웠다"도 안전하지 않다 |
+| **사람 눈으로는 못 찾는다** | 설정 파일 한 줄, 테스트 코드, 주석, 로그 파일에 섞인다. Claude가 디버깅하며 넣은 값일 수도 있다 |
+| **비공개 저장소도 위험하다** | 저장소를 볼 수 있는 사람이 모두 키를 갖게 된다. 퇴사자, 외주, 나중에 공개로 바꾸는 경우 |
+
+**어떻게 찾나**: ① 서비스마다 정해진 **형식**(AWS 접근 키는 `AKIA`로 시작하는 20자, GitHub 토큰은 `ghp_`로 시작 등)으로 찾고, ② 형식이 없는 값은 `password:`, `secret-key:` 같은 **이름 옆의 무작위해 보이는 문자열**(엔트로피가 높은 값)로 찾습니다. 그래서 가짜 값이 걸리기도 하고(오탐), 형식이 특이한 사내 비밀번호는 못 찾기도 합니다. 스캔은 **안전망**이고, 1차 방어는 7회차의 "비밀은 환경 변수·비밀 저장소에, 저장소에는 변수 이름만"입니다.
+
+**세 겹으로 막는다**
+
+```mermaid
+flowchart LR
+    A["① 내 PC<br/>gitleaks로 직접 스캔<br/>(커밋·푸시 전)"] --> B["② 푸시할 때<br/>GitHub Push protection<br/>비밀이 있으면 푸시 거부"]
+    B --> C["③ 저장소 전체<br/>GitHub Secret scanning<br/>이력까지 검사해 알림"]
+    C --> D["발견되면<br/>키 폐기·교체 → 이력 정리"]
 ```
 
-- GitHub 저장소 Settings의 **Secret scanning / Push protection**도 켜 둡니다 (저장소 종류·요금제에 따라 제공 범위가 다름)
-- 발견되면: **키를 먼저 폐기·교체**하고, 그다음 이력 정리. 이력에서 지워도 이미 유출된 키는 안전하지 않습니다
+| 단계 | 도구 | 언제 | 비용·조건 |
+|---|---|---|---|
+| ① 내 PC | **gitleaks** (오픈소스) | 내가 실행할 때, 또는 CI에서 | 무료, 어떤 저장소든 |
+| ② 푸시할 때 | GitHub **Push protection** | `git push` 하는 순간 | 저장소 종류에 따라 다름 (3-3) |
+| ③ 저장소 전체 | GitHub **Secret scanning** | 켜는 순간 이력 전체, 이후 새 커밋마다 | 저장소 종류에 따라 다름 (3-3) |
+
+### 3-2. gitleaks로 직접 스캔하기 (어떤 저장소든 됨)
+
+**설치** (gitleaks 공식 README의 방식)
+
+| PC | 방법 |
+|---|---|
+| macOS | `brew install gitleaks` |
+| Windows | GitHub `gitleaks/gitleaks` 저장소 **Releases**에서 `gitleaks_…_windows_x64.zip`을 받아 풀고 `gitleaks.exe` 폴더를 PATH에 (회사 보안 정책에 따라 IT 확인) |
+| Docker | `docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:latest git /repo` |
+| Go가 있으면 | `go install github.com/zricethezav/gitleaks/v8@latest` |
+
+**실행** (저장소 루트에서)
+
+```bash
+gitleaks git --redact .      # 커밋 이력 전체 검사 ← 기본으로 이것
+gitleaks dir --redact .      # 지금 있는 파일만 검사 (커밋하지 않은 파일 포함)
+# 예전 명령 gitleaks detect --source . --redact 도 아직 동작한다 (v8.19부터 git·dir로 나뉨)
+```
+
+- `--redact`: 찾은 값을 화면에 `REDACTED`로 가려서 출력합니다. **이 옵션 없이 실행한 결과를 Claude에게 붙여 넣지 않습니다** (비밀 값이 그대로 대화에 들어갑니다)
+- 종료 코드: 찾으면 **1**, 없으면 **0** → CI 단계에 그대로 넣으면 비밀이 있을 때 빌드가 실패합니다
+- 결과를 파일로: `--report-format json --report-path leaks.json` (이 파일은 커밋하지 않습니다)
+
+**실제로 해 보면** (이 교재 환경에서 만든 연습 저장소: AWS 키 모양의 가짜 값을 `application-dev.yml`에 커밋하고, 다음 커밋에서 지움)
+
+```text
+$ gitleaks dir --redact .
+INF no leaks found                          ← 지금 파일에는 없다
+
+$ gitleaks git --redact -v .
+Finding:     access-key: REDACTED
+RuleID:      generic-api-key
+File:        backend/src/main/resources/application-dev.yml
+Line:        3
+Commit:      e5aeb2d…                        ← 지운 커밋 이전의 커밋에 남아 있다
+Finding:     secret-key: REDACTED
+…
+INF 3 commits scanned.
+WRN leaks found: 2                          ← 종료 코드 1
+```
+
+**지금 파일을 지워도 이력에는 남는다**는 것을 눈으로 확인하는 것이 이 실습의 핵심입니다. 그래서 발견되면 **키를 먼저 폐기**합니다 (3-4).
+
+**오탐 다루기**: 테스트용 가짜 값이 걸리면 그 줄 끝에 `# gitleaks:allow` 주석을 달거나, 저장소 루트의 `.gitleaksignore`에 결과의 `Fingerprint` 값을 한 줄씩 적습니다. 무엇을 왜 예외로 했는지 PR에 남깁니다.
+
+### 3-3. GitHub에서 켜기: Secret Protection과 Push protection
+
+> 💡 **"Settings에 Secret scanning이 없다"면 정상일 수 있습니다.** 두 가지가 바뀌었습니다.
+> 1. **메뉴 이름**: 예전의 "Code security and analysis" 화면이 지금은 저장소 Settings 왼쪽 메뉴의 **"Security and quality"**(화면에 따라 "Security") 묶음 아래 **Advanced Security**입니다. Secret scanning과 Push protection은 그 안의 **Secret Protection** 항목에 들어 있습니다
+> 2. **쓸 수 있는 저장소**: 아래 표처럼 **개인 계정의 Private 저장소에서는 Secret scanning을 켤 수 없습니다** (메뉴 자체가 보이지 않거나 켤 수 없게 나옵니다). EduHub를 개인 계정에 Private으로 만들었다면 이 경우입니다
+
+| 저장소 | Secret scanning | Push protection (저장소 단위) |
+|---|---|---|
+| **Public** (개인·조직 모두) | ✅ 무료로 **자동** 실행 | ✅ 무료로 켤 수 있음 (기본은 꺼짐) |
+| **개인 계정의 Private** | ❌ 없음 | ❌ 없음 → 3-2의 gitleaks + 아래 "나를 위한 Push protection"(공개 저장소에만 적용)으로 |
+| **조직의 Private** (Team·Enterprise 요금제) | 유료 **GitHub Secret Protection**을 켜야 함 | 〃 |
+
+(GitHub 문서 "About secret scanning", "Enabling secret scanning for your repository", "Enabling push protection for your repository" 기준, 2026년 11월 확인)
+
+**저장소에서 켜는 순서** (Public 저장소, 또는 Secret Protection이 있는 조직 저장소)
+
+1. 저장소 첫 화면 → 탭 줄 오른쪽 **⚙ Settings**
+2. 왼쪽 메뉴 **"Security and quality"**(또는 "Security") 묶음 → **Advanced Security**
+3. **Secret Protection** 오른쪽 **Enable** → 영향 안내를 읽고 **Enable Secret Protection** (이것이 Secret scanning을 켭니다. Public 저장소는 이미 켜져 있을 수 있습니다)
+4. 같은 Secret Protection 영역에서 **Push protection** 오른쪽 **Enable**
+5. 결과 보기: 저장소 상단 **Security and quality**(또는 Security) 탭 → **Secret scanning** 알림 목록
+
+**개인 계정 설정: "나를 위한 Push protection"** (요금제와 상관없음, 기본으로 켜져 있음)
+
+1. 화면 오른쪽 위 프로필 사진 → **⚙ Settings** (저장소 Settings가 아니라 **내 계정** Settings)
+2. 왼쪽 "Security" 묶음 → **Code security**
+3. "User" 아래 **Push protection for yourself**가 켜져 있는지 확인
+
+이 설정은 **내가 공개 저장소에** 비밀을 푸시하는 것을 막아 줍니다. 비공개 저장소는 막지 않습니다.
+
+**Push protection이 막으면 이렇게 보입니다**
+
+```text
+$ git push
+remote: error: GH013: Repository rule violations found for refs/heads/fix/nfr-03-security.
+remote: - GITHUB PUSH PROTECTION
+remote:   ——————————————————————————————————————
+remote:     Resolve the following violations before pushing again
+remote:
+remote:     - Push cannot contain secrets
+remote:     …  (어느 커밋·파일·줄인지, 그리고 허용 요청 URL)
+```
+
+(메시지 형식은 GitHub 문서 "Push protection from the command line"의 설명을 따른 예이며, 줄 모양은 조금 다를 수 있습니다.)
+
+- **고치는 법**: 그 비밀이 들어간 커밋을 고칩니다 (아직 푸시 전이니 `git commit --amend` 또는 `git rebase -i`로 해당 줄 제거 → 다시 푸시). 마지막 커밋에서만 지우면 **이전 커밋에 남아 있어 계속 막힙니다**
+- **우회(bypass)**: 출력된 URL에서 이유를 고르면 푸시할 수 있습니다. "테스트용(It's used in tests)"·"오탐(It's a false positive)"은 닫힌 알림, "나중에 고침(I'll fix it later)"은 열린 알림이 남고, 관리자에게 메일이 갑니다. **진짜 키라면 우회하지 않습니다**
+
+### 3-4. 발견되면: 순서가 중요하다
+
+| 순서 | 할 일 | 이유 |
+|---|---|---|
+| 1 | **키를 폐기·교체** (AWS 콘솔, DB 비밀번호 변경, 토큰 삭제 후 재발급) | 이력에서 지우는 동안에도 이미 복사된 키는 쓸 수 있다. 폐기만이 확실하다 |
+| 2 | 새 키는 환경 변수·비밀 저장소로 (7회차 Step 6) | 같은 실수 반복 방지 |
+| 3 | 그 키로 무엇이 접근되었는지 확인 (클라우드·DB 접속 기록) | 이미 쓰였을 수 있다 |
+| 4 | (필요하면) 이력에서 지우기 (`git filter-repo` 등, 팀 합의 후) | 모든 사람이 다시 받아야 하는 큰 작업. 1을 했다면 급하지 않다 |
+| 5 | 사후 분석: 왜 들어갔나, 어느 단계에서 막을 수 있었나 | 6장 사후 분석과 같은 방식 |
+
+> ⚠️ Claude에게 "이 키 지워줘"라고 맡기면 **파일에서만** 지우고 끝날 수 있습니다. 폐기·교체는 사람이 해당 시스템에서 직접 하고, Claude에게는 "이 값을 쓰는 곳을 환경 변수로 바꿔줘"를 맡깁니다.
+
+**EduHub에서 할 일** (오늘 실습)
+
+1. `gitleaks git --redact .`로 저장소 이력 전체 검사 → 결과를 PR 본문에 "발견 0건" 또는 처리 내역으로
+2. 저장소가 Public이면 Secret Protection·Push protection 켜기, 개인 Private이면 내 계정의 "Push protection for yourself"만 확인
+3. (선택) CI에 gitleaks 단계 추가 (종료 코드 1이면 실패)
+
+> ✅ 이 교재 환경에서 gitleaks v8.28.0(공식 소스를 Go로 빌드)으로 위 연습 저장소를 검사해 `dir`은 0건(종료 코드 0), `git`은 지운 커밋 이전의 2건(종료 코드 1)이 나오는 것을 확인했습니다. 예전 명령 `detect --source .`도 같은 결과였습니다. 오탐 처리도 확인했습니다: `# gitleaks:allow` 주석을 단 줄은 제외(종료 코드 1 → 0), `.gitleaksignore`에 Fingerprint를 적으면 이력의 2건이 제외(1 → 0). ⚠️ GitHub 설정 화면은 이 환경에서 열어 보지 못했습니다. 메뉴 이름·순서·요금제 조건은 GitHub 공식 문서를 따랐고, 화면에 따라 조금 다를 수 있으니 수업 전에 강사 저장소에서 한 번 확인합니다.
 
 ## Step 4. PR 자동 보안 리뷰 붙이기
 
